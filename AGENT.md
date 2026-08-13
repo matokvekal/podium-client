@@ -25,6 +25,12 @@ npm run dev            # http://localhost:5173
 ```
 
 The server must be running, and its `CORS_ORIGINS` must include `http://localhost:5173`.
+`VITE_API_URL` must match the port the server actually logged on startup (`6500` in
+`podium-server/.env.example`) — a mismatch shows up as *"Could not reach the server"* on the
+login screen and nothing more specific.
+
+The login screen shows the app version from `package.json` (baked in by `vite.config.ts` as
+`__APP_VERSION__`, read via `config.appVersion`), so bump `version` there when it matters.
 
 ```bash
 npm run typecheck
@@ -76,6 +82,23 @@ public/
   eagerly took Commissaire's bundle from 65 kB to 559 kB.
 - **Display mode is presentation only** — never data, permissions or lifecycle.
 - Names describe the domain: `EventListPage`, `LiveMapPanel`, `RouteBrowser`. Not `utilX`.
+
+## ⚠ Temporary code that must be deleted before production
+
+The login screen has a **Developer sign-in** block that bypasses authentication and signs in
+as a fake user via `POST /auth/dev-login`. It renders only when two independent switches
+agree: `config.devLoginEnabled` (`import.meta.env.DEV`, so it is compiled out of any
+production build) and the server reporting `devLogin: true` from `/auth/config`.
+
+Client-side pieces, all commented `TEMPORARY DEVELOPMENT AID — DELETE BEFORE PRODUCTION`:
+
+- `src/pages/LoginPage.tsx` — the developer sign-in block, `devSignIn`, `serverDevLogin`
+- `src/auth/AuthContext.tsx` — `signInAsDevUser`
+- `src/lib/config.ts` — `devLoginEnabled`
+
+The server half and the combined removal checklist are in
+[../podium-server/README.md](../podium-server/README.md#-developer-sign-in--temporary-delete-before-production).
+Delete both halves together, and do not build anything on top of it.
 
 ## Things that are deliberately not here
 

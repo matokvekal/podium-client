@@ -1,0 +1,115 @@
+/*
+ * Design tokens.
+ *
+ * Two visual styles, set with data-display-mode on <html>:
+ *   standard     calm and minimal — the default, for rides
+ *   competition  denser, stronger status emphasis — for races and timed events
+ *
+ * They are PRESENTATION ONLY. A display mode never changes data, permissions or
+ * lifecycle — only spacing, weight and how loudly status is shown. If a mode ever needs
+ * to change behaviour, the behaviour belongs somewhere else.
+ *
+ * Colour follows the device's light/dark preference. Every colour is defined here; no
+ * component hardcodes a hex value.
+ */
+
+:root {
+  /* --- palette: light --- */
+  --surface: #ffffff;
+  --surface-raised: #f8fafc;
+  --surface-sunken: #eef2f7;
+  --border: #dbe2ea;
+  --border-strong: #b9c4d1;
+
+  --text: #0f172a;
+  --text-muted: #5a6b80;
+  --text-inverse: #ffffff;
+
+  --accent: #0369a1;
+  --accent-text: #ffffff;
+  --accent-soft: #e0f2fe;
+
+  /* status — used by rider markers, participant rows and event badges */
+  --status-live: #15803d;
+  --status-pending: #b45309;
+  --status-stale: #64748b;
+  --status-danger: #b91c1c; /* SOS */
+  --status-finished: #4338ca;
+
+  /* --- type --- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-bold: 650;
+
+  /* --- space and shape --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --row-gap: var(--space-3);
+  --card-padding: var(--space-4);
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 6px 20px rgb(15 23 42 / 0.12);
+
+  /* Anything a thumb must hit while riding. Never go below this. */
+  --tap-target: 44px;
+
+  /* --- layout --- */
+  --shell-max-width: 1400px;
+  --map-height-mobile: 55vh;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0f172a;
+    --surface-raised: #16213a;
+    --surface-sunken: #0a1120;
+    --border: #26334d;
+    --border-strong: #3a4a6b;
+
+    --text: #e8eefb;
+    --text-muted: #9aa9c0;
+    --text-inverse: #0f172a;
+
+    --accent: #38bdf8;
+    --accent-text: #06263a;
+    --accent-soft: #0d2f45;
+
+    --status-live: #4ade80;
+    --status-pending: #fbbf24;
+    --status-stale: #7c8aa3;
+    --status-danger: #f87171;
+    --status-finished: #a5b4fc;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 6px 20px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* Competition: tighter rows, heavier type, louder status. Same data, read faster. */
+:root[data-display-mode="competition"] {
+  --row-gap: var(--space-2);
+  --card-padding: var(--space-3);
+  --weight-medium: 600;
+  --weight-bold: 750;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}

@@ -1,0 +1,244 @@
+/* Global styles and the app shell layout. Component-specific rules live next to their
+ * component; only shared structure belongs here. */
+
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--surface-sunken);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-3);
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+}
+h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- app shell ------------------------------------------------------------ */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-bold);
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-header__spacer {
+  flex: 1;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--shell-max-width);
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+/* Bottom bar on phones; a side rail once there is room for the map to grow. */
+.app-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.app-nav__link {
+  flex: 1;
+  min-height: var(--tap-target);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.app-nav__link[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: var(--weight-medium);
+}
+
+.card {
+  padding: var(--card-padding);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--row-gap);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.button {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-medium);
+  color: var(--accent-text);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.button--quiet {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--border-strong);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.banner {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.banner--offline {
+  border-color: var(--status-pending);
+  color: var(--status-pending);
+}
+
+.banner--error {
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+}
+
+/* --- tablet and desktop ---------------------------------------------------
+ * The map is the main object on the live screen and the route browser, so it gets
+ * noticeably bigger here and the list sits BESIDE it rather than underneath. */
+
+@media (min-width: 768px) {
+  .app-shell {
+    flex-direction: row;
+  }
+
+  .app-nav {
+    position: static;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 13rem;
+    padding: var(--space-3);
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+
+  .app-nav__link {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    padding: 0 var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .app-shell__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .app-main {
+    padding: var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,8 +1,16 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+// package.json is the single source of truth for the version. Baking it in at build time
+// keeps `version` in one place — nothing has to be kept in step by hand, and the running app
+// can always say which build it is. Imported rather than read with node:fs so the config
+// still typechecks without @types/node.
+import pkg from "./package.json";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   server: {
     port: 5173,
   },

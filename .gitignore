@@ -32,7 +32,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+# `.env` itself was NOT ignored here — only `.env.local` and `.env*.local` were — so a
+# local `.env` would have been committed. `.env.example` stays tracked as the template.
+.env
 .env*.local
+!.env.example
 
 # vercel
 .vercel

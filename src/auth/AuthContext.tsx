@@ -43,6 +43,8 @@ interface AuthContextValue {
   requiresProfile: boolean;
   signInWithGoogle(idToken: string): Promise<void>;
   verifySmsCode(challengeId: number, code: string): Promise<void>;
+  /** ⚠ TEMPORARY developer shortcut — delete before production. See README.md. */
+  signInAsDevUser(role: Profile["role"]): Promise<void>;
   updateProfile(input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>): Promise<void>;
   signOut(): Promise<void>;
 }
@@ -111,6 +113,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completeSignIn],
   );
 
+  // ⚠⚠ TEMPORARY DEVELOPMENT AID — DELETE BEFORE PRODUCTION (see README.md).
+  // Nothing special happens here: the server hands back the same real token pair as any
+  // other sign-in, so the session that follows is indistinguishable from a genuine one.
+  const signInAsDevUser = useCallback(
+    async (role: Profile["role"]) => {
+      const auth = await apiRequest<AuthResponse>("/auth/dev-login", {
+        method: "POST",
+        body: { role, key: "default" },
+        anonymous: true,
+      });
+      await completeSignIn(auth);
+    },
+    [completeSignIn],
+  );
+
   const updateProfile = useCallback(
     async (input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>) => {
       const updated = await apiRequest<Profile>("/users/me", { method: "PATCH", body: input });
@@ -136,10 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requiresProfile: profile?.requiresProfile ?? false,
       signInWithGoogle,
       verifySmsCode,
+      signInAsDevUser,
       updateProfile,
       signOut,
     }),
-    [status, profile, signInWithGoogle, verifySmsCode, updateProfile, signOut],
+    [status, profile, signInWithGoogle, verifySmsCode, signInAsDevUser, updateProfile, signOut],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

@@ -14,3 +14,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** App version, baked in from package.json at build time by vite.config.ts. */
+declare const __APP_VERSION__: string;

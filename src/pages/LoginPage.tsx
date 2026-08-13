@@ -9,6 +9,12 @@
  *
  * Only the methods /auth/config returns are shown. Google and SMS both answer the same
  * question — who is this person — and both end with the server issuing its own tokens.
+ *
+ * Also shows the app version (lib/config.ts, from package.json) so a screenshot is enough
+ * to tell which build someone is on.
+ *
+ * ⚠ Contains a TEMPORARY developer sign-in that bypasses authentication in development
+ * builds — POST /auth/dev-login. DELETE IT BEFORE PRODUCTION: see README.md.
  */
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -16,25 +22,37 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { renderGoogleButton } from "../auth/google-signin";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { config } from "../lib/config";
 
 type Provider = "GOOGLE" | "SMS" | "EMAIL";
 
+interface AuthConfig {
+  providers: Provider[];
+  /** ⚠ TEMPORARY: server offers the developer sign-in shortcut. Delete before production. */
+  devLogin?: boolean;
+}
+
 export function LoginPage() {
-  const { status, signInWithGoogle, verifySmsCode } = useAuth();
+  const { status, signInWithGoogle, verifySmsCode, signInAsDevUser } = useAuth();
   const location = useLocation();
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // ⚠ TEMPORARY — delete with the rest of the dev sign-in (see README.md).
+  const [serverDevLogin, setServerDevLogin] = useState(false);
 
   const [phone, setPhone] = useState("");
   const [challengeId, setChallengeId] = useState<number | null>(null);
   const [code, setCode] = useState("");
 
   useEffect(() => {
-    apiRequest<{ providers: Provider[] }>("/auth/config", { anonymous: true })
-      .then((config) => setProviders(config.providers))
+    apiRequest<AuthConfig>("/auth/config", { anonymous: true })
+      .then((authConfig) => {
+        setProviders(authConfig.providers);
+        setServerDevLogin(authConfig.devLogin === true);
+      })
       .catch(() => setError("Could not reach the server. Check your connection and try again."));
   }, []);
 
@@ -68,6 +86,19 @@ export function LoginPage() {
         anonymous: true,
       });
       setChallengeId(result.challengeId);
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ⚠⚠ TEMPORARY DEVELOPMENT AID — DELETE BEFORE PRODUCTION (see README.md).
+  async function devSignIn(role: "COMMISSAIRE" | "RIDER") {
+    setBusy(true);
+    setError(null);
+    try {
+      await signInAsDevUser(role);
     } catch (err) {
       setError(messageFor(err));
     } finally {
@@ -167,6 +198,45 @@ export function LoginPage() {
       )}
 
       {providers.length === 0 && !error && <p className="muted">Loading sign-in options…</p>}
+
+      {/*
+        ⚠⚠⚠ TEMPORARY DEVELOPMENT AID — DELETE THIS BLOCK BEFORE PRODUCTION ⚠⚠⚠
+        Skips authentication entirely and signs in as a fake user. Two independent switches
+        have to agree before it renders: config.devLoginEnabled is false in any production
+        build (so this is compiled out, not merely hidden), and the server must report
+        devLogin: true from /auth/config. Removal checklist: README.md > Developer sign-in.
+      */}
+      {config.devLoginEnabled && serverDevLogin && (
+        <section
+          className="card stack"
+          style={{ borderColor: "#b45309", borderStyle: "dashed", borderWidth: 2 }}
+        >
+          <h2 style={{ color: "#b45309" }}>⚠ Developer sign-in</h2>
+          <p className="muted">
+            Bypasses login with a fake account. Development builds only — never reaches production.
+          </p>
+          <button
+            className="button"
+            type="button"
+            disabled={busy}
+            onClick={() => devSignIn("COMMISSAIRE")}
+          >
+            Sign in as dev commissaire
+          </button>
+          <button
+            className="button button--quiet"
+            type="button"
+            disabled={busy}
+            onClick={() => devSignIn("RIDER")}
+          >
+            Sign in as dev rider
+          </button>
+        </section>
+      )}
+
+      <p className="muted" style={{ textAlign: "center", fontSize: "0.8rem" }}>
+        Version {config.appVersion}
+      </p>
     </main>
   );
 }

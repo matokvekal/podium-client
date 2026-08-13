@@ -41,6 +41,23 @@ export const config = {
   /** Google OAuth client id for sign-in. The server verifies the token against its own list. */
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "",
 
+  /**
+   * App version, from package.json via vite.config.ts. Shown on the login screen so a
+   * screenshot from a rider is enough to tell which build they are on.
+   */
+  appVersion: __APP_VERSION__,
+
+  /**
+   * ⚠ TEMPORARY: whether to offer the developer sign-in shortcut on the login screen.
+   *
+   * `import.meta.env.DEV` is false in every production build, so this is compiled out by
+   * dead-code elimination rather than merely hidden. The server has the final say — it also
+   * has to report `devLogin: true` from /auth/config, and its endpoint 404s otherwise.
+   *
+   * Delete this along with the server route before production — see README.md.
+   */
+  devLoginEnabled: import.meta.env.DEV,
+
   /** How often the live map asks for new positions. 10–15 s: riders move, batteries don't. */
   livePollIntervalMs: 12_000,
 

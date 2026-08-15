@@ -13,8 +13,15 @@ import {
   useMemo,
   useState,
 } from "react";
-import { apiRequest, SESSION_EXPIRED_EVENT } from "../lib/api-client";
-import { clearTokens, hasSession, saveTokens } from "../lib/auth-storage";
+import { ApiError, apiRequest, SESSION_EXPIRED_EVENT } from "../lib/api-client";
+import {
+  clearProfile,
+  clearTokens,
+  getProfile,
+  hasSession,
+  saveProfile,
+  saveTokens,
+} from "../lib/auth-storage";
 import { forgetGoogleSession } from "./google-signin";
 
 export interface Profile {
@@ -45,6 +52,10 @@ interface AuthContextValue {
   verifySmsCode(challengeId: number, code: string): Promise<void>;
   /** ⚠ TEMPORARY developer shortcut — delete before production. See README.md. */
   signInAsDevUser(role: Profile["role"]): Promise<void>;
+  /** ⚠ TEMPORARY, CLIENT-ONLY developer shortcut — delete before production. See README.md.
+   * Unlike signInAsDevUser, never touches the network — for testing sign-in-gated screens
+   * with the server down. */
+  signInAsLocalDevUser(): void;
   updateProfile(input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>): Promise<void>;
   signOut(): Promise<void>;
 }
@@ -52,28 +63,48 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>(() => (hasSession() ? "loading" : "signed-out"));
-  const [profile, setProfile] = useState<Profile | null>(null);
+  // A cached profile lets a cold start with no network still show who is signed in, instead
+  // of forcing a re-login the instant the server is unreachable — see the cold-start effect
+  // below, and plan/05-auth-jwt.md's "never clear the session on a network error" rule.
+  const [profile, setProfile] = useState<Profile | null>(() => getProfile<Profile>());
+  const [status, setStatus] = useState<AuthStatus>(() => {
+    if (!hasSession()) return "signed-out";
+    return getProfile<Profile>() ? "signed-in" : "loading";
+  });
 
   const loadProfile = useCallback(async () => {
     const me = await apiRequest<Profile>("/users/me");
+    saveProfile(me);
     setProfile(me);
     setStatus("signed-in");
   }, []);
 
-  // Cold start with a stored session: find out who this is before rendering anything else.
+  // Cold start with a stored session: refresh who this is. A cached profile is already
+  // showing (see the initializers above), so this only needs to upgrade or correct that —
+  // never wipe the session because the server happened to be unreachable.
   useEffect(() => {
     if (!hasSession()) return;
-    loadProfile().catch(() => {
-      clearTokens();
-      setProfile(null);
-      setStatus("signed-out");
+    loadProfile().catch((err: unknown) => {
+      const sessionRejected = err instanceof ApiError && !err.isOffline && err.status === 401;
+      if (sessionRejected) {
+        clearTokens();
+        clearProfile();
+        setProfile(null);
+        setStatus("signed-out");
+      } else if (!getProfile<Profile>()) {
+        // Nothing cached to fall back to and the server didn't actually reject us — keep the
+        // tokens (a reconnect can still recover this session) but there is no profile to show.
+        setStatus("signed-out");
+      }
+      // Otherwise: a cached profile is already on screen and the session is untouched. The
+      // offline banner in AppShell explains why data may be stale.
     });
   }, [loadProfile]);
 
   // The API client fires this when a refresh is refused — the session is gone for good.
   useEffect(() => {
     function onExpired() {
+      clearProfile();
       setProfile(null);
       setStatus("signed-out");
     }
@@ -128,9 +159,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completeSignIn],
   );
 
+  // ⚠⚠ TEMPORARY, CLIENT-ONLY DEVELOPMENT AID — DELETE BEFORE PRODUCTION, alongside
+  // signInAsDevUser (see README.md). Fakes a signed-in session entirely on this device: no
+  // request goes out, so this works with the server down, unlike every other sign-in path
+  // here. The fake token pair still satisfies hasSession() on the next cold start, so the
+  // cold-start effect above will try /users/me — and safely no-op on its failure (a network
+  // error, not a 401), leaving this profile on screen exactly like any other offline reload.
+  const signInAsLocalDevUser = useCallback(() => {
+    const fakeProfile: Profile = {
+      id: -1,
+      role: "RIDER",
+      firstName: "Dev",
+      lastName: "Rider",
+      nickname: "You",
+      emergencyPhone: null,
+      requiresProfile: false,
+    };
+    saveTokens({ accessToken: "local-dev-fake", refreshToken: "local-dev-fake" });
+    saveProfile(fakeProfile);
+    setProfile(fakeProfile);
+    setStatus("signed-in");
+  }, []);
+
   const updateProfile = useCallback(
     async (input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>) => {
       const updated = await apiRequest<Profile>("/users/me", { method: "PATCH", body: input });
+      saveProfile(updated);
       setProfile(updated);
     },
     [],
@@ -141,6 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // with no signal still gets signed out locally.
     await apiRequest("/auth/logout", { method: "POST" }).catch(() => undefined);
     clearTokens();
+    clearProfile();
     forgetGoogleSession();
     setProfile(null);
     setStatus("signed-out");
@@ -154,10 +209,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       verifySmsCode,
       signInAsDevUser,
+      signInAsLocalDevUser,
       updateProfile,
       signOut,
     }),
-    [status, profile, signInWithGoogle, verifySmsCode, signInAsDevUser, updateProfile, signOut],
+    [
+      status,
+      profile,
+      signInWithGoogle,
+      verifySmsCode,
+      signInAsDevUser,
+      signInAsLocalDevUser,
+      updateProfile,
+      signOut,
+    ],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

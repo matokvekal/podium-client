@@ -1,0 +1,171 @@
+/* Same bottom-sheet pattern as TracksPage.module.css's .sheet/.sheetOverlay — see that file
+   for the z-index reasoning. */
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.sheetBody {
+  padding: var(--space-4);
+  gap: 10px;
+}
+
+.sourceToggle {
+  display: flex;
+  gap: 8px;
+}
+
+.search {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Fixed size, scrolls internally — does not grow with the number of events. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.row:hover {
+  background: var(--surface-raised);
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rowName {
+  font-size: 0.92rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.rowMeta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.mapBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mapBtn:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+/* Route preview — a smaller centered card, not a full sheet, layered above the picker sheet
+   (same z-index scale as .sheet/.sheetOverlay, one step higher so it wins). */
+.previewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.previewCard {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1003;
+  width: min(92vw, 420px);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.previewFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}

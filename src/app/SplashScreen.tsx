@@ -1,0 +1,96 @@
+/**
+ * Splash screen
+ *
+ * Shown once per cold start, for one second, layered over the real app while it mounts
+ * underneath — it does not delay anything; routing and auth are already loading in
+ * parallel behind it.
+ *
+ * Purely presentational: a dark, glowing road route — straight streets meeting at angled
+ * junctions, like a real map, not a smooth circle — with a scatter of small rider dots, one
+ * of them blinking red like a radar ping. It is a wordless pitch for what this app is for —
+ * a group riding together, watched over, with trouble visible the instant it happens. The
+ * red-and-blinking language for "needs help" is the same one the real SOS marker on the live
+ * map uses (see AGENT.md); reused here on purpose, not a coincidence.
+ */
+
+import { useEffect, useState } from "react";
+import "./splash-screen.css";
+
+const VISIBLE_MS = 1000;
+const FADE_MS = 300;
+
+// Riders bunch up on a real ride — a few small groups strung out along the route, not one
+// rider every few metres. Three clusters near the road route (the SVG path below), 2-3
+// riders each. The one in trouble rides alone, apart from any group — that separation is
+// part of how it reads as "found": everyone else is together, this one isn't.
+const RIDERS: { id: string; x: number; y: number; sos?: boolean }[] = [
+  // Lead group, along the top straight
+  { id: "r1", x: 58, y: 9 },
+  { id: "r2", x: 65, y: 8 },
+  { id: "r3", x: 61, y: 12 },
+
+  // Chase pair, the right-hand straight
+  { id: "r4", x: 89, y: 36 },
+  { id: "r5", x: 91, y: 43 },
+
+  // Group at the back, lower left straight
+  { id: "r6", x: 19, y: 74 },
+  { id: "r7", x: 24, y: 79 },
+  { id: "r8", x: 15, y: 68 },
+
+  // Off on their own, lower right — the one that needs help
+  { id: "r9", x: 77, y: 68, sos: true },
+];
+
+export function SplashScreen() {
+  const [phase, setPhase] = useState<"visible" | "fading" | "done">("visible");
+
+  useEffect(() => {
+    const toFade = setTimeout(() => setPhase("fading"), VISIBLE_MS);
+    const toDone = setTimeout(() => setPhase("done"), VISIBLE_MS + FADE_MS);
+    return () => {
+      clearTimeout(toFade);
+      clearTimeout(toDone);
+    };
+  }, []);
+
+  if (phase === "done") return null;
+
+  return (
+    <div className={phase === "fading" ? "splash splash--fading" : "splash"} aria-hidden="true">
+      <div className="splash__glow" />
+      <div className="splash__grid" />
+
+      <div className="splash__stage">
+        {/* A road route, not a circle: straight segments meeting at angled junctions, plus
+            three short spur roads branching off — reads as a real street map, not a loop
+            drawn with a compass. */}
+        <svg className="splash__track" viewBox="0 0 100 100" aria-hidden="true">
+          <path
+            className="splash__track-glow"
+            d="M50,12 L78,8 L94,30 L90,54 L74,58 L78,82 L52,96 L26,88 L8,64 L14,38 L30,14 Z
+               M78,8 L93,3 M8,64 L-5,58 M52,96 L57,101"
+          />
+          <path
+            className="splash__track-line"
+            d="M50,12 L78,8 L94,30 L90,54 L74,58 L78,82 L52,96 L26,88 L8,64 L14,38 L30,14 Z
+               M78,8 L93,3 M8,64 L-5,58 M52,96 L57,101"
+          />
+        </svg>
+
+        {RIDERS.map((rider, index) => (
+          <span
+            key={rider.id}
+            className={rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"}
+            style={{ left: `${rider.x}%`, top: `${rider.y}%`, animationDelay: `${index * 0.2}s` }}
+          />
+        ))}
+
+        <div className="splash__mark">
+          <span className="splash__mark-name">El Niño Move</span>
+          <span className="splash__mark-tag">Every rider, watched over.</span>
+        </div>
+      </div>
+    </div>
+  );
+}

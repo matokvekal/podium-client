@@ -1,0 +1,134 @@
+.search {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Fixed size, scrolls internally — does not grow with participant count. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 420px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.checkBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.checkBtnActive {
+  background: var(--status-live);
+  border-color: var(--status-live);
+  color: #fff;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.92rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bib {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: var(--weight-normal);
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.iconBtn:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.approveRow {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.statusBadge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 999px;
+  text-transform: capitalize;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.statusBadge[data-status="approved"] {
+  cursor: pointer;
+}
+
+.statusBadge[data-status="approved"] {
+  background: rgb(62 221 164 / 0.15);
+  color: var(--status-live);
+}
+
+.statusBadge[data-status="rejected"] {
+  background: rgb(224 74 122 / 0.15);
+  color: #e04a7a;
+}

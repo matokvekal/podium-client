@@ -1,0 +1,139 @@
+/* Ported directly from Figma (Tomer-Design / new-commissaire, "All Races" > Card/N — CSS
+ * export pasted 2026-08-14), not re-derived from the old race-pwa code. Card is 104px tall:
+ * a 90x94 image on the left, then title+status tag, then two icon+text meta rows.
+ *
+ * The three status colours are literal — they're a fixed part of this design system, not
+ * meant to shift with light/dark, so unlike the rest of the app they're not sourced from
+ * tokens.css. Text/icon colour on the card body does still use --text/--text-muted so the
+ * card itself still adapts to dark mode.
+ */
+
+.card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 13px;
+  width: 100%;
+  min-height: 104px;
+  padding: 5px;
+  background: var(--surface);
+  box-shadow: 0 0 12px rgba(41, 48, 66, 0.08);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 120ms ease;
+}
+
+.card:active {
+  transform: scale(0.99);
+}
+
+.image {
+  flex-shrink: 0;
+  width: 90px;
+  height: 94px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Abel", var(--font-sans);
+  font-size: 28px;
+  color: #fff;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  font-family: "Abel", var(--font-sans);
+  font-size: 16px;
+  line-height: 20px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: "Abel", var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+.tag[data-status="upcoming"] {
+  background: rgba(62, 221, 164, 0.17);
+  color: #3edda4;
+}
+.tag[data-status="live"] {
+  background: rgba(99, 166, 252, 0.17);
+  color: #63a6fc;
+  animation: live-tag-pulse 1.6s ease-in-out infinite;
+}
+.tag[data-status="finished"] {
+  background: rgba(41, 48, 66, 0.17);
+  color: #293042;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #63a6fc;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes live-tag-pulse {
+  0%,
+  100% {
+    background: rgba(99, 166, 252, 0.17);
+  }
+  50% {
+    background: rgba(99, 166, 252, 0.32);
+  }
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Abel", var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--text);
+  flex-shrink: 0;
+}

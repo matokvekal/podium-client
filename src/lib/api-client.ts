@@ -10,8 +10,8 @@
 // The server sends UTC in every timestamp. Converting to the viewer's local time is a
 // display concern and happens in lib/time.ts, never here.
 
-import { config } from "./config";
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "./auth-storage";
+import { config } from "./config";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -177,6 +177,8 @@ export async function apiMutate<T>(
 
   const body = (await response.json()) as ApiEnvelope<T> | T;
   const result =
-    body && typeof body === "object" && "data" in body ? ((body as ApiEnvelope<T>).data as T) : (body as T);
+    body && typeof body === "object" && "data" in body
+      ? ((body as ApiEnvelope<T>).data as T)
+      : (body as T);
   return { result, alreadyApplied: false };
 }

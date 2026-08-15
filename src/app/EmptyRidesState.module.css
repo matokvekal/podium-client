@@ -1,0 +1,105 @@
+/* Ported from race-pwa's EmptyRaces.module.css. */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  text-align: center;
+}
+
+.iconCircle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--accent-soft), rgba(62, 221, 164, 0.16));
+  border: 1px solid rgba(99, 166, 252, 0.2);
+  box-shadow: 0 10px 22px rgba(99, 166, 252, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.icon {
+  width: 44px;
+  height: 44px;
+  color: var(--accent-strong);
+  opacity: 0.8;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 260px;
+  margin-bottom: 36px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.btnPrimary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  background: linear-gradient(140deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  border: 1px solid rgba(73, 127, 210, 0.34);
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+  box-shadow:
+    0 12px 20px rgba(99, 166, 252, 0.26),
+    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+}
+
+.btnPrimary:active {
+  transform: translateY(1px);
+}
+
+.btnSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  background: linear-gradient(180deg, var(--surface), var(--accent-soft));
+  color: var(--text-muted);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+  box-shadow: 0 8px 16px rgba(99, 166, 252, 0.12);
+}
+
+.btnSecondary:active {
+  transform: translateY(1px);
+}

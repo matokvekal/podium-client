@@ -1,0 +1,240 @@
+/* No overflow-x here on purpose: setting it forces overflow-y to "auto" too (CSS can't have
+   one axis scrollable and the other visible), which clips .dropdownPanel to this row's own
+   thin height no matter its z-index — that was the real reason the country/surface dropdowns
+   looked like they opened "behind" everything. The trigger buttons are icon-only now (flag /
+   activity icon, no label text) so both groups fit on one row without it. */
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.topRow > .dropdownGroup:first-child {
+  flex-shrink: 0;
+}
+
+.dropdownGroup {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dropdownGroup > button,
+.topRow > button {
+  white-space: nowrap;
+}
+
+.dropdownWrap {
+  position: relative;
+}
+
+/* Icon-only now (flag / activity icon + chevron, no label text) — narrower than the default
+   .button padding since there's no text to clear. */
+.dropdownTrigger {
+  padding: 0 8px;
+  font-size: 0.85rem;
+}
+
+.dropdownPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  /* Same reasoning as .sheetOverlay/.sheet below: well above Leaflet's own pane range
+     (tile 200, overlay 400, marker 600, tooltip 650, popup 700) so it never renders under
+     the map. */
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dropdownOption:hover {
+  background: var(--surface-raised);
+}
+
+.layersPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.layerToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+/* Bottom-sheet filter modal — mirrors global.css's .drawer-overlay/.drawer pattern, but
+   slides up from the bottom instead of in from the side.
+   z-index is deliberately way above Leaflet's own pane range (tile 200, overlay 400,
+   shadow 500, marker 600, tooltip 650, popup 700 — see TrackMap.tsx). The map container only
+   sets position: relative, not its own z-index, so it never isolates those panes into their
+   own stacking context — they compare directly against this page's z-index numbers, and a
+   marker/tooltip/popup pane can otherwise render on top of a "lower" modal like this one. */
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.sheetBody {
+  padding: var(--space-4);
+  gap: 14px;
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-raised));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 14px rgba(17, 66, 133, 0.08);
+}
+
+.searchIcon {
+  width: 17px;
+  height: 17px;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.search::placeholder {
+  color: var(--text-muted);
+}
+
+.rangeRow {
+  display: flex;
+  gap: 12px;
+}
+
+.rangeField {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.rangeField input {
+  width: 100%;
+}
+
+/* Day-of-week picker — one row, no wrap. Compact so all 8 (Any + 7 days) fit without
+   crowding on a phone-width screen; horizontal scroll is the fallback on anything narrower. */
+.dayRow {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.dayBtn {
+  flex-shrink: 0;
+  min-width: 40px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-top-width: 3px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dayBtnActive {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+  border-top-width: 3px;
+}
+
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.cardSlide {
+  animation: cardSlideIn 180ms ease-out;
+}

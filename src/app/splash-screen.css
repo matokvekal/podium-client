@@ -1,0 +1,207 @@
+/* SplashScreen. Fixed dark palette on purpose — this is a brand moment, not a themed
+ * screen, so it does not follow prefers-color-scheme the way the rest of the app does. */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #050b16;
+  opacity: 1;
+  transition: opacity 500ms ease;
+}
+
+.splash--fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash__glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 50% 45%, rgb(56 189 248 / 0.35), rgb(15 23 42 / 0) 60%);
+  filter: blur(40px);
+  animation: splash-breathe 5s ease-in-out infinite alternate;
+}
+
+.splash__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px);
+  mask-image: radial-gradient(circle at 50% 45%, black 0%, transparent 70%);
+}
+
+.splash__stage {
+  position: relative;
+  width: min(78vw, 320px);
+  aspect-ratio: 1 / 1;
+}
+
+.splash__track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.splash__track-glow,
+.splash__track-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.splash__track-glow {
+  stroke: #38bdf8;
+  stroke-width: 3.5;
+  opacity: 0.55;
+  filter: blur(3px);
+}
+
+.splash__track-line {
+  stroke: #7dd3fc;
+  stroke-width: 0.8;
+  stroke-dasharray: 2.2 2.6;
+  opacity: 0.9;
+}
+
+/* Riders: literally 3x3 px squares, in real pixels — not SVG units — so they read as small
+ * marks on a map at any screen size. Square on purpose, to read as distinct from the round
+ * SOS marker below rather than just "a dimmer red dot". */
+.splash__dot {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 1px;
+  background: #fb923c;
+  box-shadow: 0 0 4px rgb(251 146 60 / 0.9);
+  transform: translate(-50%, -50%);
+  animation: splash-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__dot {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
+/* The SOS rider: same red-and-blinking language as the real live-map marker (see AGENT.md
+ * > "SOS v1: red blinking marker only"). A small radar ping on top makes it read as "found",
+ * not just "different colour". */
+.splash__dot--sos {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 6px rgb(248 113 113 / 0.95);
+  animation: splash-blink 1.1s steps(1, end) infinite;
+}
+
+.splash__dot--sos::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border: 1px solid #f87171;
+  border-radius: 50%;
+  animation: splash-radar 1.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__dot--sos {
+    animation: none;
+    opacity: 1;
+  }
+  .splash__dot--sos::after {
+    display: none;
+  }
+}
+
+.splash__mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  animation: splash-mark-in 900ms ease-out 300ms both;
+}
+
+.splash__mark-name {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #eaf6ff;
+  letter-spacing: 0.01em;
+}
+
+.splash__mark-tag {
+  font-size: 0.8rem;
+  color: #93c5fd;
+}
+
+@keyframes splash-breathe {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes splash-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes splash-radar {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(6);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-mark-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

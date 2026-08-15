@@ -13,8 +13,10 @@
  * Also shows the app version (lib/config.ts, from package.json) so a screenshot is enough
  * to tell which build someone is on.
  *
- * ⚠ Contains a TEMPORARY developer sign-in that bypasses authentication in development
- * builds — POST /auth/dev-login. DELETE IT BEFORE PRODUCTION: see README.md.
+ * ⚠ Contains two TEMPORARY developer sign-ins that bypass authentication in development
+ * builds — DELETE BEFORE PRODUCTION, see README.md:
+ *   - server-backed: POST /auth/dev-login (needs the server running)
+ *   - client-only: signInAsLocalDevUser (no network — works with the server down)
  */
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -33,7 +35,8 @@ interface AuthConfig {
 }
 
 export function LoginPage() {
-  const { status, signInWithGoogle, verifySmsCode, signInAsDevUser } = useAuth();
+  const { status, signInWithGoogle, verifySmsCode, signInAsDevUser, signInAsLocalDevUser } =
+    useAuth();
   const location = useLocation();
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +67,11 @@ export function LoginPage() {
    * To get the real providers back, set DEV_LOGIN_ENABLED=false in the server's .env.
    */
   const devSignInActive = config.devLoginEnabled && serverDevLogin;
+
+  // SMS sign-in is hidden for now — product decision, not a removal. The provider, the
+  // request/verify handlers and the form below are untouched; flip this back to
+  // `providers.includes("SMS")` to restore it.
+  const smsLoginVisible = false;
 
   useEffect(() => {
     // devSignInActive un-renders the container, so the ref check below also covers it.
@@ -132,7 +140,7 @@ export function LoginPage() {
 
   return (
     <main className="app-main stack" style={{ maxWidth: "26rem" }}>
-      <h1>Bike Podium</h1>
+      <h1>El Niño Move</h1>
       <p className="muted">
         Create a ride or a race, join with a code, and follow every rider live on the map.
       </p>
@@ -141,6 +149,29 @@ export function LoginPage() {
         <p className="banner banner--error" role="alert">
           {error}
         </p>
+      )}
+
+      {/*
+        ⚠⚠⚠ TEMPORARY, CLIENT-ONLY DEVELOPMENT AID — DELETE THIS BLOCK BEFORE PRODUCTION ⚠⚠⚠
+        Unlike the server-backed dev sign-in below, this never makes a network call — it works
+        even with the server down (unlike literally everything else on this page, including
+        the /auth/config check above). Gated only by config.devLoginEnabled, so it's compiled
+        out of every production build regardless of what any server reports.
+      */}
+      {config.devLoginEnabled && (
+        <section
+          className="card stack"
+          style={{ borderColor: "#3edda4", borderStyle: "dashed", borderWidth: 2 }}
+        >
+          <h2 style={{ color: "#3edda4" }}>⚠ Local dev sign-in (no server needed)</h2>
+          <p className="muted">
+            Signs you in entirely on this device — no request goes out. For testing sign-in-gated
+            screens (like adding a ride) while the server isn't running.
+          </p>
+          <button className="button" type="button" onClick={() => signInAsLocalDevUser()}>
+            Sign in as me (local only)
+          </button>
+        </section>
       )}
 
       {/*
@@ -186,7 +217,7 @@ export function LoginPage() {
         </section>
       )}
 
-      {providers.includes("SMS") && (
+      {smsLoginVisible && providers.includes("SMS") && (
         <section className="card stack">
           <h2>Continue with your phone</h2>
 

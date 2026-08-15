@@ -11,29 +11,38 @@
  *
  * Colour follows the device's light/dark preference. Every colour is defined here; no
  * component hardcodes a hex value.
+ *
+ * The light/dark palette, the Fibonacci spacing scale (--sp-*), the golden-ratio type
+ * scale (--fs-*) and the beat/stagger motion tokens are ported from the reference app
+ * (E:\DEV2026\commissaire\race-pwa\src\app\globals.css) rather than re-derived, so cards
+ * and layouts built against them come out actually matching, not approximately similar.
  */
 
 :root {
-  /* --- palette: light --- */
+  /* --- palette: light (ported from race-pwa's :root) --- */
   --surface: #ffffff;
-  --surface-raised: #f8fafc;
-  --surface-sunken: #eef2f7;
-  --border: #dbe2ea;
-  --border-strong: #b9c4d1;
+  --surface-raised: #f5f8ff;
+  --surface-sunken: #f5f8fc;
+  --border: #d9e7fb;
+  --border-strong: #bcd3f5;
 
-  --text: #0f172a;
-  --text-muted: #5a6b80;
+  --text: #14243c;
+  --text-muted: #7b95b8;
   --text-inverse: #ffffff;
 
-  --accent: #0369a1;
+  --accent: #63a6fc;
+  --accent-strong: #3f86e7;
   --accent-text: #ffffff;
-  --accent-soft: #e0f2fe;
+  --accent-soft: #edf4ff;
 
-  /* status — used by rider markers, participant rows and event badges */
-  --status-live: #15803d;
+  /* status — used by rider markers, participant rows and event badges. --status-live and
+     --status-danger are race-pwa's --ok/--ok-strong and --danger; --pending/--finished/
+     --stale are Podium's own, race-pwa has no equivalent for them. */
+  --status-live: #3edda4;
+  --status-live-strong: #2fcf95;
   --status-pending: #b45309;
   --status-stale: #64748b;
-  --status-danger: #b91c1c; /* SOS */
+  --status-danger: #df4b7b;
   --status-finished: #4338ca;
 
   /* --- type --- */
@@ -47,6 +56,15 @@
   --text-xl: 1.375rem;
   --text-2xl: 1.75rem;
 
+  /* Golden-ratio scale (16 × φⁿ, snapped to Fibonacci px) — for anything ported directly
+     from a race-pwa component, alongside the --text-* scale above for everything else. */
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-base: 16px;
+  --fs-md: 21px;
+  --fs-lg: 26px;
+  --fs-xl: 34px;
+
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-bold: 650;
@@ -59,6 +77,17 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
+  /* Fibonacci px scale, φ = 1.618 — used by anything ported directly from a race-pwa
+     component (cards, tile rows), alongside the --space-* scale above for everything else. */
+  --sp-1: 3px;
+  --sp-2: 5px;
+  --sp-3: 8px;
+  --sp-4: 13px;
+  --sp-5: 21px;
+  --sp-6: 34px;
+  --sp-7: 55px;
+  --sp-8: 89px;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -66,8 +95,16 @@
   --row-gap: var(--space-3);
   --card-padding: var(--space-4);
 
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-sm: 0 10px 22px rgba(17, 62, 126, 0.1);
   --shadow-md: 0 6px 20px rgb(15 23 42 / 0.12);
+
+  /* Motion beat — Fibonacci ms, one shared tempo. --beat-3 is the card/row entrance used
+     by the rise-in stagger; --stagger is the delay step between siblings. */
+  --beat-1: 130ms;
+  --beat-2: 210ms;
+  --beat-3: 340ms;
+  --beat-4: 550ms;
+  --stagger: 89ms;
 
   /* Anything a thumb must hit while riding. Never go below this. */
   --tap-target: 44px;
@@ -79,27 +116,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: #0f172a;
-    --surface-raised: #16213a;
-    --surface-sunken: #0a1120;
-    --border: #26334d;
-    --border-strong: #3a4a6b;
+    --surface: #161b22;
+    --surface-raised: #1c2230;
+    --surface-sunken: #0d1117;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
 
-    --text: #e8eefb;
-    --text-muted: #9aa9c0;
+    --text: #e4e9f0;
+    --text-muted: #8b949e;
     --text-inverse: #0f172a;
 
-    --accent: #38bdf8;
-    --accent-text: #06263a;
-    --accent-soft: #0d2f45;
+    --accent: #63a6fc;
+    --accent-strong: #3f86e7;
+    --accent-text: #ffffff;
+    --accent-soft: #1e2740;
 
-    --status-live: #4ade80;
+    --status-live: #3edda4;
+    --status-live-strong: #2fcf95;
     --status-pending: #fbbf24;
     --status-stale: #7c8aa3;
-    --status-danger: #f87171;
+    --status-danger: #df4b7b;
     --status-finished: #a5b4fc;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 10px 22px rgba(0, 0, 0, 0.35);
     --shadow-md: 0 6px 20px rgb(0 0 0 / 0.5);
   }
 }

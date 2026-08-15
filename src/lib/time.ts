@@ -50,6 +50,16 @@ export function formatLocalDate(utcIso: string | Date | null | undefined): strin
   return date ? dateFormat.format(date) : "—";
 }
 
+/** 03/2026 — month/year only, for compact cards. A fixed MM/YYYY format rather than
+ * Intl.DateTimeFormat's month style, since that varies by locale ("Mar 2026" vs "2026年3月")
+ * and this was asked for as an exact numeric format. Still converts from UTC to the viewer's
+ * own local date first, same as every other formatter here. */
+export function formatLocalMonthYear(utcIso: string | Date | null | undefined): string {
+  const date = toDate(utcIso);
+  if (!date) return "—";
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+}
+
 /** "4 min ago" — how fresh a rider's position is. Deliberately coarse. */
 export function formatAge(utcIso: string | Date | null | undefined, now = Date.now()): string {
   const date = toDate(utcIso);

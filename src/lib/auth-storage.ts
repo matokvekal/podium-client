@@ -8,20 +8,21 @@
 
 const ACCESS_KEY = "podium.accessToken";
 const REFRESH_KEY = "podium.refreshToken";
+const PROFILE_KEY = "podium.profile";
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }
 
-let memoryFallback: Partial<TokenPair> = {};
+let memoryFallback: Record<string, string | undefined> = {};
 
 function read(key: string): string | null {
   try {
     return window.localStorage.getItem(key);
   } catch {
     // Private mode, or storage disabled: keep the session working in memory only.
-    return key === ACCESS_KEY ? (memoryFallback.accessToken ?? null) : (memoryFallback.refreshToken ?? null);
+    return memoryFallback[key] ?? null;
   }
 }
 
@@ -30,8 +31,7 @@ function write(key: string, value: string | null): void {
     if (value === null) window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, value);
   } catch {
-    if (key === ACCESS_KEY) memoryFallback.accessToken = value ?? undefined;
-    else memoryFallback.refreshToken = value ?? undefined;
+    memoryFallback[key] = value ?? undefined;
   }
 }
 
@@ -56,4 +56,27 @@ export function clearTokens(): void {
 
 export function hasSession(): boolean {
   return getRefreshToken() !== null;
+}
+
+/**
+ * The last profile we successfully loaded, so a cold start with no network can still show
+ * who is signed in instead of showing nothing (or worse, forcing a re-login — see
+ * AuthContext's cold-start effect). Deliberately untyped here: AuthContext owns the shape.
+ */
+export function getProfile<T>(): T | null {
+  const raw = read(PROFILE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProfile(profile: unknown): void {
+  write(PROFILE_KEY, JSON.stringify(profile));
+}
+
+export function clearProfile(): void {
+  write(PROFILE_KEY, null);
 }

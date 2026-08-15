@@ -1,0 +1,491 @@
+/*
+ * Ops-deck HUD skin for the event page — same cockpit language as EventCreatePage.module.css
+ * (dark field, neon glow, mono display font, corner brackets, scanline) but a different
+ * palette on purpose: amber/purple/cyan "mission control" instead of Create's green/blue/pink
+ * "launch," so the two pages read as related but distinct — asked for directly ("page look
+ * need to be similar to create event but diff color"). Scoped entirely to this page via
+ * `.page`'s own custom properties, same isolation approach as the create page.
+ *
+ * The global `.card`/`.badge`/`.button`/`.muted` overrides below are what let the rest of this
+ * page's markup (RiderResultRow, weather/condition badges, the results/route card, etc.) pick
+ * up the new look without every one of those elements needing its own HUD-specific className —
+ * only the page shell, header, and the new Command/menu UI got bespoke markup.
+ */
+
+.page {
+  --hud-bg: #05040a;
+  --hud-panel: rgba(14, 10, 22, 0.85);
+  --hud-panel-raised: rgba(22, 16, 34, 0.92);
+  --hud-line: rgba(255, 200, 120, 0.14);
+  --hud-grid: rgba(180, 120, 255, 0.05);
+
+  --hud-primary: #ffb020;
+  --hud-primary-dim: rgba(255, 176, 32, 0.35);
+  --hud-secondary: #a855f7;
+  --hud-secondary-dim: rgba(168, 85, 247, 0.35);
+  --hud-accent: #22d3ee;
+  --hud-accent-dim: rgba(34, 211, 238, 0.35);
+  --hud-danger: #ff3b5c;
+  --hud-danger-dim: rgba(255, 59, 92, 0.35);
+
+  --hud-text: #f3ecff;
+  --hud-text-dim: #b6a6d6;
+
+  --hud-font-display: "Orbitron", var(--font-sans);
+  --hud-font-mono: "Share Tech Mono", var(--font-mono);
+
+  display: block;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.deck {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background:
+    repeating-linear-gradient(0deg, var(--hud-grid) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 34px),
+    radial-gradient(120% 140% at 12% -10%, rgba(168, 85, 247, 0.12), transparent 55%),
+    radial-gradient(120% 140% at 100% 110%, rgba(255, 176, 32, 0.1), transparent 55%), var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 30px 60px rgba(0, 0, 0, 0.55),
+    0 0 60px rgba(168, 85, 247, 0.08);
+  overflow: hidden;
+}
+
+.deck::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.05) 45%,
+    rgba(34, 211, 238, 0.12) 50%,
+    rgba(34, 211, 238, 0.05) 55%,
+    transparent 100%
+  );
+  background-size: 100% 240%;
+  animation: deck-scan-sweep 6s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes deck-scan-sweep {
+  from {
+    background-position: 0 -140%;
+  }
+  to {
+    background-position: 0 140%;
+  }
+}
+
+.corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 0 4px var(--hud-accent));
+  pointer-events: none;
+}
+.cornerTl {
+  top: 10px;
+  left: 10px;
+  border-top: 2px solid var(--hud-accent);
+  border-left: 2px solid var(--hud-accent);
+}
+.cornerTr {
+  top: 10px;
+  right: 10px;
+  border-top: 2px solid var(--hud-accent);
+  border-right: 2px solid var(--hud-accent);
+}
+.cornerBl {
+  bottom: 10px;
+  left: 10px;
+  border-bottom: 2px solid var(--hud-accent);
+  border-left: 2px solid var(--hud-accent);
+}
+.cornerBr {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 2px solid var(--hud-accent);
+  border-right: 2px solid var(--hud-accent);
+}
+
+/* --- header --------------------------------------------------------------- */
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  color: var(--hud-bg);
+  background: var(--hud-primary);
+  border-radius: 6px;
+  box-shadow:
+    0 0 18px var(--hud-primary-dim),
+    0 0 40px var(--hud-primary-dim);
+}
+
+.headerIcon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.headerText {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Standalone Share icon — the join code + QR were only reachable through the overflow menu
+   before; this puts them one tap away from the header instead ("share link icon", asked for
+   directly). Opens the same ShareEventSheet the overflow menu's Share item does. */
+.shareBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  color: var(--hud-primary);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-primary-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.shareBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.shareBtn:hover {
+  border-color: var(--hud-primary);
+  box-shadow: 0 0 14px var(--hud-primary-dim);
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--hud-secondary);
+  text-shadow: 0 0 10px var(--hud-secondary-dim);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-family: var(--hud-font-display);
+  font-weight: 900;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  letter-spacing: 0.01em;
+  color: var(--hud-text);
+  text-shadow:
+    0 0 8px var(--hud-accent-dim),
+    0 0 24px var(--hud-accent-dim);
+  overflow-wrap: anywhere;
+}
+
+.codeTag {
+  display: inline-block;
+  padding: 3px 9px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--hud-primary);
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid var(--hud-primary-dim);
+  border-radius: 4px;
+}
+
+/* --- global overrides: everything else on this page rides on these -------- */
+
+.page :global(.card) {
+  padding: var(--space-4);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-sm);
+  color: var(--hud-text);
+}
+
+.page :global(h2) {
+  font-family: var(--hud-font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--hud-text);
+}
+
+.page :global(.muted) {
+  color: var(--hud-text-dim);
+}
+
+.page :global(.banner--error) {
+  background: rgba(255, 59, 92, 0.1);
+  border: 1px solid var(--hud-danger);
+  color: var(--hud-danger);
+}
+
+.page :global(.badge) {
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hud-line);
+}
+
+.page :global(.badge--live) {
+  color: #39ff8c;
+  background: rgba(57, 255, 140, 0.12);
+  border-color: rgba(57, 255, 140, 0.4);
+  box-shadow: 0 0 10px rgba(57, 255, 140, 0.25);
+}
+
+.page :global(.badge--finished) {
+  color: var(--hud-accent);
+  background: rgba(34, 211, 238, 0.12);
+  border-color: var(--hud-accent-dim);
+}
+
+.page :global(.badge--danger) {
+  color: var(--hud-danger);
+  background: rgba(255, 59, 92, 0.12);
+  border-color: var(--hud-danger-dim);
+}
+
+.page :global(.badge--pending) {
+  color: var(--hud-primary);
+  background: rgba(255, 176, 32, 0.12);
+  border-color: var(--hud-primary-dim);
+}
+
+.page :global(.button) {
+  font-family: var(--hud-font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--hud-bg);
+  background: linear-gradient(90deg, var(--hud-primary), var(--hud-accent));
+  border: none;
+  box-shadow: 0 0 14px var(--hud-primary-dim);
+}
+
+.page :global(.button--quiet) {
+  font-family: var(--hud-font-mono);
+  letter-spacing: 0.02em;
+  color: var(--hud-text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--hud-line);
+}
+
+.page :global(.button--quiet:hover) {
+  border-color: var(--hud-accent-dim);
+}
+
+/* --- condition badges (weather/air/traffic) — dark-panel-friendly versions --- */
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hud-line);
+  color: var(--hud-text);
+  font-size: 0.78rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  border-color: var(--hud-accent-dim);
+}
+
+.conditionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.conditionGood {
+  background: rgba(57, 255, 140, 0.14);
+  color: #39ff8c;
+}
+
+.conditionModerate {
+  background: rgba(255, 176, 32, 0.16);
+  color: var(--hud-primary);
+}
+
+.conditionBad {
+  background: rgba(255, 59, 92, 0.14);
+  color: var(--hud-danger);
+}
+
+/* --- Command (organizer actions) ------------------------------------------ */
+
+.opsCard {
+  border: 1px solid var(--hud-secondary-dim) !important;
+}
+
+.opsTitle {
+  margin: 0;
+}
+
+.primaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  font-family: var(--hud-font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--hud-bg);
+  background: linear-gradient(90deg, var(--hud-primary), var(--hud-accent));
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: 0 0 16px var(--hud-primary-dim);
+}
+
+.primaryAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.menuTrigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font-family: var(--hud-font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: var(--hud-text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.menuTrigger:hover {
+  border-color: var(--hud-secondary-dim);
+}
+
+/* Bottom sheet, ~1/3 of the viewport tall — a small dropdown here was getting missed
+   ("the organizer action not seen"); asked for directly: a bottom-up modal instead. Same
+   z-index scale as every other sheet in this app (CopyTrackSheet etc.). */
+.menuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 4 10 / 0.6);
+}
+
+.menu {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  height: 33vh;
+  min-height: 260px;
+  padding: 6px;
+  background: var(--hud-panel-raised);
+  border-top: 1px solid var(--hud-secondary-dim);
+  border-radius: 16px 16px 0 0;
+  box-shadow:
+    0 -12px 30px rgba(0, 0, 0, 0.5),
+    0 0 24px var(--hud-secondary-dim);
+  overflow-y: auto;
+}
+
+.menuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 6px;
+  font-family: var(--hud-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+}
+
+.menuClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--hud-text-dim);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menuClose:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hud-text);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 10px;
+  font-family: var(--hud-font-mono);
+  font-size: 0.9rem;
+  color: var(--hud-text);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.menuItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hud-accent);
+}
+
+.menuItemDanger {
+  color: var(--hud-danger);
+}
+
+.menuItemDanger:hover {
+  background: rgba(255, 59, 92, 0.12);
+  color: var(--hud-danger);
+}

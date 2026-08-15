@@ -1,0 +1,314 @@
+/* Ported from race-pwa's main.module.css — the My Rides toolbar: search, sort cycle,
+   favourites filter, Add, and the See All / back toggle. Find Rides/Races keeps its own
+   simpler tab row from global.css; this module is scoped to My Rides only, matching race-pwa. */
+
+/* Top-level tab bar — My Rides / Find Rides / Find Races / Track. A guest only ever sees the
+   two Find tabs; see the page doc comment for why. */
+.tabBar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.tabActive {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab {
+  color: var(--text-muted);
+}
+
+.tabActive {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent-strong);
+}
+
+.tabIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  cursor: pointer;
+  padding: 4px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.backBtn:active {
+  opacity: 0.6;
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-raised));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 14px rgba(17, 66, 133, 0.08);
+}
+
+.searchIcon {
+  width: 17px;
+  height: 17px;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.search::placeholder {
+  color: var(--text-muted);
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-raised));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 8px 16px rgba(73, 126, 210, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.iconBtn:active {
+  transform: translateY(1px);
+}
+
+.iconGlyph {
+  width: 15px;
+  height: 15px;
+}
+
+.heartIcon {
+  width: 16px;
+  height: 16px;
+  color: #8ea9d4;
+}
+
+.heartActive {
+  border-color: rgba(223, 75, 123, 0.45);
+}
+
+.heartActive .heartIcon {
+  color: #df4b7b;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  background: linear-gradient(150deg, var(--status-live), var(--status-live-strong));
+  border: 1px solid rgba(24, 143, 102, 0.22);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f7fffc;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 10px 20px rgba(39, 191, 136, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+}
+
+.addBtn:active {
+  transform: translateY(1px);
+}
+
+/* Other Rides' status filter — rounded pills, ported from Figma (plan/ui/page1's filter
+   tabs), replacing the old Live/Upcoming/Past buttons with the same Active/On Progress/
+   Finished categories EventCard's own tag already shows, via event-visuals.ts's figmaStatus
+   so the two never drift out of sync. */
+.pillRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.pill,
+.pillActive {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pill {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 8px rgba(41, 48, 66, 0.06);
+}
+
+.pillActive {
+  background: var(--text);
+  color: var(--text-inverse);
+}
+
+/* Live / Upcoming / Past section labels within My Rides — Meetup-style grouping, with Live
+   always first and called out in colour (the group itself is what blinks, via EventTile's
+   liveBar / EventCard's liveDot, not this label). */
+.sectionLabel {
+  padding: 4px 2px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sectionLabel[data-tone="live"] {
+  color: var(--status-live-strong);
+}
+
+/* .tileRow is a CSS grid — a label needs to span every column to read as a divider instead
+   of sitting inside the first tile's cell. */
+.sectionLabelGrid {
+  grid-column: 1 / -1;
+}
+
+.noResults {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* First few cards/tiles rise in on the shared beat, not all at once. */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fixed height, not max-height — the box stays the same size whether there are 3 rides or
+   30; extra rides scroll within it instead of growing the page. ~340px is roughly 3
+   EventCard rows (104px card + the .list gap), matching how this looked before more mock
+   rides were added. */
+.list {
+  height: 340px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Compact home-row tiles: a 3-column grid that scrolls vertically within a box, instead of
+   one long horizontally-scrolling row. max-height is 90vh (viewport-relative, not a guessed
+   pixel number, asked for directly) so it scales with the actual screen instead of being
+   tuned for one device — a short My Rides (1 row or less) still doesn't reserve the full 90vh
+   and leave a dead gap; it only caps out and starts scrolling once there's actually enough
+   content to fill it. The footer itself is a fixed bar (global.css's .app-footer), always
+   pinned to the true bottom of the screen regardless of this box's height — so this cap is
+   purely about not letting a very long My Rides list grow the page past the screen, not about
+   footer position. */
+.tileRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.list > *,
+.tileRow > * {
+  animation: riseIn var(--beat-3) ease-out backwards;
+}
+.list > *:nth-child(2),
+.tileRow > *:nth-child(2) {
+  animation-delay: var(--stagger);
+}
+.list > *:nth-child(3),
+.tileRow > *:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+.list > *:nth-child(4),
+.tileRow > *:nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+.list > *:nth-child(5),
+.tileRow > *:nth-child(5) {
+  animation-delay: calc(var(--stagger) * 4);
+}

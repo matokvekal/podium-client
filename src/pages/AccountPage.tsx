@@ -31,8 +31,8 @@ export function AccountPage() {
           {profile?.nickname && <span className="muted"> — {profile.nickname}</span>}
         </div>
         <p className="muted">
-          Emergency phone: {profile?.emergencyPhone ?? "not set"}. Collected for a future
-          emergency feature; not shown to anyone in this version.
+          Emergency phone: {profile?.emergencyPhone ?? "not set"}. Collected for a future emergency
+          feature; not shown to anyone in this version.
         </p>
       </div>
 

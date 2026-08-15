@@ -1,0 +1,263 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 12px rgba(41, 48, 66, 0.08);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.surfaceTag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+}
+
+.daysTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.favBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8facd4;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.favActive {
+  color: #e04a7a;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.location {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.statsRow {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.statIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-strong);
+}
+
+.badgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.aqiBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.tagIcon {
+  width: 13px;
+  height: 13px;
+}
+
+.aqiGood {
+  background: rgba(62, 221, 164, 0.17);
+  color: #3edda4;
+}
+
+.aqiModerate {
+  background: rgba(245, 185, 66, 0.2);
+  color: #b8860b;
+}
+
+.aqiUnhealthy {
+  background: rgba(223, 75, 123, 0.15);
+  color: #df4b7b;
+}
+
+/* Only ever a "very dangerous" (high severity) rider report — see TrackCard.tsx's doc
+   comment for why this is deliberately the only hazard tier shown here, and why there is no
+   green/good-road counterpart. */
+.dangerBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(223, 75, 123, 0.12);
+  border: 1px solid rgba(223, 75, 123, 0.3);
+}
+
+.dangerHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #df4b7b;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+}
+
+.dangerIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.dangerNote {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.socialRow {
+  display: flex;
+  gap: 10px;
+}
+
+.socialBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.socialActive {
+  color: var(--accent-strong);
+}
+
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.comment {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.commentMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.commentAuthor {
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.commentText {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.commentForm {
+  display: flex;
+  gap: 8px;
+}
+
+.commentInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.poiRow {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.poiItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.planBtn {
+  margin-top: 4px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-strong);
+  color: var(--accent-text);
+  text-align: center;
+  text-decoration: none;
+  font-weight: var(--weight-medium);
+  font-size: 0.9rem;
+}

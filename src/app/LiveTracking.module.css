@@ -1,0 +1,94 @@
+.placeholder {
+  align-items: center;
+  text-align: center;
+  padding: var(--space-5) var(--space-4);
+  color: var(--text-muted);
+}
+
+.icon {
+  color: var(--text-muted);
+}
+
+.actionBar {
+  gap: 8px;
+}
+
+/* Fixed size, scrolls internally — mirrors EventParticipantsPage.module.css's .list, same
+   reasoning: doesn't grow the page with rider count. */
+.riderList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.riderRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.riderRowSelected {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+.riderRowMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.riderName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+}
+
+.sosTag {
+  margin-left: 6px;
+  font-size: 0.7rem;
+  font-weight: var(--weight-medium);
+  color: #f87171;
+}
+
+.arrivedBtn,
+.arrivedBtnActive {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.arrivedBtnActive {
+  color: var(--status-live);
+}

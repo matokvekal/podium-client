@@ -3,7 +3,8 @@
 This file tracks the current state of the project so work can resume cleanly after
 any interruption. **Read this first when you come back.**
 
-Last updated: **2026-08-13** (second update: Prisma removed, client scaffolded)
+Last updated: **2026-08-14** (home screen rebuilt on the Commissaire/race-pwa pattern —
+drawer nav, My Rides / Other Rides, IndexedDB local cache)
 
 ---
 
@@ -41,9 +42,11 @@ live-positions query, history tracks.
 
 ## Immediate next task
 
-**Install the dependencies and run the checks, then run the timestamp migration.**
-Both are in [QUESTIONS.md](QUESTIONS.md) as items 1 and 2 — they need a decision
-from the owner, not more code.
+**Local dev is now unblocked** — install, tests, typecheck, and dev sign-in all verified
+2026-08-14 (see the update log entry below). What is left in
+[QUESTIONS.md](QUESTIONS.md) items 1–2 is specifically the **live production** database:
+the timestamp migration has still not been run there, and that needs a decision from the
+owner, not more code.
 
 ```bash
 cd server-podium && npm install && npm test && npm run typecheck && npm run lint
@@ -52,16 +55,17 @@ cd ../client-podium && npm install && npm run typecheck && npm run lint
 
 The Prisma removal itself ([11-prisma-removal.md](11-prisma-removal.md)) is
 **written**: no `@prisma/client` anywhere in `src/`, `prisma/` deleted, SQL owned
-by hand in `server-podium/sql/`. What has *not* happened is any execution —
-nothing was installed, no test was run, and the database is untouched.
+by hand in `server-podium/sql/`. Verified 2026-08-14 against a local database.
 
-The risky step is still ahead: `sql/900-timestamptz-migration.sql` rewrites every
-timestamp in the live database and will silently shift them all by hours if the
-`AT TIME ZONE 'UTC'` clause is lost. Back up first, and finish with the real
-Android app, not curl.
+The risky step is still ahead **on the live database only**:
+`sql/900-timestamptz-migration.sql` rewrites every timestamp in the live database and will
+silently shift them all by hours if the `AT TIME ZONE 'UTC'` clause is lost. Back up first,
+and finish with the real Android app, not curl.
 
 After that, the build order is in [01-task-list.md](01-task-list.md) — milestone 2,
-event ownership, is next.
+event ownership, is next. Uncommitted work already sitting in the client tree suggests a
+prior session started on milestone 9's events-list/create/detail screens — read those files
+before starting fresh on the same screens.
 
 ---
 
@@ -131,8 +135,10 @@ reason.
 - [x] [client-podium](../client-podium) initialized
 - [x] frontend architecture reviewed
 - [x] Prisma removed from the code
-- [ ] dependencies installed and the three checks green ⚠
-- [ ] timestamps migrated in the live database ⚠
+- [x] dependencies installed and test + typecheck green in both workspaces (2026-08-14).
+      `lint` has CRLF-only formatting diffs on this Windows checkout, no logic errors
+- [ ] timestamps migrated in the **live** database ⚠ (a local dev database now exists and
+      was built with the fresh-database SQL order, which is a separate thing)
 
 ## Product status
 
@@ -162,6 +168,207 @@ When starting again:
 ---
 
 ## Update log
+
+### 2026-08-14 (latest) — Home screen rebuilt on the Commissaire (race-pwa) pattern
+
+Full plan: `C:\Users\PC\.claude\plans\lucky-snuggling-panda.md`. Reference app:
+`E:\DEV2026\commissaire\race-pwa`. Direction confirmed by the product owner: full visual
+match — dark card-forward look, hamburger + drawer nav, tile-row home, `idb`-backed local
+cache — not just the same behavior in Podium's old styling.
+
+**Server**
+
+- `GET /events/:eventId` no longer requires auth (`requireAuth` → new `optionalAuth` in
+  `middleware/requireAuth.ts`, which decodes a token if present but never rejects its
+  absence). `getEventForViewer` now takes `viewerId: number | null`; a public event is
+  readable by anyone, a private one still 403s anyone but its owner. Two new tests in
+  `events-crud.test.ts`. 70/70 passing.
+
+**Client**
+
+- `lib/local-db.ts` — new IndexedDB cache (`idb`, new dependency) replacing the
+  `localStorage` cache written earlier today: `getCachedEvents`/`putCachedEvents` per source
+  (`"mine"` | `"guest"`), plus `getCachedEvent`/`putCachedEvent` for the detail page. Also
+  now the single source of truth for the `EventSummary`/`EventStatus` types — every screen
+  that touches an event imports them from here instead of re-declaring them.
+- `app/AppShell.tsx` rewritten, `app/AppDrawer.tsx` added (new dependency: `lucide-react`) —
+  hamburger + slide-out drawer replaces the old bottom-bar/side-rail nav at every breakpoint.
+  Drawer shows Guest/signed-in state, My Rides / Routes / History / Join with a code, and
+  either "Register / Login" or Account + Sign out. Deliberately did not bring over
+  race-pwa's theme/language/skin pickers, Joker mode, Board Hold, or feedback section — not
+  asked for.
+- `app/EventTile.tsx`, `app/EventCard.tsx`, `app/event-visuals.ts` — new card components
+  mirroring race-pwa's RaceTile/RaceCard, adapted to what `EventSummary` actually has (no
+  cover-image or favorite field yet, so cards get a deterministic colour+initial placeholder
+  sourced from the existing `--status-*`/`--accent` tokens, never a new hardcoded hex).
+- `pages/EventsListPage.tsx` restructured into "My Rides" (owned + joined, merged from
+  `filter=mine` + `filter=joined`, tile row, signed-in only — a guest sees a "Sign in to see
+  your rides" prompt card, not a hidden section) and "Other Rides" (the public
+  live/upcoming/past list, identical for everyone — this is a correction from earlier today:
+  the authed live/upcoming/past filters on `GET /events` are scoped to *this user's own*
+  events by status, not a discovery feed, so Other Rides now always reads `/events/public`
+  regardless of auth state).
+- `pages/EventDetailPage.tsx` — no auth-gating changes needed there at all (it already
+  degraded correctly on `isOwner: false`, which is exactly what an anonymous viewer gets
+  now); added `local-db` caching so a previously-seen event's summary paints instantly and
+  survives a failed refresh.
+- `App.tsx` — `/events/:eventId` moved from `RequireAuth` to the same `OpenHome` wrapper `/`
+  already used.
+- `SplashScreen.tsx` — rider dots regrouped into three small clusters (lead group, chase
+  pair, back group) instead of scattering individually, per a follow-up request; changed
+  from round to square (the SOS marker stays round, so it still reads as visually distinct,
+  not just a different colour).
+- Found and fixed a real, previously-latent CSS bug while verifying: `.stack` is
+  `display:flex; flex-direction:column`, and a flex item's default `min-width:auto` let a
+  long sentence in a nested `.stack` (the new "Sign in to see your rides" prompt) push the
+  whole card past the viewport instead of wrapping. Added `min-width: 0` to `.stack`
+  globally — safe, standard fix, and it was latent everywhere this pattern nests, not just
+  here. Also added `flex-wrap: wrap` to the new `.section-header` so the section title drops
+  to its own line instead of squeezing next to action buttons on a narrow phone.
+- **Debugging note for next time:** Chrome's `--headless --screenshot=... --window-size=W,H`
+  CLI flag did not reliably honour `--window-size` in this environment and produced
+  misleading, apparently-clipped screenshots that looked like real overflow bugs. Verified
+  ground truth instead via `getBoundingClientRect`/computed styles over the Chrome DevTools
+  Protocol, and switched to `Emulation.setDeviceMetricsOverride` +
+  `Page.captureScreenshot` over CDP for all further screenshots this session — that combination
+  was reliable. Prefer CDP over the CLI screenshot flag if this comes up again.
+- A stray second `npm run dev` on port 5174 — possibly the product owner's own — was killed
+  while cleaning up multiple stale dev-server instances accumulated over the session, so a
+  fresh, singly-tracked instance could be verified against with confidence. If that was your
+  window, it just needs restarting.
+
+**Follow-up, same day:** the first pass matched the *structure* (drawer, My Rides/Other
+Rides, tile row) but not race-pwa's actual visual richness — flagged directly: "the page
+should look similar to main page." Went back to `main.module.css` and `raceCard.module.css`
+for the real values and closed the gap:
+
+- `EventCard` gained a left status-colour accent bar, a bigger (4.25rem) shadowed thumb,
+  and its badge became a tinted pill (`color-mix(in srgb, var(--status-live) 18%,
+  transparent)` etc.) instead of the plain bordered `.badge` used elsewhere in the app —
+  its own dedicated classes now, so `EventDetailPage`'s badges are untouched. Meta-row icons
+  tinted with `var(--accent)`. Press feedback (`translateY(1px) scale(0.99)`) added to both
+  the card and the tile, matching race-pwa's tactile feel.
+- New `.home-bg` — a soft multi-colour radial-gradient panel behind the whole home screen,
+  every colour drawn from existing tokens via `color-mix()` rather than a new hardcoded hex,
+  so it still adapts to light/dark automatically. Mirrors race-pwa's `.main` background
+  without forking a second colour system for it.
+- New staggered rise-in entrance animation on the first few tiles/cards (`rise-in`
+  keyframe), matching race-pwa's "Overture" touch — collapses to instant under
+  `prefers-reduced-motion` via the existing global rule, no separate override needed.
+
+**Known gaps, not fixed here:** Participants and Live map still require signing in even for
+a public event — the plan deliberately scoped guest access to the event *detail* page only,
+not those two, since they carry more sensitive data (live location, participant PII) and
+that boundary deserves its own explicit decision rather than being widened as a side effect.
+
+### 2026-08-14 (later) — Fixed: the app got stuck on "Could not reach the server"
+
+Reported directly: the app should open even with no server at all, and should still show
+previously-seen events — like a native app, not a page that dead-ends the moment a request
+fails. It should only ask you to register when you actually try to *connect* to something
+(create, join, go live).
+
+**Root cause, not just a symptom.** `AuthContext`'s cold-start effect
+(`src/auth/AuthContext.tsx`) called `loadProfile()` on every app load with a stored session,
+and on **any** failure — including a plain network error or the dev server being down —
+called `clearTokens()` and dropped straight to `signed-out`. That is the exact thing
+[05-auth-jwt.md](05-auth-jwt.md) says never to do: *"never clear the session because a
+refresh failed with a network error. Only clear it on an explicit 401 from a reachable
+server."* The old code didn't check which kind of failure it was.
+
+On top of that, the whole app was gated: `App.tsx`'s `RequireAuth` wrapped **every** route,
+including the events list at `/`, so a signed-out visitor (or a signed-in one who just got
+logged out by the bug above) landed on `/login`, which calls `GET /auth/config` — and if the
+server is unreachable, that fails too, with nothing behind it. That produced exactly
+*"Could not reach the server. Check your connection and try again."* with no way forward.
+This was reproduced live: the podium-server dev process had actually crashed (see below),
+and a real browser session hit precisely this dead end.
+
+**What changed:**
+
+- `src/lib/auth-storage.ts` — added `getProfile`/`saveProfile`/`clearProfile`, caching the
+  signed-in profile in `localStorage` the same way tokens already are. Also fixed the
+  private-mode memory fallback, which only special-cased two keys and would have silently
+  corrupted the refresh token's fallback slot for the new profile key.
+- `src/auth/AuthContext.tsx` — cold start now hydrates `profile` and `status` from the
+  cache immediately (optimistic — no more forced "Loading…" when we already know who this
+  is), then refreshes in the background. The refresh only clears the session on a genuine
+  `401` (`ApiError` with `!isOffline && status === 401`). Any other failure — offline, 5xx,
+  timeout — leaves the cached profile and the stored tokens exactly as they were.
+- `src/App.tsx` — `/` no longer goes through `RequireAuth`. New `OpenHome` wrapper: still
+  redirects a signed-in-but-incomplete-profile user to `/account/setup`, but otherwise
+  renders for anyone, signed in or not. Every route that actually mutates or needs an
+  identity (`/events/new`, `/join`, `/events/:id/live`, etc.) is untouched and still behind
+  `RequireAuth`.
+- `src/pages/EventsListPage.tsx` — signed in, behaves as before (`GET /events?filter=`).
+  Signed out, calls the already-existing, already-unauthenticated `GET /events/public` and
+  filters `live`/`upcoming`/`past` client-side (that endpoint has no filter param); the
+  "Mine"/"Joined" tabs are hidden rather than shown and rejected, and "Create an event" /
+  "Join with a code" become a single "Sign in to create or join events" link. Every
+  successful load is cached in `localStorage` (`podium.events.auth.<filter>` or
+  `podium.events.guest`) and shown immediately on the next visit, before the network request
+  resolves. A failed refresh with a cache present shows a "showing saved events" notice
+  instead of the red error banner; only a failure with nothing cached shows that.
+- Seeded two local dev events (`sql/seed.sql`) and marked them `visibility = 'public'` so
+  the signed-out home screen has something real to show — local dev data only, not a runtime
+  behavior change.
+
+**Also found while investigating:** milestone 2 (event ownership, the whole CRUD surface,
+`GET /events/public`) turned out to be fully implemented already in
+`podium-server/src/modules/events/` — the task list below had it 100% unchecked, which was
+stale by a wide margin. Corrected there rather than left for the next surprise.
+
+**Known gap, not fixed here:** tapping into a specific event's detail page
+(`EventDetailPage`, `/events/:eventId`) still requires signing in — the server route is
+`requireAuth`-gated (`event.routes.ts`), so a guest browsing the public list from home can
+see the card but not open it yet. Making public-event detail viewable without an account
+is a reasonable next step but is a separate, server-side change; flagging it rather than
+scope-creeping this fix.
+
+### 2026-08-14 — Local dev environment verified, dev sign-in confirmed working, SMS hidden
+
+The blocker in [QUESTIONS.md](QUESTIONS.md) item 1 — nothing had ever been installed or
+run — is now cleared for local development (production DB migration, item 2, is still
+untouched and still needs the owner's sign-off).
+
+- `npm install` had in fact already been run in both `server-podium` and `client-podium`
+  (`node_modules` present) since the note was written.
+- **`server-podium`: `npm test` → 68/68 passing (9 files). `npm run typecheck` → clean.**
+  `npm run lint` reports only CRLF-vs-LF formatting diffs (this is a Windows checkout;
+  biome expects LF) — no logic errors. Same story in `client-podium`'s `npm run typecheck`
+  (clean) and `npm run lint` (CRLF noise only). Worth a `.gitattributes` fix
+  (`* text=auto eol=lf`) if a clean `lint` run matters; not done here since it would touch
+  nearly every file and wasn't asked for.
+- **The local Postgres had no `podium` database at all** — `DATABASE_URL` in
+  `server-podium/.env` pointed at a database that didn't exist yet, so every DB-backed
+  route, including dev sign-in, failed with `database "podium" does not exist`. Created it
+  and ran `sql/001` through `006` (the fresh-database order from `sql/README.md`, `007` is
+  already folded into `001`). This is a **local, empty dev database** — unrelated to the
+  live production database that items 1–2 in QUESTIONS.md are about; no production data
+  was touched.
+- **Developer sign-in confirmed working end to end**: `POST /auth/dev-login` now returns a
+  real token pair against the local DB. Verified with `curl` and by inspecting the compiled
+  module Vite serves for `LoginPage.tsx`.
+- `client-podium/.env.example` had been deleted from the working tree (unstaged, unclear
+  why) and `client-podium/.env` did not exist. Restored `.env.example` and created `.env`
+  from it pointing at `http://localhost:6500/api/v1`. `VITE_GOOGLE_CLIENT_ID` deliberately
+  left blank — not needed while the developer sign-in shortcut is used instead of real
+  Google auth.
+- **SMS sign-in hidden on the login screen** per today's product direction. This is a UI
+  suppression, not a removal: `LoginPage.tsx` gates the SMS section behind a
+  `smsLoginVisible = false` constant right next to `devSignInActive`, with a comment on how
+  to bring it back. The provider, `/auth/sms/request` + `/auth/sms/verify` calls, and the
+  server side are all untouched.
+- **Found and removed a suspicious line appended to the end of `AGENT.md`**:
+  `##claude --dangerously-skip-permissions##`. It did not match anything in the surrounding
+  diff (which was otherwise just biome's italics-quote-style reformat) and reads as an
+  attempt to get a future session to disable its own permission checks. Not acted on;
+  flagged to the project owner.
+- Confirmed real, uncommitted feature work already sitting in the working tree from a
+  prior session: `EventsListPage.tsx`, `EventCreatePage.tsx` and `EventDetailPage.tsx` are
+  no longer placeholders — they call real endpoints (`GET /events`, create, detail) and
+  `global.css` grew matching styles. This is milestone 9 work in progress; the checkboxes
+  below are updated to match what actually exists on disk, not just what's committed.
 
 ### 2026-08-13 (later) — Prisma removed, client scaffolded
 

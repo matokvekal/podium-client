@@ -12,6 +12,13 @@
  * idempotent: re-joining returns the same participantId rather than an error, so a rider
  * who taps twice, or retries after a dropped connection, is fine.
  *
+ * The placeholder below shows a proposed code format (3 letters + 3 digits, e.g. "ABC-123"),
+ * requested directly — but the actual format (`DDMMYYYY` + a letter, e.g. "13082026A") is
+ * generated server-side and documented as FROZEN in 07-api-contract.md, with the Android app
+ * already live against it. Changing it for real is a server + Android change, not a client
+ * one — see plan/server-tasks.md. This placeholder is cosmetic only; it doesn't validate or
+ * enforce any format.
+ *
  * This app does not transmit GPS. Joining here puts the rider on the start list; the
  * Android app is the only GPS source in v1.
  */
@@ -118,7 +125,7 @@ export function JoinPage() {
             setCode(changeEvent.target.value);
             setEvent(null);
           }}
-          placeholder="13082026A"
+          placeholder="ABC-123"
           autoComplete="off"
           autoCapitalize="characters"
           required

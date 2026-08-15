@@ -1,0 +1,46 @@
+/* Same bottom-sheet pattern as TracksPage.module.css's .sheet/.sheetOverlay — see that file
+   for the z-index reasoning. */
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.sheetBody {
+  padding: var(--space-4);
+  gap: 10px;
+}

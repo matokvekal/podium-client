@@ -1,0 +1,156 @@
+/* Ported from Figma (new-commissaire, "Today" > Card/1 & Card/2) — full-bleed cards with
+ * title/time/location overlaid at the bottom over a dark gradient, replacing race-pwa's small
+ * vertical RaceTile this used to be. Taller than the original 219x147 Figma spec — asked for
+ * directly, so the home row fills more of the screen and leaves less dead space above the
+ * sticky footer on short My Rides lists (see global.css's .app-main doc comment). */
+
+.tile {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 185px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile:active {
+  transform: scale(0.98);
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.initial {
+  font-size: 48px;
+  font-weight: var(--weight-bold);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+/* Small top-left pill, not a full-width bar — keeps clear of .favBtn, which sits top-right. */
+.liveBar {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  background: rgba(62, 221, 164, 0.9);
+  color: #04140d;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 5px;
+  animation: live-bar-pulse 1.6s ease-in-out infinite;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #04140d;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes live-bar-pulse {
+  0%,
+  100% {
+    background: rgba(62, 221, 164, 0.85);
+  }
+  50% {
+    background: rgba(62, 221, 164, 1);
+  }
+}
+
+.favBtn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8facd4;
+  backdrop-filter: blur(4px);
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.favActive {
+  color: #e04a7a;
+}
+
+.info {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* The date must never truncate — asked for directly ("can't see the date good"). Location
+   (if present) shares the row and shrinks/ellipsizes instead; it's the less critical of the
+   two at this tile width. */
+.dateItem {
+  flex-shrink: 0;
+}

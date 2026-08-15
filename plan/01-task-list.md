@@ -42,8 +42,10 @@ Prisma is gone from the code. **Nothing has been installed, run or migrated yet*
 - [x] Create hand-written `server-podium/sql/*.sql`
 - [x] Delete `prisma/`, drop deps and `db:*` scripts
 - [x] Add the missing `tsconfig.json` — referenced by the build scripts but absent
-- [ ] **`npm install`, then `npm test` + `typecheck` + `lint` green** ⚠ blocker,
-      see [QUESTIONS.md](QUESTIONS.md) item 1
+- [x] **`npm install`, then `npm test` + `typecheck` + `lint` green** — verified
+      2026-08-14 against a local dev database: 68/68 tests pass, typecheck clean;
+      `lint` shows only pre-existing CRLF/LF formatting diffs, no logic errors. See
+      [03-progress.md](03-progress.md)
 - [ ] **Migrate all timestamps to `TIMESTAMPTZ` with `AT TIME ZONE 'UTC'`** ⚠
       — `sql/900-timestamptz-migration.sql`, written but **not run**️
 - [ ] Verify known rows read the same instant after migration
@@ -56,24 +58,30 @@ Prisma is gone from the code. **Nothing has been installed, run or migrated yet*
 
 ---
 
-## Milestone 2 — Events and ownership
+## Milestone 2 — Events and ownership ✅ (found already built, 2026-08-14)
 
-- [ ] **Add `owner_id` to `events`** ⚠️ nothing owns an event today; almost every
-      permission rule depends on this. Do it first.
-- [ ] Set `owner_id` on every event at creation
-- [ ] Backfill `owner_id` for any existing events
-- [ ] **Add `event_id` to `location_points`** — makes retention cleanup and
-      per-event export one statement instead of a join over millions of rows
-- [ ] Add `status`, `visibility`, `display_mode`, `description`, `location`, `finished_at`
-- [ ] Add the six `show_*` visibility columns
-- [ ] Keep `is_active` in sync with `status` so the Android lookup keeps working
-- [ ] `POST /events` — create
-- [ ] `GET /events` — my events, filterable
-- [ ] `GET /events/:id` — detail, respecting visibility
-- [ ] `PATCH /events/:id` — edit
-- [ ] `DELETE /events/:id`
-- [ ] `GET /events/public` — browse public events
-- [ ] Event status workflow: draft → published → ready → live → finished
+This whole milestone turned out to already be implemented in `podium-server/src/modules/events/`
+— none of it was reflected here before 2026-08-14, which made the plan badly out of date with
+the code. Verified by reading the actual source, not just trusting old checkboxes again.
+
+- [x] `owner_id` on `events`
+- [x] Set on every event at creation (`createEvent`, `event.service.ts`)
+- [x] `event_id` on `location_points`, added and backfilled in `sql/002-events-podium.sql`
+- [x] `status`, `visibility`, `display_mode`, `description`, `location`, `finished_at`
+- [x] The six `show_*` visibility columns (`updateEventSchema` in `event.schemas.ts`)
+- [x] `is_active` kept in sync with `status` (`isActiveForStatus`, `event.service.ts:122`)
+- [x] `POST /events` — create
+- [x] `GET /events` — my events, filterable (`mine`, `joined`, `upcoming`, `live`, `past`)
+- [x] `GET /events/:id` — detail, respecting visibility (private events 403 a non-owner)
+- [x] `PATCH /events/:id` — edit
+- [x] `DELETE /events/:id`
+- [x] `GET /events/public` — unauthenticated, paged. As of 2026-08-14 this is also what
+      powers the client's signed-out home screen — see `EventsListPage.tsx`
+- [x] Event status workflow, transition graph validated in `changeEventStatus`
+
+Not yet verified: whether the transition graph matches
+draft → published → ready → live → finished exactly, or allows more than that. Worth a
+closer read before relying on it for milestone 3+.
 
 ## Milestone 3 — Roles and permissions *(later — owner first)*
 
@@ -165,15 +173,19 @@ caveat: `npm install` has not run, so none of it has been executed.
 - [x] Google sign-in flow, plus SMS sign-in and the profile gate
 - [x] Responsive layout — bottom bar on a phone, side rail from 768px so the map can grow
 - [x] Join an event by code or QR link (`src/pages/JoinPage.tsx`)
-- [ ] `npm install`, then typecheck + lint green ⚠ blocker
+- [x] `npm install`, then typecheck + lint green — verified 2026-08-14; typecheck clean,
+      `lint` shows only pre-existing CRLF/LF formatting diffs
 - [ ] App icons — the manifest points at three PNGs that do not exist yet
       ([QUESTIONS.md](QUESTIONS.md) item 8)
 
 ## Milestone 9 — Client screens
 
-- [ ] Events list
-- [ ] Event create / edit
-- [ ] Event detail
+- [~] Events list — real, uncommitted work in the tree as of 2026-08-14
+      (`src/pages/EventsListPage.tsx`, calls `GET /events?filter=`)
+- [~] Event create / edit — real, uncommitted work in the tree as of 2026-08-14
+      (`src/pages/EventCreatePage.tsx`)
+- [~] Event detail — real, uncommitted work in the tree as of 2026-08-14
+      (`src/pages/EventDetailPage.tsx`)
 - [ ] Participants
 - [ ] Route selection + public route browser
 - [ ] Live map (Leaflet, lazy-loaded)

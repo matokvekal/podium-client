@@ -1,0 +1,826 @@
+/*
+ * Cockpit HUD skin for the create-event flow — asked for directly: "F-35 aircraft cockpit
+ * view for a pilot," black field, neon pink/blue/fluorescent-green glow, exciting/dopamine.
+ * Scoped entirely to this page via the .cockpit wrapper's own custom properties — does not
+ * touch src/styles/tokens.css, so every other screen keeps the calm light/dark theme.
+ */
+
+.page {
+  --hud-bg: #030405;
+  --hud-panel: rgba(6, 16, 14, 0.82);
+  --hud-panel-raised: rgba(10, 24, 21, 0.9);
+  --hud-line: rgba(120, 255, 210, 0.14);
+  --hud-grid: rgba(0, 255, 170, 0.05);
+
+  --hud-green: #39ff8c;
+  --hud-green-dim: rgba(57, 255, 140, 0.35);
+  --hud-blue: #1fd9ff;
+  --hud-blue-dim: rgba(31, 217, 255, 0.35);
+  --hud-pink: #ff2fa6;
+  --hud-pink-dim: rgba(255, 47, 166, 0.4);
+  --hud-amber: #ffb020;
+  --hud-amber-dim: rgba(255, 176, 32, 0.4);
+  --hud-danger: #ff3b5c;
+  --hud-danger-dim: rgba(255, 59, 92, 0.4);
+
+  --hud-text: #e4fff2;
+  --hud-text-dim: #7fb3a6;
+
+  --hud-font-display: "Orbitron", var(--font-sans);
+  --hud-font-mono: "Share Tech Mono", var(--font-mono);
+
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+/* --- frame ------------------------------------------------------------- */
+
+.cockpit {
+  position: relative;
+  padding: var(--space-5);
+  background:
+    repeating-linear-gradient(0deg, var(--hud-grid) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 34px),
+    radial-gradient(120% 140% at 12% -10%, rgba(31, 217, 255, 0.12), transparent 55%),
+    radial-gradient(120% 140% at 100% 110%, rgba(255, 47, 166, 0.1), transparent 55%), var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 30px 60px rgba(0, 0, 0, 0.55),
+    0 0 60px rgba(31, 217, 255, 0.08);
+  overflow: hidden;
+}
+
+.cockpit::after {
+  /* scanline sweep */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(57, 255, 140, 0.06) 45%,
+    rgba(57, 255, 140, 0.14) 50%,
+    rgba(57, 255, 140, 0.06) 55%,
+    transparent 100%
+  );
+  background-size: 100% 240%;
+  animation: scan-sweep 5.5s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes scan-sweep {
+  from {
+    background-position: 0 -140%;
+  }
+  to {
+    background-position: 0 140%;
+  }
+}
+
+.corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 0 4px var(--hud-blue));
+  pointer-events: none;
+}
+.cornerTl {
+  top: 10px;
+  left: 10px;
+  border-top: 2px solid var(--hud-blue);
+  border-left: 2px solid var(--hud-blue);
+}
+.cornerTr {
+  top: 10px;
+  right: 10px;
+  border-top: 2px solid var(--hud-blue);
+  border-right: 2px solid var(--hud-blue);
+}
+.cornerBl {
+  bottom: 10px;
+  left: 10px;
+  border-bottom: 2px solid var(--hud-blue);
+  border-left: 2px solid var(--hud-blue);
+}
+.cornerBr {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 2px solid var(--hud-blue);
+  border-right: 2px solid var(--hud-blue);
+}
+
+/* --- header -------------------------------------------------------------- */
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-radius: 6px;
+  box-shadow:
+    0 0 18px var(--hud-green-dim),
+    0 0 40px var(--hud-green-dim);
+  animation: pulse-glow 2.6s ease-in-out infinite;
+}
+
+.headerIcon svg {
+  width: 26px;
+  height: 26px;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px var(--hud-green-dim),
+      0 0 32px var(--hud-green-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 22px var(--hud-green),
+      0 0 54px var(--hud-green-dim);
+  }
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--hud-pink);
+  text-shadow: 0 0 10px var(--hud-pink-dim);
+}
+
+.title {
+  margin: 0 0 4px;
+  font-family: var(--hud-font-display);
+  font-weight: 900;
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  letter-spacing: 0.02em;
+  color: var(--hud-text);
+  text-shadow:
+    0 0 8px var(--hud-blue-dim),
+    0 0 24px var(--hud-blue-dim);
+}
+
+.subtitle {
+  margin: 0;
+  font-family: var(--hud-font-mono);
+  font-size: 13px;
+  color: var(--hud-text-dim);
+}
+
+/* --- readiness meter ------------------------------------------------------ */
+
+.readiness {
+  position: relative;
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-sm);
+}
+
+.readinessHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--hud-text-dim);
+}
+
+.readinessPct {
+  color: var(--hud-blue);
+  font-weight: 700;
+}
+
+.readinessTrack {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.readinessFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--hud-blue), var(--hud-green));
+  box-shadow: 0 0 12px var(--hud-green-dim);
+  transition: width 260ms ease;
+}
+
+.readinessFill[data-armed="true"] {
+  background: linear-gradient(90deg, var(--hud-green), var(--hud-green));
+  animation: armed-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes armed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px var(--hud-green-dim);
+  }
+  50% {
+    box-shadow: 0 0 22px var(--hud-green);
+  }
+}
+
+.readinessStatus {
+  margin: var(--space-2) 0 0;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--hud-text-dim);
+}
+
+.readinessStatus[data-armed="true"] {
+  color: var(--hud-green);
+  text-shadow: 0 0 8px var(--hud-green-dim);
+}
+
+/* --- error --------------------------------------------------------------- */
+
+.errorBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 59, 92, 0.08);
+  border: 1px solid var(--hud-danger);
+  border-radius: var(--radius-sm);
+  color: var(--hud-danger);
+  box-shadow: 0 0 16px rgba(255, 59, 92, 0.15);
+}
+
+.errorBanner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.errorBanner strong {
+  display: block;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.errorBanner p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--hud-text);
+}
+
+/* --- layout ---------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: start;
+  }
+}
+
+.colMain,
+.colSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* --- fields ------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hud-blue);
+}
+
+.fieldLabel svg {
+  width: 14px;
+  height: 14px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--hud-font-mono);
+  font-size: 14px;
+  color: var(--hud-text);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: 4px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--hud-text-dim);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--hud-green);
+  box-shadow:
+    0 0 0 1px var(--hud-green),
+    0 0 16px var(--hud-green-dim);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.hint {
+  margin: 0;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+}
+
+.hint--active {
+  color: var(--hud-green);
+}
+
+/* --- panel (side-column groups) ------------------------------------------ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-sm);
+}
+
+/* --- chips (activity type / level) --------------------------------------- */
+
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Terrain — asked to stay on one row rather than wrap. No overflow-x/absolutely-positioned
+   child mix here (unlike TracksPage.module.css's dropdown bug), so a plain scroll is safe. */
+.chipGroupRow {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.chipInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip:has(.chipInput:checked) {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 14px var(--hud-green-dim);
+}
+
+/* Difficulty class — each tier gets its own glow colour, escalating in intensity from
+   Beginners (calm green, smallest glow) to World Tour (brightest, widest glow) — asked for
+   directly ("each will more glow color"). */
+.chip[data-level="beginner"]:has(.chipInput:checked) {
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 10px var(--hud-green-dim);
+}
+
+.chip[data-level="intermediate"]:has(.chipInput:checked) {
+  background: var(--hud-blue);
+  border-color: var(--hud-blue);
+  box-shadow:
+    0 0 14px var(--hud-blue-dim),
+    0 0 26px var(--hud-blue-dim);
+}
+
+.chip[data-level="masters"]:has(.chipInput:checked) {
+  background: var(--hud-pink);
+  border-color: var(--hud-pink);
+  box-shadow:
+    0 0 16px var(--hud-pink-dim),
+    0 0 32px var(--hud-pink-dim);
+}
+
+.chip[data-level="elite"]:has(.chipInput:checked) {
+  background: var(--hud-amber);
+  border-color: var(--hud-amber);
+  box-shadow:
+    0 0 18px var(--hud-amber-dim),
+    0 0 40px var(--hud-amber-dim);
+}
+
+.chip[data-level="world_tour"]:has(.chipInput:checked) {
+  background: var(--hud-danger);
+  border-color: var(--hud-danger);
+  box-shadow:
+    0 0 20px var(--hud-danger-dim),
+    0 0 50px var(--hud-danger-dim),
+    0 0 70px var(--hud-danger-dim);
+  animation: world-tour-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes world-tour-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px var(--hud-danger-dim),
+      0 0 50px var(--hud-danger-dim),
+      0 0 70px var(--hud-danger-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 26px var(--hud-danger),
+      0 0 60px var(--hud-danger-dim),
+      0 0 90px var(--hud-danger-dim);
+  }
+}
+
+.chip:has(.chipInput:focus-visible) {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+/* --- track / flight path -------------------------------------------------- */
+
+.trackBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-blue);
+  background: transparent;
+  border: 1px dashed var(--hud-blue-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.trackBtn:hover {
+  border-style: solid;
+  box-shadow: 0 0 12px var(--hud-blue-dim);
+}
+
+.trackPicked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--hud-panel-raised);
+  border: 1px solid var(--hud-green-dim);
+  border-radius: 4px;
+}
+
+.trackPickedName {
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hud-green);
+}
+
+.trackPickedMeta {
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+}
+
+.trackRemove {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-danger);
+  background: transparent;
+  border: 1px solid var(--hud-danger);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mapFrame {
+  position: relative;
+  padding: 4px;
+  border: 1px solid var(--hud-green-dim);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mapFrame::before {
+  content: "ROUTE SCAN";
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 5;
+  font-family: var(--hud-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--hud-green);
+  text-shadow: 0 0 6px var(--hud-bg);
+  pointer-events: none;
+}
+
+.mapLoading {
+  padding: var(--space-3);
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+  text-align: center;
+}
+
+/* --- comms (visibility) segmented toggle ----------------------------------- */
+
+.comms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.commsOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--hud-line);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.commsOption svg {
+  width: 14px;
+  height: 14px;
+}
+
+.commsOption[data-active="true"] {
+  color: var(--hud-bg);
+  background: var(--hud-blue);
+  border-color: var(--hud-blue);
+  box-shadow: 0 0 14px var(--hud-blue-dim);
+}
+
+.commsOption[data-active="true"][data-tone="broadcast"] {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 14px var(--hud-green-dim);
+}
+
+/* --- switch (clearance / approval) ----------------------------------------- */
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.switchInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switchTrack {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--hud-line);
+  border-radius: 999px;
+  transition: all 150ms ease;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--hud-text-dim);
+  border-radius: 50%;
+  transition: all 150ms ease;
+}
+
+.switchInput:checked + .switchTrack {
+  background: rgba(255, 47, 166, 0.14);
+  border-color: var(--hud-pink);
+  box-shadow: 0 0 12px var(--hud-pink-dim);
+}
+
+.switchInput:checked + .switchTrack .switchThumb {
+  left: 20px;
+  background: var(--hud-pink);
+  box-shadow: 0 0 8px var(--hud-pink);
+}
+
+.switchInput:focus-visible + .switchTrack {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+.switchLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  color: var(--hud-text-dim);
+}
+
+.switchLabel svg {
+  width: 14px;
+  height: 14px;
+  color: var(--hud-pink);
+}
+
+/* --- go live (edit mode only) -------------------------------------------- */
+
+/* A very clear, separate action from Save — "i must see very clerwaf rok start to manange
+   event or to go live": green (not the create page's green/blue gradient) so it reads
+   unmistakably as "this one starts the event right now," distinct from Save. */
+.goLiveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  margin-bottom: var(--space-2);
+  font-family: var(--hud-font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #04120a;
+  background: #39ff8c;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow:
+    0 0 18px rgba(57, 255, 140, 0.45),
+    0 0 40px rgba(57, 255, 140, 0.25);
+  animation: go-live-pulse 2s ease-in-out infinite;
+}
+
+.goLiveBtn:disabled {
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  cursor: not-allowed;
+  animation: none;
+}
+
+@keyframes go-live-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 16px rgba(57, 255, 140, 0.4),
+      0 0 32px rgba(57, 255, 140, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 26px rgba(57, 255, 140, 0.65),
+      0 0 52px rgba(57, 255, 140, 0.3);
+  }
+}
+
+/* --- launch button ----------------------------------------------------- */
+
+.launchBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 56px;
+  margin-top: var(--space-5);
+  font-family: var(--hud-font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hud-bg);
+  background: linear-gradient(90deg, var(--hud-green), var(--hud-blue));
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow:
+    0 0 20px var(--hud-green-dim),
+    0 0 40px var(--hud-blue-dim);
+  transition:
+    transform 100ms ease,
+    box-shadow 150ms ease;
+}
+
+.launchBtn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.launchBtn:disabled {
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.launchBtn:not(:disabled) {
+  animation: launch-ready 2.2s ease-in-out infinite;
+}
+
+@keyframes launch-ready {
+  0%,
+  100% {
+    box-shadow:
+      0 0 16px var(--hud-green-dim),
+      0 0 32px var(--hud-blue-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 28px var(--hud-green),
+      0 0 52px var(--hud-blue-dim);
+  }
+}

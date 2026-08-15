@@ -1,0 +1,11 @@
+.map {
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-sunken);
+  /* Isolates Leaflet's internal panes into their own stacking context — see TrackMap.module
+     .css's fuller comment. Same issue is possible here even without a dropdown/modal over
+     this map today, so fixing it at the source rather than only where it's been noticed. */
+  position: relative;
+  z-index: 0;
+}

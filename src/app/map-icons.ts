@@ -1,0 +1,114 @@
+// Shared Leaflet marker icons for RouteMap.tsx and TrackMap.tsx — a small triangle inside the
+// start circle pointing the way the route goes, a flag for the finish, and a few sparse
+// direction arrows along the line so the ride's direction reads at a glance without needing to
+// tap Start first. Asked for directly: "best ui ux not to bif [big]" — kept deliberately small
+// and sparse (directionArrowIndices caps it at 3 arrows, skipped on short routes) rather than
+// arrows on every segment.
+
+import L from "leaflet";
+
+function toRad(deg: number): number {
+  return (deg * Math.PI) / 180;
+}
+function toDeg(rad: number): number {
+  return (rad * 180) / Math.PI;
+}
+
+/** Compass bearing in degrees (0 = north, clockwise) from one point to the next. */
+export function bearingDeg(from: [number, number], to: [number, number]): number {
+  const phi1 = toRad(from[0]);
+  const phi2 = toRad(to[0]);
+  const deltaLambda = toRad(to[1] - from[1]);
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x =
+    Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+/** A handful of evenly-spaced indices to place direction arrows at — empty for a route too
+ * short to need them, capped at 3 so a busy multi-track map never gets cluttered. */
+export function directionArrowIndices(pointCount: number): number[] {
+  if (pointCount < 6) return [];
+  return [0.25, 0.5, 0.75]
+    .map((f) => Math.round(f * (pointCount - 1)))
+    .filter((i) => i > 0 && i < pointCount - 1);
+}
+
+export function startIcon(headingDeg: number, color = "#3edda4"): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;">
+      <svg width="10" height="10" viewBox="0 0 10 10" style="transform:rotate(${headingDeg}deg)">
+        <polygon points="5,0 10,10 0,10" fill="#fff" />
+      </svg>
+    </div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+export function finishIcon(color = "#df4b7b"): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;">🏁</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+export function directionArrowIcon(headingDeg: number, color = "#63a6fc"): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<svg width="13" height="13" viewBox="0 0 14 14" style="transform:rotate(${headingDeg}deg);filter:drop-shadow(0 0 1px rgba(0,0,0,.5));">
+      <polygon points="7,1 13,12 1,12" fill="${color}" />
+    </svg>`,
+    iconSize: [13, 13],
+    iconAnchor: [6, 6],
+  });
+}
+
+/** Live-map rider marker: a small square (same "3x3px square" visual language as
+ * SplashScreen's rider dots — see splash-screen.css) with an optional direction arrow, sized
+ * up and outlined when selected from the rider list below the map. `stale` (no update within
+ * config.staleAfterMs) dims it rather than hiding it — still real, just not fresh. */
+export function riderSquareIcon(
+  headingDeg: number | null,
+  opts: { color?: string; stale?: boolean; selected?: boolean } = {},
+): L.DivIcon {
+  const color = opts.color ?? "#fb923c";
+  const size = opts.selected ? 14 : 9;
+  const arrow =
+    headingDeg != null
+      ? `<div style="position:absolute;top:-5px;left:50%;width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:5px solid ${color};transform-origin:50% 7px;transform:translateX(-50%) rotate(${headingDeg}deg);"></div>`
+      : "";
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="position:relative;width:${size}px;height:${size}px;opacity:${opts.stale ? 0.4 : 1};">
+      <div style="width:100%;height:100%;background:${color};border-radius:2px;box-shadow:0 0 4px ${color}${opts.selected ? ";outline:2px solid #fff" : ""};"></div>
+      ${arrow}
+    </div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+/** The viewer's own device position — a distinct blue "you are here" dot, never confused with
+ * a rider square or the red SOS marker. Client-side only: this app displays positions, it
+ * never transmits them (see AGENT.md). */
+export function selfPositionIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#4285f4;border:2px solid #fff;box-shadow:0 0 0 4px rgba(66,133,244,.35);"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+export function restStopIcon(color = "#3edda4"): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;">☕</div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}

@@ -8,6 +8,9 @@
  * card itself still adapts to dark mode.
  */
 
+/* Fluorescent green/blue border + glow, asked for directly ("green libt blue floruents
+   border") — reuses the same two colors the status tag already carries (upcoming's teal-green,
+   live's light blue) rather than introducing a third accent. Brightens further on hover. */
 .card {
   position: relative;
   display: flex;
@@ -17,15 +20,56 @@
   min-height: 104px;
   padding: 5px;
   background: var(--surface);
-  box-shadow: 0 0 12px rgba(41, 48, 66, 0.08);
+  border: 1px solid rgba(62, 221, 164, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(99, 166, 252, 0.15),
+    0 0 14px rgba(62, 221, 164, 0.18),
+    0 0 22px rgba(99, 166, 252, 0.12);
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
-  transition: transform 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(62, 221, 164, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(99, 166, 252, 0.3),
+    0 0 20px rgba(62, 221, 164, 0.32),
+    0 0 32px rgba(99, 166, 252, 0.22),
+    0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
 .card:active {
   transform: scale(0.99);
+}
+
+/* Flags the ride just created on EventCreatePage.tsx — asked for directly, so it stands out
+   from the rest of the list at a glance for a few minutes rather than blending straight in.
+   See EventsListPage.tsx for how long "isNew" stays true. */
+.card[data-new] {
+  box-shadow:
+    0 0 0 2px var(--accent-strong),
+    0 0 15px 15px rgba(63, 134, 231, 0.35);
+  animation: new-card-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes new-card-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent-strong),
+      0 0 15px 12px rgba(63, 134, 231, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent-strong),
+      0 0 15px 18px rgba(63, 134, 231, 0.45);
+  }
 }
 
 .image {
@@ -57,10 +101,42 @@
   gap: 8px;
 }
 
+/* Edit shortcut — only rendered for a ride this rider owns that hasn't started yet (see
+   EventCard.tsx's canEdit). Sits between the title and status tag rather than stealing a
+   whole extra row. */
+.editBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.editBtn:hover {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.editBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: "Abel", var(--font-sans);
-  font-size: 16px;
-  line-height: 20px;
+  font-size: 17px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
+  line-height: 21px;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -123,17 +199,86 @@
   align-items: center;
   gap: 6px;
   font-family: "Abel", var(--font-sans);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  line-height: 15px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Location, as a tappable button (opens Waze) rather than plain text — "icon for location
+   that open waze or google map", asked for directly. Otherwise identical to .metaItem; reset
+   from a native <button> baseline since it's not a <span> like its siblings. */
+.metaLinkItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-family: "Abel", var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  line-height: 15px;
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.metaLinkItem:hover {
+  text-decoration: underline;
+}
+
 .metaIcon {
   width: 14px;
   height: 14px;
-  color: var(--text);
+  color: #3edda4;
   flex-shrink: 0;
+}
+
+/* Difficulty "stairs" — same read-only signal-bars idea and storm-intensity color-per-level
+   scheme as EventCreatePage.module.css's difficulty picker / EventDetailPage.module.css's
+   own copy of it. Only the current level's bar is lit. */
+.levelBars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 15px;
+}
+
+.levelBar {
+  width: 5px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border);
+}
+
+.levelBar[data-level="beginner"][data-filled="true"] {
+  background: #39ff8c;
+  border-color: #39ff8c;
+}
+
+.levelBar[data-level="intermediate"][data-filled="true"] {
+  background: #c3ff39;
+  border-color: #c3ff39;
+}
+
+.levelBar[data-level="masters"][data-filled="true"] {
+  background: #ffb020;
+  border-color: #ffb020;
+}
+
+.levelBar[data-level="elite"][data-filled="true"] {
+  background: #ff3b5c;
+  border-color: #ff3b5c;
+}
+
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: #b026ff;
+  border-color: #b026ff;
 }

@@ -151,8 +151,8 @@ export function EventGroupsPage() {
   const isRace = event?.type === "RACE";
 
   useEffect(() => {
-    if (eventId && event) ensureParticipantsLoaded(eventId, isRace);
-  }, [eventId, event, isRace, ensureParticipantsLoaded]);
+    if (eventId && event) void ensureParticipantsLoaded(eventId);
+  }, [eventId, event, ensureParticipantsLoaded]);
 
   const groups = (eventId && groupsByEvent[eventId]) || [];
   const clampedIndex = Math.min(groupIndex, Math.max(groups.length - 1, 0));

@@ -17,6 +17,7 @@ import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
+import { COUNTRIES, flagEmoji } from "../lib/countries";
 
 export function ProfileSetupPage() {
   const { profile, updateProfile } = useAuth();
@@ -26,6 +27,10 @@ export function ProfileSetupPage() {
   const [lastName, setLastName] = useState(profile?.lastName ?? "");
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergencyPhone ?? "");
+  // TEMPORARY: kept out of the updateProfile() call below until the server has a `country`
+  // column on users — see BUGS.md / the country-filter feature. Required in the UI now so
+  // the field, its validation and the picker are all in place for when that lands.
+  const [country, setCountry] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -100,7 +105,26 @@ export function ProfileSetupPage() {
           Kept for a future emergency feature. It is not shown to anyone in this version.
         </p>
 
-        <button className="button" type="submit" disabled={busy}>
+        <label htmlFor="country">Country</label>
+        <select
+          id="country"
+          value={country}
+          onChange={(event) => setCountry(event.target.value)}
+          autoComplete="country"
+          required
+        >
+          <option value="" disabled>
+            Select your country
+          </option>
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {flagEmoji(c.code)} {c.name}
+            </option>
+          ))}
+        </select>
+        <p className="muted">Used to show you rides near you first. You can change this later.</p>
+
+        <button className="button" type="submit" disabled={busy || !country}>
           Save and continue
         </button>
       </form>

@@ -1,6 +1,9 @@
 .map {
   width: 100%;
-  height: 380px;
+  /* Fills whatever height its container gives it — pages/LiveEventPage.tsx (the only caller
+     now) sizes that container to most of the viewport, since the map is the whole point of
+     that page, not a panel inside a longer scroll like the old inline usage was. */
+  height: 100%;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--surface-sunken);

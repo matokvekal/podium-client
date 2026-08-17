@@ -12,11 +12,6 @@ import type { RiderLevel } from "../lib/rider-level";
 interface EventExtras {
   level: RiderLevel | null;
   organizerGroup: string | null;
-  /** "Open for all, but I still approve each rider" — see the doc comment on
-   * EventCreatePage.tsx's `requiresApproval` state for why this is preview-only for now: the
-   * server doesn't yet default self-joiners to `waiting_approval`, so this flag has nothing to
-   * enforce it yet. */
-  requiresApproval: boolean;
   /** Links this event into a team's shared schedule (store/teamsStore.ts) — distinct from
    * organizerGroup, which is just the display string. Set together via setTeam() when the
    * organizer picks a team on EventCreatePage.tsx, so organizerGroup always mirrors the
@@ -30,7 +25,6 @@ interface EventExtras {
 const EMPTY_EXTRAS: EventExtras = {
   level: null,
   organizerGroup: null,
-  requiresApproval: false,
   teamId: null,
   activityType: null,
 };
@@ -39,7 +33,6 @@ interface EventExtrasState {
   byEvent: Record<string, EventExtras>;
   setLevel(eventId: string, level: RiderLevel | null): void;
   setOrganizerGroup(eventId: string, name: string): void;
-  setRequiresApproval(eventId: string, value: boolean): void;
   setTeam(eventId: string, teamId: string | null, teamName: string | null): void;
   setActivityType(eventId: string, activityType: SurfaceType): void;
 }
@@ -67,15 +60,6 @@ export const useEventExtrasStore = create<EventExtrasState>()(
               ...(state.byEvent[eventId] ?? EMPTY_EXTRAS),
               organizerGroup: trimmed || null,
             },
-          },
-        }));
-      },
-
-      setRequiresApproval(eventId, value) {
-        set((state) => ({
-          byEvent: {
-            ...state.byEvent,
-            [eventId]: { ...(state.byEvent[eventId] ?? EMPTY_EXTRAS), requiresApproval: value },
           },
         }));
       },

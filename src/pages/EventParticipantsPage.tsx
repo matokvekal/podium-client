@@ -1,18 +1,21 @@
 /**
- * Participants — the start list, manual add, edit/delete, registration approval, and
- * event-day check-in, all in one page. Owner-only (same "not permitted" pattern
- * EventDetailPage's own actions rely on, just enforced as a full-page gate here since this
- * page has nothing else on it for a non-owner to see).
+ * Participants — the start list, manual add, edit/delete, registration approval, event-day
+ * check-in, and (once live) Pause/Resume + Stop, all in one page. Owner-only (same "not
+ * permitted" pattern EventDetailPage's own actions rely on, just enforced as a full-page gate
+ * here since this page has nothing else on it for a non-owner to see).
  *
  * Route:    /events/:eventId/participants
- * Loads:    GET /events/:eventId for the event's name/type/isOwner (same endpoint
- *           EventDetailPage uses); the participant list itself is mock-seeded — see
- *           lib/mock-participants.ts and store/participantsStore.ts — standing in for
- *           plan/07-api-contract.md's Participants endpoints, none of which are built
- *           server-side yet (see plan/server-tasks.md Part D).
+ * Loads:    GET /events/:eventId for the event's name/type/isOwner/status/isPaused (same
+ *           endpoint EventDetailPage uses); the participant list itself comes from the real
+ *           participants module (elnino-server/src/modules/participants) via
+ *           store/participantsStore.ts.
  * Actions:  add a participant by hand (name/phone/email, +bib/category for a race), edit or
- *           delete one, approve/reject a self-registered rider, mark present for event-day
- *           check-in (persisted — see participantsStore.ts).
+ *           delete one, approve/reject a self-registered rider — all real, server-backed
+ *           mutations now. Event-day check-in and "mark finished" stay a local-only overlay
+ *           (participantsStore.ts's own doc comment) — the server has the DB columns for both
+ *           but no write endpoint yet. While the event is live: Pause/Resume tracking and Stop
+ *           (finish) — this page doubles as the restricted "Manage" view once live, not a
+ *           separate screen, per the plan's "same slot, two lives" Start/LIVE design.
  *
  * "Import from file" (Excel/CSV, mentioned in the API contract for races) is shown but
  * disabled for RACE events only — explicitly asked for, explicitly deferred: real parsing and
@@ -24,6 +27,8 @@ import {
   Check,
   CheckCircle2,
   Pencil,
+  Radio,
+  Square,
   Trash2,
   Upload,
   UserPlus,
@@ -36,7 +41,7 @@ import { Link, useParams } from "react-router-dom";
 import { ParticipantFormSheet, type ParticipantFormValues } from "../app/ParticipantFormSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
-import { getCachedEvent } from "../lib/local-db";
+import { type EventStatus, getCachedEvent } from "../lib/local-db";
 import type { Participant } from "../lib/mock-participants";
 import { useEventGroupsStore } from "../store/eventGroupsStore";
 import { useParticipantsStore } from "../store/participantsStore";
@@ -47,6 +52,8 @@ interface EventInfo {
   name: string;
   type: "RIDE" | "RACE";
   isOwner: boolean;
+  status: EventStatus;
+  isPaused: boolean;
 }
 
 const EMPTY_FORM: ParticipantFormValues = {
@@ -76,6 +83,8 @@ export function EventParticipantsPage() {
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pauseBusy, setPauseBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Participant | null>(null);
@@ -108,6 +117,8 @@ export function EventParticipantsPage() {
         name: cached.name,
         type: cached.type,
         isOwner: profile != null && profile.id === cached.ownerId,
+        status: cached.status,
+        isPaused: false,
       });
       setError(null);
       setLoading(false);
@@ -142,8 +153,44 @@ export function EventParticipantsPage() {
   const isRace = event?.type === "RACE";
 
   useEffect(() => {
-    if (eventId && event) ensureLoaded(eventId, isRace);
-  }, [eventId, event, isRace, ensureLoaded]);
+    if (eventId && event)
+      ensureLoaded(eventId).catch(() => setActionError("Could not load participants."));
+  }, [eventId, event, ensureLoaded]);
+
+  async function togglePause(next: boolean) {
+    if (!eventId) return;
+    setPauseBusy(true);
+    setActionError(null);
+    try {
+      const updated = await apiRequest<{ isPaused: boolean }>(`/events/${eventId}/pause`, {
+        method: "PATCH",
+        body: { paused: next },
+      });
+      setEvent((e) => (e ? { ...e, isPaused: updated.isPaused } : e));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not change pause state.");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
+  async function stopEvent() {
+    if (!eventId) return;
+    if (!window.confirm("Stop this event? It finishes permanently and can't be reopened.")) return;
+    setPauseBusy(true);
+    setActionError(null);
+    try {
+      const updated = await apiRequest<{ status: EventStatus }>(`/events/${eventId}/status`, {
+        method: "PATCH",
+        body: { status: "finished" },
+      });
+      setEvent((e) => (e ? { ...e, status: updated.status } : e));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not stop this event.");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
 
   const participants = (eventId && byEvent[eventId]) || [];
 
@@ -203,6 +250,44 @@ export function EventParticipantsPage() {
           </Link>
         </div>
       </div>
+
+      {actionError && (
+        <p className="banner banner--error" role="alert">
+          {actionError}
+        </p>
+      )}
+
+      {event.status === "live" && (
+        <div className="card row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+          <span className="row" style={{ gap: 8 }}>
+            <Radio width={16} height={16} aria-hidden="true" />
+            {event.isPaused ? "Tracking is paused" : "Live now"}
+          </span>
+          <div className="row">
+            <Link className="button button--quiet" to={`/events/${event.id}/live`}>
+              LIVE map
+            </Link>
+            <button
+              type="button"
+              className="button button--quiet"
+              disabled={pauseBusy}
+              onClick={() => togglePause(!event.isPaused)}
+            >
+              {event.isPaused ? "Resume tracking" : "Pause tracking"}
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={pauseBusy}
+              onClick={stopEvent}
+              title="Finish this event permanently"
+            >
+              <Square width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
+              Stop
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="row" style={{ justifyContent: "space-between" }}>
         <span className="badge">{participants.length} total</span>
@@ -274,7 +359,14 @@ export function EventParticipantsPage() {
                   <button
                     type="button"
                     className={styles.iconBtn}
-                    onClick={() => eventId && setRegistrationStatus(eventId, p.id, "approved")}
+                    onClick={() =>
+                      eventId &&
+                      setRegistrationStatus(eventId, p.id, "approved").catch((err) =>
+                        setActionError(
+                          err instanceof ApiError ? err.message : "Could not approve.",
+                        ),
+                      )
+                    }
                     aria-label="Approve"
                     title="Approve"
                   >
@@ -283,26 +375,21 @@ export function EventParticipantsPage() {
                   <button
                     type="button"
                     className={styles.iconBtn}
-                    onClick={() => eventId && setRegistrationStatus(eventId, p.id, "rejected")}
+                    onClick={() =>
+                      eventId &&
+                      setRegistrationStatus(eventId, p.id, "rejected").catch((err) =>
+                        setActionError(err instanceof ApiError ? err.message : "Could not reject."),
+                      )
+                    }
                     aria-label="Reject"
                     title="Reject"
                   >
                     <XCircle width={17} height={17} aria-hidden="true" />
                   </button>
                 </div>
-              ) : p.registrationStatus === "approved" ? (
-                <button
-                  type="button"
-                  className={styles.statusBadge}
-                  data-status={p.registrationStatus}
-                  onClick={() =>
-                    eventId && setRegistrationStatus(eventId, p.id, "waiting_approval")
-                  }
-                  title="Unapprove — send back to pending"
-                >
-                  approved
-                </button>
               ) : (
+                // "approved" here has no way back to pending server-side (only approve/reject
+                // exist, not an unapprove) — a plain badge, not a button, unlike before.
                 <span className={styles.statusBadge} data-status={p.registrationStatus}>
                   {p.registrationStatus.replace("_", " ")}
                 </span>
@@ -322,7 +409,9 @@ export function EventParticipantsPage() {
                 className={styles.iconBtn}
                 onClick={() => {
                   if (eventId && window.confirm(`Remove ${p.name} from this event?`)) {
-                    deleteParticipant(eventId, p.id);
+                    deleteParticipant(eventId, p.id).catch((err) =>
+                      setActionError(err instanceof ApiError ? err.message : "Could not remove."),
+                    );
                   }
                 }}
                 aria-label="Delete"
@@ -343,7 +432,13 @@ export function EventParticipantsPage() {
           groupOptions={groups}
           onClose={() => setAddOpen(false)}
           onSubmit={(values) => {
-            if (eventId) addParticipant(eventId, values);
+            if (eventId) {
+              addParticipant(eventId, values).catch((err) =>
+                setActionError(
+                  err instanceof ApiError ? err.message : "Could not add participant.",
+                ),
+              );
+            }
             setAddOpen(false);
           }}
         />
@@ -357,7 +452,11 @@ export function EventParticipantsPage() {
           groupOptions={groups}
           onClose={() => setEditing(null)}
           onSubmit={(values) => {
-            if (eventId) updateParticipant(eventId, editing.id, values);
+            if (eventId) {
+              updateParticipant(eventId, editing.id, values).catch((err) =>
+                setActionError(err instanceof ApiError ? err.message : "Could not save changes."),
+              );
+            }
             setEditing(null);
           }}
           extraActions={
@@ -366,7 +465,9 @@ export function EventParticipantsPage() {
               className="button button--quiet"
               onClick={() => {
                 if (eventId && window.confirm(`Remove ${editing.name} from this event?`)) {
-                  deleteParticipant(eventId, editing.id);
+                  deleteParticipant(eventId, editing.id).catch((err) =>
+                    setActionError(err instanceof ApiError ? err.message : "Could not remove."),
+                  );
                   setEditing(null);
                 }
               }}

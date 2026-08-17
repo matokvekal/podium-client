@@ -24,8 +24,16 @@ body {
   font-size: var(--text-base);
   color: var(--text);
   background:
-    radial-gradient(120% 90% at 5% -20%, rgba(99, 166, 252, 0.14), transparent 58%),
-    radial-gradient(120% 90% at 100% 0%, rgba(62, 221, 164, 0.1), transparent 58%),
+    radial-gradient(
+      120% 90% at 5% -20%,
+      rgba(99, 166, 252, 0.14),
+      transparent 58%
+    ),
+    radial-gradient(
+      120% 90% at 100% 0%,
+      rgba(62, 221, 164, 0.1),
+      transparent 58%
+    ),
     linear-gradient(180deg, #f2f6fc 0%, #fcfeff 100%);
   -webkit-font-smoothing: antialiased;
 }
@@ -33,8 +41,16 @@ body {
 @media (prefers-color-scheme: dark) {
   body {
     background:
-      radial-gradient(120% 90% at 5% -20%, rgba(99, 166, 252, 0.16), transparent 58%),
-      radial-gradient(120% 90% at 100% 0%, rgba(62, 221, 164, 0.08), transparent 58%),
+      radial-gradient(
+        120% 90% at 5% -20%,
+        rgba(99, 166, 252, 0.16),
+        transparent 58%
+      ),
+      radial-gradient(
+        120% 90% at 100% 0%,
+        rgba(62, 221, 164, 0.08),
+        transparent 58%
+      ),
       linear-gradient(180deg, rgb(13 17 23) 0%, rgb(15 20 30) 100%);
   }
 }
@@ -74,6 +90,26 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+/* Plain, unstyled form fields (no CSS-module .input class) still need an explicit
+   background + text color — without it they keep the browser's native white field
+   background in dark mode too, while `color: inherit` above resolves to the near-white
+   --text token, making typed text unreadable. */
+input,
+select,
+textarea {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+}
+
+textarea {
+  min-height: calc(var(--tap-target) * 2);
+  padding: var(--space-2) var(--space-3);
 }
 
 :focus-visible {
@@ -392,6 +428,15 @@ textarea {
 .banner--error {
   border-color: var(--status-danger);
   color: var(--status-danger);
+}
+
+.banner--success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-color: var(--status-live);
+  color: var(--text);
 }
 
 /* --- layout helpers --------------------------------------------------------- */

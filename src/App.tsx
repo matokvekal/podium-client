@@ -15,6 +15,7 @@ import { EventGroupsPage } from "./pages/EventGroupsPage";
 import { EventParticipantsPage } from "./pages/EventParticipantsPage";
 import { EventsListPage } from "./pages/EventsListPage";
 import { JoinPage } from "./pages/JoinPage";
+import { LiveEventPage } from "./pages/LiveEventPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
@@ -114,16 +115,27 @@ export function App() {
           </OpenHome>
         }
       />
-      {/* Participants (start list, check-in, approvals) — owner-only, so this needs a real
-          identity behind it, unlike the detail page above. mock-participants.ts stands in for
-          plan/07-api-contract.md's Participants endpoints, none built server-side yet — see
-          plan/server-tasks.md Part D. */}
+      {/* Participants — owner-only start list/check-in/approvals. Once an event is live this
+          doubles as the restricted "Manage" view (pause/resume, stop) — same page, not a
+          separate screen; see EventParticipantsPage.tsx's own doc comment. */}
       <Route
         path="/events/:eventId/participants"
         element={
           <RequireAuth>
             <EventParticipantsPage />
           </RequireAuth>
+        }
+      />
+      {/* The live map — fully separate from the event detail page on purpose (asked for
+          directly: "event page and live are 2 different pages... not same page with 2 maps").
+          Open, same as the detail page: a public event's live locations (if show_live_locations
+          allows it) are viewable by a guest, not just a signed-in participant. */}
+      <Route
+        path="/events/:eventId/live"
+        element={
+          <OpenHome>
+            <LiveEventPage />
+          </OpenHome>
         }
       />
       {/* Ride groups (Elite/Masters etc.) — owner-only, same reasoning as Participants above.

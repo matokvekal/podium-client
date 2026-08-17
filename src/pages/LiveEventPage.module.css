@@ -1,0 +1,210 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* The map is the page — most of the viewport, not a panel in a longer scroll. */
+.mapArea {
+  position: relative;
+  height: min(78vh, 760px);
+  min-height: 420px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Shared look for every floating control: large, round, thumb-reachable, high-contrast
+   against the map underneath it — matching the map's own marker visual language (solid fill,
+   white outline, drop shadow) rather than a small text button. */
+.backBtn,
+.manageBtn,
+.othersBtn,
+.shareLocationBtn,
+.ridersBtn {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target, 44px);
+  height: var(--tap-target, 44px);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.backBtn {
+  top: 12px;
+  left: 12px;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: var(--weight-bold);
+  padding-bottom: 3px;
+}
+
+.manageBtn {
+  top: 12px;
+  right: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.othersBtn,
+.shareLocationBtn,
+.ridersBtn {
+  width: 52px;
+  height: 52px;
+  right: 12px;
+}
+
+.othersBtn {
+  bottom: 128px;
+}
+
+.shareLocationBtn[aria-pressed="true"] {
+  background: var(--status-live);
+  color: #fff;
+  border-color: var(--status-live);
+}
+
+.shareLocationBtn {
+  bottom: 70px;
+}
+
+.ridersBtn {
+  bottom: 12px;
+  background: var(--accent-strong);
+  color: var(--accent-text);
+  border-color: var(--accent-strong);
+}
+
+.ridersBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--status-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+}
+
+.pausedBanner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--status-pending);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  box-shadow: var(--shadow-sm);
+}
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.drawer {
+  position: fixed;
+  z-index: 31;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--card-padding) var(--space-4);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.drawerHandle {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: var(--weight-medium);
+}
+
+.drawerClose {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+}
+
+.riderList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.riderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.riderRow[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.riderRowSelected {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+.riderName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+}

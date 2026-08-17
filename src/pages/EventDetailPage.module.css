@@ -1,10 +1,12 @@
 /*
- * Ops-deck HUD skin for the event page — same cockpit language as EventCreatePage.module.css
- * (dark field, neon glow, mono display font, corner brackets, scanline) but a different
- * palette on purpose: amber/purple/cyan "mission control" instead of Create's green/blue/pink
- * "launch," so the two pages read as related but distinct — asked for directly ("page look
- * need to be similar to create event but diff color"). Scoped entirely to this page via
- * `.page`'s own custom properties, same isolation approach as the create page.
+ * Ops-deck HUD skin for the event page — same cockpit language AND palette as
+ * EventCreatePage.module.css now (dark field, green/blue/pink neon glow, mono display font,
+ * corner brackets, scanline). Used to run its own amber/purple/cyan "mission control" palette
+ * to read as related-but-distinct from Create; reversed directly ("evnt look very bad must be
+ * very similar to toe edit like f35 cockpit but in ready mode not edit") — this is deliberately
+ * the *same* green/blue/pink now, just steady ("ready") rather than Create's pulsing
+ * launch-armed animations. Scoped entirely to this page via `.page`'s own custom properties,
+ * same isolation approach as the create page.
  *
  * The global `.card`/`.badge`/`.button`/`.muted` overrides below are what let the rest of this
  * page's markup (RiderResultRow, weather/condition badges, the results/route card, etc.) pick
@@ -13,23 +15,23 @@
  */
 
 .page {
-  --hud-bg: #05040a;
-  --hud-panel: rgba(14, 10, 22, 0.85);
-  --hud-panel-raised: rgba(22, 16, 34, 0.92);
-  --hud-line: rgba(255, 200, 120, 0.14);
-  --hud-grid: rgba(180, 120, 255, 0.05);
+  --hud-bg: #030405;
+  --hud-panel: rgba(6, 16, 14, 0.82);
+  --hud-panel-raised: rgba(10, 24, 21, 0.9);
+  --hud-line: rgba(120, 255, 210, 0.14);
+  --hud-grid: rgba(0, 255, 170, 0.05);
 
-  --hud-primary: #ffb020;
-  --hud-primary-dim: rgba(255, 176, 32, 0.35);
-  --hud-secondary: #a855f7;
-  --hud-secondary-dim: rgba(168, 85, 247, 0.35);
-  --hud-accent: #22d3ee;
-  --hud-accent-dim: rgba(34, 211, 238, 0.35);
+  --hud-primary: #39ff8c;
+  --hud-primary-dim: rgba(57, 255, 140, 0.35);
+  --hud-secondary: #ff2fa6;
+  --hud-secondary-dim: rgba(255, 47, 166, 0.4);
+  --hud-accent: #1fd9ff;
+  --hud-accent-dim: rgba(31, 217, 255, 0.35);
   --hud-danger: #ff3b5c;
-  --hud-danger-dim: rgba(255, 59, 92, 0.35);
+  --hud-danger-dim: rgba(255, 59, 92, 0.4);
 
-  --hud-text: #f3ecff;
-  --hud-text-dim: #b6a6d6;
+  --hud-text: #e4fff2;
+  --hud-text-dim: #7fb3a6;
 
   --hud-font-display: "Orbitron", var(--font-sans);
   --hud-font-mono: "Share Tech Mono", var(--font-mono);
@@ -46,16 +48,33 @@
   gap: var(--space-4);
   padding: var(--space-5);
   background:
-    repeating-linear-gradient(0deg, var(--hud-grid) 0 1px, transparent 1px 34px),
-    repeating-linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 34px),
-    radial-gradient(120% 140% at 12% -10%, rgba(168, 85, 247, 0.12), transparent 55%),
-    radial-gradient(120% 140% at 100% 110%, rgba(255, 176, 32, 0.1), transparent 55%), var(--hud-bg);
+    repeating-linear-gradient(
+      0deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    radial-gradient(
+      120% 140% at 12% -10%,
+      rgba(31, 217, 255, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      120% 140% at 100% 110%,
+      rgba(255, 47, 166, 0.1),
+      transparent 55%
+    ),
+    var(--hud-bg);
   border: 1px solid var(--hud-line);
   border-radius: var(--radius-md);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.4),
     0 30px 60px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(168, 85, 247, 0.08);
+    0 0 60px rgba(31, 217, 255, 0.08);
   overflow: hidden;
 }
 
@@ -66,9 +85,9 @@
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(34, 211, 238, 0.05) 45%,
-    rgba(34, 211, 238, 0.12) 50%,
-    rgba(34, 211, 238, 0.05) 55%,
+    rgba(57, 255, 140, 0.06) 45%,
+    rgba(57, 255, 140, 0.14) 50%,
+    rgba(57, 255, 140, 0.06) 55%,
     transparent 100%
   );
   background-size: 100% 240%;
@@ -120,11 +139,28 @@
 
 /* --- header --------------------------------------------------------------- */
 
+/* Three stacked rows — name+icon, then actions, then the join code — asked for directly
+   ("second row all butons like start edit share then the event id"). Each row is its own
+   flex line, so nothing has to fight the others for width (that fight was squeezing the name
+   down to one letter per line before). */
 .header {
   position: relative;
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.headerTop {
+  display: flex;
   align-items: center;
   gap: var(--space-4);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .headerIcon {
@@ -183,6 +219,36 @@
   box-shadow: 0 0 14px var(--hud-primary-dim);
 }
 
+/* Same shape as .shareBtn, accent-colored instead — a direct header shortcut to editing,
+   asked for directly rather than leaving it buried in the Command menu further down. */
+.editBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  color: var(--hud-accent);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-accent-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.editBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.editBtn:hover {
+  border-color: var(--hud-accent);
+  box-shadow: 0 0 14px var(--hud-accent-dim);
+}
+
 .eyebrow {
   margin: 0 0 2px;
   font-family: var(--hud-font-mono);
@@ -190,6 +256,36 @@
   letter-spacing: 0.16em;
   color: var(--hud-secondary);
   text-shadow: 0 0 10px var(--hud-secondary-dim);
+}
+
+/* Same "// LABEL" language as .eyebrow, reused for in-card section labels (Mission Brief,
+   Conditions) so they read as this page's one consistent heading style. */
+.infoLabel {
+  margin: 0 0 2px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--hud-secondary);
+}
+
+.infoBlock {
+  padding-top: 4px;
+  border-top: 1px solid var(--hud-line);
+}
+
+/* Location and start time — the two facts a rider actually needs to show up — get bigger
+   text and a glow instead of the plain muted rows everything else uses, asked for directly. */
+.highlightRow {
+  font-family: var(--hud-font-mono);
+  font-size: 1rem;
+  font-weight: var(--weight-medium);
+  color: var(--hud-text);
+  text-shadow: 0 0 10px var(--hud-accent-dim);
+}
+
+.highlightRow svg {
+  color: var(--hud-accent);
+  filter: drop-shadow(0 0 4px var(--hud-accent-dim));
 }
 
 .title {
@@ -207,12 +303,13 @@
 
 .codeTag {
   display: inline-block;
+  align-self: flex-start;
   padding: 3px 9px;
   font-family: var(--hud-font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--hud-primary);
-  background: rgba(255, 176, 32, 0.12);
+  background: rgba(57, 255, 140, 0.12);
   border: 1px solid var(--hud-primary-dim);
   border-radius: 4px;
 }
@@ -262,7 +359,7 @@
 
 .page :global(.badge--finished) {
   color: var(--hud-accent);
-  background: rgba(34, 211, 238, 0.12);
+  background: rgba(31, 217, 255, 0.12);
   border-color: var(--hud-accent-dim);
 }
 
@@ -274,8 +371,56 @@
 
 .page :global(.badge--pending) {
   color: var(--hud-primary);
-  background: rgba(255, 176, 32, 0.12);
+  background: rgba(57, 255, 140, 0.12);
   border-color: var(--hud-primary-dim);
+}
+
+/* Difficulty "stairs" — same read-only-signal-bars idea and storm-intensity color-per-level
+   scheme as EventCreatePage.module.css's difficulty picker, asked for directly ("insted of
+   intemidiate show the level step as the create"). Only the current level's bar is lit. */
+.levelBars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+  padding: 0 2px;
+}
+
+.levelBar {
+  width: 7px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--hud-line);
+}
+
+.levelBar[data-level="beginner"][data-filled="true"] {
+  background: #39ff8c;
+  border-color: #39ff8c;
+  box-shadow: 0 0 6px rgba(57, 255, 140, 0.6);
+}
+
+.levelBar[data-level="intermediate"][data-filled="true"] {
+  background: #c3ff39;
+  border-color: #c3ff39;
+  box-shadow: 0 0 6px rgba(195, 255, 57, 0.6);
+}
+
+.levelBar[data-level="masters"][data-filled="true"] {
+  background: #ffb020;
+  border-color: #ffb020;
+  box-shadow: 0 0 6px rgba(255, 176, 32, 0.6);
+}
+
+.levelBar[data-level="elite"][data-filled="true"] {
+  background: #ff3b5c;
+  border-color: #ff3b5c;
+  box-shadow: 0 0 6px rgba(255, 59, 92, 0.6);
+}
+
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: #b026ff;
+  border-color: #b026ff;
+  box-shadow: 0 0 6px rgba(176, 38, 255, 0.6);
 }
 
 .page :global(.button) {
@@ -302,22 +447,32 @@
 
 /* --- condition badges (weather/air/traffic) — dark-panel-friendly versions --- */
 
+/* A proper glowing button, not a plain inline link — "also need to see the waze button",
+   asked for directly. Blue (--hud-accent), same family as the header's Edit button. */
 .navLink {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--hud-line);
-  color: var(--hud-text);
-  font-size: 0.78rem;
+  gap: 5px;
+  padding: 5px 11px;
+  font-family: var(--hud-font-mono);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  background: rgba(31, 217, 255, 0.1);
+  border: 1px solid var(--hud-accent-dim);
+  color: var(--hud-accent);
   text-decoration: none;
   white-space: nowrap;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .navLink:hover {
-  border-color: var(--hud-accent-dim);
+  border-color: var(--hud-accent);
+  box-shadow: 0 0 12px var(--hud-accent-dim);
 }
 
 .conditionBadge {
@@ -336,9 +491,12 @@
   color: #39ff8c;
 }
 
+/* Amber/caution, independent of --hud-primary (now green, "good") — this is a real-world
+   semantic (moderate air quality/traffic), not a brand accent, so it keeps its own literal
+   color instead of following the page's green/blue/pink remap. */
 .conditionModerate {
   background: rgba(255, 176, 32, 0.16);
-  color: var(--hud-primary);
+  color: #ffb020;
 }
 
 .conditionBad {
@@ -346,14 +504,135 @@
   color: var(--hud-danger);
 }
 
-/* --- Command (organizer actions) ------------------------------------------ */
+/* --- Command (organizer actions) — now in the header, next to Edit/Share -------------- */
 
-.opsCard {
-  border: 1px solid var(--hud-secondary-dim) !important;
+/* Start/LIVE — the one organizer action that isn't a plain icon button, so it gets a text
+   label and stands out as *the* primary action. Becomes the "LIVE" link once the ride is
+   actually live (plus a separate .stopBtn next to it then). Light blue with a light-sweep
+   animation crossing it every 3s — "glowing lite blue button and the light pass every 3 sec",
+   asked for directly, in place of the earlier plain pink glow. */
+/* Wider than the icon buttons around it — "the go live/start wide but only for creator",
+   asked for directly. Owner-only already (see the isOwner guard around its two JSX forms). */
+.startBtn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  min-width: 140px;
+  height: 40px;
+  padding: 0 var(--space-5);
+  font-family: var(--hud-font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--hud-bg);
+  background: var(--hud-accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow:
+    0 0 14px var(--hud-accent-dim),
+    0 0 28px var(--hud-accent-dim);
 }
 
-.opsTitle {
-  margin: 0;
+.startBtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: start-btn-sweep 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes start-btn-sweep {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -140% 0;
+  }
+}
+
+.startBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.startBtn:disabled::after {
+  animation: none;
+}
+
+/* Stop — only ever shown next to the LIVE link while the ride is actually live, asked for
+   directly ("i need some stop event that make it past"). Danger red, no sweep: the light
+   animation is reserved for the "start something" action, not "end something." */
+.stopBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  height: 40px;
+  padding: 0 var(--space-4);
+  font-family: var(--hud-font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-danger);
+  background: rgba(255, 59, 92, 0.1);
+  border: 1px solid var(--hud-danger);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.stopBtn:hover {
+  background: rgba(255, 59, 92, 0.18);
+}
+
+.stopBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Overflow trigger for what's left in the Command sheet (Participants/Groups/Cancel) — same
+   40x40 icon-button shape as Edit/Share, muted rather than accent-colored since it's "more
+   actions," not a primary one. */
+.menuTriggerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  color: var(--hud-text-dim);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.menuTriggerIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.menuTriggerIcon:hover {
+  border-color: var(--hud-text-dim);
+  color: var(--hud-text);
 }
 
 .primaryAction {
@@ -377,25 +656,6 @@
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.menuTrigger {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-3);
-  font-family: var(--hud-font-mono);
-  font-size: 0.85rem;
-  letter-spacing: 0.02em;
-  color: var(--hud-text);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--hud-line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.menuTrigger:hover {
-  border-color: var(--hud-secondary-dim);
 }
 
 /* Bottom sheet, ~1/3 of the viewport tall — a small dropdown here was getting missed

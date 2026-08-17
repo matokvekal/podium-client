@@ -36,12 +36,13 @@
 
 import {
   AlertTriangle,
-  Clock3,
+  CalendarDays,
   MapPin,
+  Mountain,
   Navigation,
   Pencil,
   Phone,
-  QrCode,
+  Ruler,
   Settings,
   Share2,
   Users,
@@ -49,8 +50,15 @@ import {
   Wind,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { mockLevel, mockOrganizerName } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RiderResultRow } from "../app/RiderResultRow";
@@ -67,7 +75,7 @@ import {
 import { seedParticipantCount } from "../lib/mock-participants";
 import { SURFACE_TYPE_ICON } from "../lib/mock-tracks";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
-import { LEVEL_ICON, LEVEL_LABEL } from "../lib/rider-level";
+import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { formatLocalDateTime } from "../lib/time";
 import { getEventTraffic } from "../lib/traffic";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
@@ -79,8 +87,17 @@ const RouteMap = lazy(() => import("../app/RouteMap"));
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
-  import("../app/ShareEventSheet").then((m) => ({ default: m.ShareEventSheet })),
+  import("../app/ShareEventSheet").then((m) => ({
+    default: m.ShareEventSheet,
+  })),
 );
+
+interface MyParticipant {
+  id: number;
+  registrationStatus:
+    "registered" | "waiting_approval" | "approved" | "rejected";
+  attendanceStatus: "unknown" | "present" | "dns" | "started";
+}
 
 interface EventDetail {
   id: string;
@@ -98,10 +115,18 @@ interface EventDetail {
   description: string | null;
   finishedAt: string | null;
   isOwner: boolean;
+  requiresApproval: boolean;
+  isPaused: boolean;
+  effectiveStatus: EventStatus;
+  showParticipants: boolean;
+  showLiveLocations: boolean;
+  myParticipant: MyParticipant | null;
 }
 
 /** Mirrors the server's transition graph (event.service.ts) with a button label per step. */
-const NEXT_STATUS: Partial<Record<EventStatus, { status: EventStatus; label: string }>> = {
+const NEXT_STATUS: Partial<
+  Record<EventStatus, { status: EventStatus; label: string }>
+> = {
   draft: { status: "published", label: "Publish" },
   published: { status: "registration_open", label: "Open registration" },
   registration_open: { status: "ready", label: "Mark ready" },
@@ -109,7 +134,13 @@ const NEXT_STATUS: Partial<Record<EventStatus, { status: EventStatus; label: str
   live: { status: "finished", label: "Finish" },
 };
 
-const CANCELLABLE: EventStatus[] = ["draft", "published", "registration_open", "ready", "live"];
+const CANCELLABLE: EventStatus[] = [
+  "draft",
+  "published",
+  "registration_open",
+  "ready",
+  "live",
+];
 
 // The cache only ever holds the summary shape (whatever a list screen last saw) — the
 // fields a list never has (description, requiresBib, finishedAt, isOwner) get an honest
@@ -120,18 +151,30 @@ const CANCELLABLE: EventStatus[] = ["draft", "published", "registration_open", "
 // never resolves), fall back to the same profile.id === ownerId check EventTile.tsx already
 // uses on the tile itself. Without this, every mock "my ride" looked read-only forever: no
 // Manage/Participants/Share/Start-Finish, nothing to preview any event status in.
-function detailFromCachedSummary(summary: EventSummary, viewerId: number | null): EventDetail {
+function detailFromCachedSummary(
+  summary: EventSummary,
+  viewerId: number | null,
+): EventDetail {
   return {
     ...summary,
     requiresBib: false,
     description: null,
     finishedAt: null,
     isOwner: viewerId != null && viewerId === summary.ownerId,
+    requiresApproval: false,
+    isPaused: false,
+    effectiveStatus: summary.status,
+    showParticipants: true,
+    showLiveLocations: true,
+    myParticipant: null,
   };
 }
 
 export function EventDetailPage() {
   const { eventId } = useParams();
+  const location = useLocation();
+  const redirectMessage =
+    (location.state as { message?: string } | null)?.message ?? null;
   const { profile } = useAuth();
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
 
@@ -141,6 +184,8 @@ export function EventDetailPage() {
   const [busy, setBusy] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [registerBusy, setRegisterBusy] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
 
   const results = useResultsStore((state) => state.results);
   const resultsLoading = useResultsStore((state) => state.loading);
@@ -228,33 +273,80 @@ export function EventDetailPage() {
     };
   }, [event]);
 
-  async function changeStatus(nextStatus: EventStatus) {
+  // confirmMessage is only passed for the two consequential transitions (going live, and
+  // finishing/stopping) — asked for directly ("it ask are you sure also for start"). The
+  // earlier low-stakes steps (Publish, Open registration, Mark ready) stay one-tap, same as
+  // Cancel's own window.confirm above.
+  async function changeStatus(
+    nextStatus: EventStatus,
+    confirmMessage?: string,
+  ) {
     if (!eventId) return;
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
     setBusy(true);
     setError(null);
     try {
-      const updated = await apiRequest<EventDetail>(`/events/${eventId}/status`, {
-        method: "PATCH",
-        body: { status: nextStatus },
-      });
+      const updated = await apiRequest<EventDetail>(
+        `/events/${eventId}/status`,
+        {
+          method: "PATCH",
+          body: { status: nextStatus },
+        },
+      );
       setEvent(updated);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not change the event status.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not change the event status.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
+  // Reuses the frozen POST /events/join (keyed by the event's own code) rather than a new
+  // endpoint — the same call JoinPage.tsx makes for a code/QR join, just triggered from here.
+  async function handleRegister() {
+    if (!event) return;
+    setRegisterBusy(true);
+    setRegisterError(null);
+    try {
+      await apiRequest(`/events/join`, {
+        method: "POST",
+        body: { eventCode: event.code },
+      });
+      await load();
+    } catch (err) {
+      setRegisterError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not register. Try again.",
+      );
+    } finally {
+      setRegisterBusy(false);
+    }
+  }
+
   async function cancelEvent() {
     if (!eventId) return;
-    if (!window.confirm("Cancel this event? Riders will no longer be able to join.")) return;
+    if (
+      !window.confirm(
+        "Cancel this event? Riders will no longer be able to join.",
+      )
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
-      const updated = await apiRequest<EventDetail>(`/events/${eventId}`, { method: "DELETE" });
+      const updated = await apiRequest<EventDetail>(`/events/${eventId}`, {
+        method: "DELETE",
+      });
       setEvent(updated);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not cancel this event.");
+      setError(
+        err instanceof ApiError ? err.message : "Could not cancel this event.",
+      );
     } finally {
       setBusy(false);
     }
@@ -279,12 +371,11 @@ export function EventDetailPage() {
 
   if (!event) return null;
 
-  // Auto-treat a past-due event as finished, client-side — asked for directly ("after date
-  // passed ... it can be changed"). No server cron exists to actually transition it, so this
-  // is a display-only computation, recomputed fresh on every load, not something written back.
-  // Only ever moves *toward* finished, never overrides an owner's real cancel/finish action —
-  // and only once endsAt (or startsAt, if the event never got an end time) has genuinely
-  // passed, not the moment it starts, so a same-day live ride doesn't flip mid-ride.
+  // The server now computes the same "past-due counts as finished" rule (event.effectiveStatus,
+  // see event.service.ts's computeEffectiveStatus) so every client agrees without a cron job
+  // ever writing the real status back. Fall back to the same calc locally only for the instant
+  // the cached summary is painted, before the real fetch (which always includes
+  // effectiveStatus) resolves.
   const scheduledEnd = event.endsAt ?? event.startsAt;
   const isPastDue =
     scheduledEnd != null &&
@@ -292,7 +383,8 @@ export function EventDetailPage() {
     event.status !== "finished" &&
     event.status !== "cancelled" &&
     event.status !== "live";
-  const displayStatus: EventStatus = isPastDue ? "finished" : event.status;
+  const displayStatus: EventStatus =
+    event.effectiveStatus ?? (isPastDue ? "finished" : event.status);
 
   const next = NEXT_STATUS[displayStatus];
   const routePoint = results?.route.points[0] ?? null;
@@ -306,36 +398,134 @@ export function EventDetailPage() {
   // yet (no server column), so a deterministic mock fills in rather than showing blank; the
   // point is that whatever the card promised before the click is what's still here after it.
   const level = extras.level ?? mockLevel(event.id);
-  const LevelIcon = LEVEL_ICON[level];
+  const levelIndex = LEVELS.findIndex((l) => l.value === level);
   const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
   const riderCount = seedParticipantCount(event.id);
 
   return (
     <section className={styles.page}>
       <div className={styles.deck}>
-        <span className={`${styles.corner} ${styles.cornerTl}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerTr}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerBl}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerBr}`} aria-hidden="true" />
+        <span
+          className={`${styles.corner} ${styles.cornerTl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerTr}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBr}`}
+          aria-hidden="true"
+        />
 
         <div className={styles.header}>
-          <div className={styles.headerIcon}>
-            <ActivityIcon aria-hidden="true" />
+          {/* Row 1: icon beside the name — "up the event name and at side the activity
+              icon", asked for directly. */}
+          <div className={styles.headerTop}>
+            <div className={styles.headerIcon}>
+              <ActivityIcon aria-hidden="true" />
+            </div>
+            <div className={styles.headerText}>
+              <h1 className={styles.title}>{event.name}</h1>
+              <span className={styles.codeTag}>{event.code}</span>
+            </div>
           </div>
-          <div className={styles.headerText}>
-            <p className={styles.eyebrow}>{"// EVENT OPS"}</p>
-            <h1 className={styles.title}>{event.name}</h1>
-            <span className={styles.codeTag}>{event.code}</span>
+          {/* Row 2: the action buttons, all together — "second row all butons like start
+              edit share", asked for directly. Wraps if it doesn't fit one line. */}
+          <div className={styles.headerActions}>
+            {/* Edit was previously reachable only through the Command menu further down the
+                page — asked for directly to put it right in the header instead, next to Share.
+                Same guard as that menu item: gone once live/finished, since the server blocks
+                general-detail edits past that point anyway (EventCreatePage.tsx's edit-mode
+                guard). Links to the same EventCreatePage component Create uses, in edit mode. */}
+            {event.isOwner &&
+              displayStatus !== "live" &&
+              displayStatus !== "finished" && (
+                <Link
+                  className={styles.editBtn}
+                  to={`/events/${event.id}/edit`}
+                  aria-label="Edit this event"
+                  title="Edit event"
+                >
+                  <Pencil aria-hidden="true" />
+                </Link>
+              )}
+            {/* Was buried in a "Command" card at the bottom of the page — asked for directly
+                ("the orgenize action is at end and that not good must be up"), moved into the
+                header next to Edit/Share. Same slot, two lives: while live this is the "LIVE"
+                link straight to the dedicated live page (asked for: "if it allredy started
+                then the caption change to LIVE ... that bring us to new page"), plus a
+                separate Stop button next to it ("i need some stop event that make it past");
+                otherwise it fires the next status transition (Publish/Open registration/etc.),
+                with a confirm prompt on the two consequential ones (going live, finishing). */}
+            {event.isOwner &&
+              (displayStatus === "live" ? (
+                <>
+                  <Link
+                    className={styles.startBtn}
+                    to={`/events/${event.id}/live`}
+                  >
+                    LIVE
+                  </Link>
+                  <button
+                    type="button"
+                    className={styles.stopBtn}
+                    disabled={busy}
+                    onClick={() =>
+                      changeStatus(
+                        "finished",
+                        "Stop this event and mark it finished? This can't be undone.",
+                      )
+                    }
+                  >
+                    Stop
+                  </button>
+                </>
+              ) : (
+                next && (
+                  <button
+                    type="button"
+                    className={styles.startBtn}
+                    disabled={busy}
+                    onClick={() =>
+                      changeStatus(
+                        next.status,
+                        next.status === "live"
+                          ? "Go live now? Riders will see the ride as started."
+                          : undefined,
+                      )
+                    }
+                  >
+                    {next.label}
+                  </button>
+                )
+              ))}
+            <button
+              type="button"
+              className={styles.shareBtn}
+              onClick={() => setShareOpen(true)}
+              aria-label="Share this event"
+              title="Share — code, QR, link"
+            >
+              <Share2 aria-hidden="true" />
+            </button>
+            {event.isOwner && (
+              <button
+                type="button"
+                className={styles.menuTriggerIcon}
+                onClick={() => setMenuOpen(true)}
+                aria-expanded={menuOpen}
+                aria-label="More organizer actions"
+                title="More organizer actions"
+              >
+                <Settings aria-hidden="true" />
+              </button>
+            )}
           </div>
-          <button
-            type="button"
-            className={styles.shareBtn}
-            onClick={() => setShareOpen(true)}
-            aria-label="Share this event"
-            title="Share — code, QR, link"
-          >
-            <Share2 aria-hidden="true" />
-          </button>
         </div>
 
         {error && (
@@ -343,7 +533,9 @@ export function EventDetailPage() {
             {error}
           </p>
         )}
+        {redirectMessage && <p className="banner">{redirectMessage}</p>}
 
+        {/* --- quick facts: the status strip every viewer scans first ------------------- */}
         <div className="card stack">
           <div className="row">
             <span
@@ -356,81 +548,209 @@ export function EventDetailPage() {
                       ? "badge badge--danger"
                       : "badge badge--pending"
               }
-              title={isPastDue ? "Automatically marked finished — the date has passed" : undefined}
+              title={
+                isPastDue
+                  ? "Automatically marked finished — the date has passed"
+                  : undefined
+              }
             >
               {displayStatus.replace("_", " ")}
             </span>
             <span className="badge">{event.visibility}</span>
-            <span className="badge">
-              <LevelIcon width={12} height={12} aria-hidden="true" />
-              {LEVEL_LABEL[level]}
+            {/* Same steps visual (and color-per-level scheme) as the create page's difficulty
+                picker, asked for directly ("insted of intemidiate show the level step as the
+                create"). Read-only here — just the current level lit. */}
+            <span
+              className={styles.levelBars}
+              title={LEVEL_LABEL[level]}
+              aria-label={`Difficulty: ${LEVEL_LABEL[level]}`}
+            >
+              {LEVELS.map((l, i) => (
+                <span
+                  key={l.value}
+                  className={styles.levelBar}
+                  data-level={l.value}
+                  data-filled={i === levelIndex}
+                  style={{ height: `${6 + i * 4}px` }}
+                />
+              ))}
             </span>
             <span className="badge">
               <Users width={12} height={12} aria-hidden="true" />
               {riderCount} riders
             </span>
-            {extras.requiresApproval && event.isOwner && (
+            {results?.route.distanceKm != null && (
+              <span className="badge">
+                <Ruler width={12} height={12} aria-hidden="true" />
+                {results.route.distanceKm} km
+              </span>
+            )}
+            {results?.route.elevationM != null && (
+              <span className="badge">
+                <Mountain width={12} height={12} aria-hidden="true" />
+                {results.route.elevationM} m
+              </span>
+            )}
+            {event.requiresApproval && event.isOwner && (
               <span
                 className="badge"
-                title="Preview only — self-joiners are still confirmed immediately until the server supports this. See plan/server-tasks.md."
+                title="Riders who join must be approved before they're in"
               >
                 Approval required
               </span>
             )}
+            {event.isPaused && (
+              <span
+                className="badge badge--pending"
+                title="The organizer has paused live tracking"
+              >
+                Paused
+              </span>
+            )}
           </div>
-          {event.location && (
-            <p className="muted row" style={{ margin: 0, gap: "6px" }}>
-              {event.location}
-              {wazeHref && (
-                <a
-                  href={wazeHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.navLink}
-                  aria-label="Navigate with Waze"
-                  title="Navigate with Waze"
-                >
-                  <Navigation width={14} height={14} aria-hidden="true" />
-                  Waze
-                </a>
-              )}
-              {googleMapsHref && (
-                <a
-                  href={googleMapsHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.navLink}
-                  aria-label="Navigate with Google Maps"
-                  title="Navigate with Google Maps"
-                >
-                  <MapPin width={14} height={14} aria-hidden="true" />
-                  Maps
-                </a>
-              )}
-            </p>
-          )}
-          {event.startsAt && (
-            <p className="muted" style={{ margin: 0 }}>
-              Starts {formatLocalDateTime(event.startsAt)}
-            </p>
-          )}
-          <p className="muted row" style={{ margin: 0, gap: "6px" }}>
-            <Users width={14} height={14} aria-hidden="true" />
-            Organized by {organizer}
-          </p>
-          {event.description && <p style={{ margin: 0 }}>{event.description}</p>}
         </div>
 
-        {displayStatus === "live" && (
-          <LiveTracking
-            eventId={event.id}
-            isOwner={event.isOwner}
-            busy={busy}
-            onFinish={() => changeStatus("finished")}
-            routePoints={results?.route.points ?? []}
-            wazeHref={wazeHref}
-          />
-        )}
+        {/* Owner gets the LIVE entry point in the header's Start/LIVE button — this compact
+            summary is only for a non-owner viewer, who has no such control. The full live map
+            itself is never embedded here; it's the fully separate /events/:eventId/live page. */}
+        {displayStatus === "live" &&
+          !event.isOwner &&
+          event.showLiveLocations && (
+            <LiveTracking eventId={event.id} isPaused={event.isPaused} />
+          )}
+
+        {/* --- primary CTA: right under the status strip, not buried under everything else
+            ("pro ux" reorg) — a browsing rider's next step should be the second thing on the
+            page, not the fifth. --------------------------------------------------------- */}
+        {!event.isOwner &&
+          profile &&
+          displayStatus !== "finished" &&
+          displayStatus !== "cancelled" && (
+            <div className="card stack">
+              {event.myParticipant ? (
+                <span
+                  className="badge"
+                  data-status={event.myParticipant.registrationStatus}
+                >
+                  {event.myParticipant.registrationStatus === "waiting_approval"
+                    ? "Pending approval"
+                    : event.myParticipant.registrationStatus === "rejected"
+                      ? "Registration rejected"
+                      : event.myParticipant.registrationStatus === "approved"
+                        ? "Approved"
+                        : "Registered"}
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.primaryAction}
+                    disabled={registerBusy}
+                    onClick={handleRegister}
+                  >
+                    {event.requiresApproval
+                      ? "Request to Register"
+                      : "Register"}
+                  </button>
+                  {registerError && (
+                    <p className="banner banner--error" role="alert">
+                      {registerError}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+        {!event.isOwner &&
+          !profile &&
+          displayStatus !== "finished" &&
+          displayStatus !== "cancelled" && (
+            <Link
+              className={`button ${styles.primaryAction}`}
+              to="/login"
+              state={{ from: `/events/${event.id}` }}
+            >
+              Sign in to register
+            </Link>
+          )}
+
+        {/* --- at a glance: where/when/who, one card, one source of truth per field (was
+            split across two cards before — start time and organizer each shown twice) ----- */}
+        <div className="card stack">
+          {/* Date and location share one row — "near dat add the location field", asked for
+              directly (was two separate lines before). */}
+          {(event.startsAt || event.location) && (
+            <p
+              className={`${styles.highlightRow} row`}
+              style={{ margin: 0, gap: "14px", flexWrap: "wrap" }}
+            >
+              {event.startsAt && (
+                <span className="row" style={{ gap: "6px" }}>
+                  <CalendarDays width={16} height={16} aria-hidden="true" />
+                  {formatLocalDateTime(event.startsAt)}
+                </span>
+              )}
+              {event.location && (
+                <span className="row" style={{ gap: "6px" }}>
+                  <MapPin width={16} height={16} aria-hidden="true" />
+                  {event.location}
+                  {wazeHref && (
+                    <a
+                      href={wazeHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.navLink}
+                      aria-label="Navigate with Waze"
+                      title="Navigate with Waze"
+                    >
+                      <Navigation width={14} height={14} aria-hidden="true" />
+                      Waze
+                    </a>
+                  )}
+                  {googleMapsHref && (
+                    <a
+                      href={googleMapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.navLink}
+                      aria-label="Navigate with Google Maps"
+                      title="Navigate with Google Maps"
+                    >
+                      <MapPin width={14} height={14} aria-hidden="true" />
+                      Maps
+                    </a>
+                  )}
+                </span>
+              )}
+            </p>
+          )}
+          <div className="row" style={{ gap: "6px" }}>
+            <p className="muted row" style={{ margin: 0, gap: "6px" }}>
+              <Users width={14} height={14} aria-hidden="true" />
+              Organized by {organizer}
+            </p>
+            {/* Flag/phone come from the (async, mock-until-server) results endpoint, so they
+                fade in once that resolves rather than blocking this always-available line. */}
+            {results && countryFlagEmoji(results.organizer.countryCode) && (
+              <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
+                {countryFlagEmoji(results.organizer.countryCode)}
+              </span>
+            )}
+            {results?.organizer.phone && (
+              <span className="muted row" style={{ margin: 0, gap: "4px" }}>
+                <Phone width={14} height={14} aria-hidden="true" />
+                {results.organizer.phone}
+              </span>
+            )}
+          </div>
+          {event.description && (
+            <div className={styles.infoBlock}>
+              <p className={styles.infoLabel}>{"// MISSION BRIEF"}</p>
+              <p style={{ margin: 0 }}>{event.description}</p>
+            </div>
+          )}
+        </div>
 
         {resultsLoading && !results && (
           <div className="row">
@@ -447,33 +767,11 @@ export function EventDetailPage() {
 
         {results && (
           <div className="stack">
+            {/* Organizer contact and start time now live once, in the "at a glance" card
+                above (they were duplicated here before — same two facts, two different
+                cards). This card is conditions only now. */}
             <div className="card stack">
-              {(countryFlagEmoji(results.organizer.countryCode) || results.organizer.phone) && (
-                <div className="row">
-                  {(() => {
-                    const flag = countryFlagEmoji(results.organizer.countryCode);
-                    return (
-                      flag && (
-                        <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
-                          {flag}
-                        </span>
-                      )
-                    );
-                  })()}
-                  {results.organizer.phone && (
-                    <span className="muted row" style={{ gap: "4px" }}>
-                      <Phone width={14} height={14} aria-hidden="true" />
-                      {results.organizer.phone}
-                    </span>
-                  )}
-                </div>
-              )}
-              {event.startsAt && (
-                <p className="muted row" style={{ margin: 0, gap: "6px" }}>
-                  <Clock3 width={14} height={14} aria-hidden="true" />
-                  {formatLocalDateTime(event.startsAt)}
-                </p>
-              )}
+              <p className={styles.infoLabel}>{"// CONDITIONS"}</p>
               <div className="row" style={{ flexWrap: "wrap" }}>
                 <span
                   className={`${styles.conditionBadge} ${
@@ -490,7 +788,9 @@ export function EventDetailPage() {
                 </span>
                 <span
                   className={`${styles.conditionBadge} ${
-                    traffic.level === "ok" ? styles.conditionGood : styles.conditionBad
+                    traffic.level === "ok"
+                      ? styles.conditionGood
+                      : styles.conditionBad
                   }`}
                   title="Illustrative — no live traffic provider yet"
                 >
@@ -507,59 +807,48 @@ export function EventDetailPage() {
                   <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
                     {forecast.emoji}
                   </span>
-                  {forecast.source === "historical" ? "Recorded" : "Forecast"}: {forecast.label} ·{" "}
-                  {forecast.tempMinC}°–{forecast.tempMaxC}°C
-                  {forecast.cloudCoverPct != null && ` · ${forecast.cloudCoverPct}% cloud`}
-                  {forecast.windSpeedKmh != null && ` · ${forecast.windSpeedKmh} km/h wind`}
+                  {forecast.source === "historical" ? "Recorded" : "Forecast"}:{" "}
+                  {forecast.label} · {forecast.tempMinC}°–{forecast.tempMaxC}°C
+                  {forecast.cloudCoverPct != null &&
+                    ` · ${forecast.cloudCoverPct}% cloud`}
+                  {forecast.windSpeedKmh != null &&
+                    ` · ${forecast.windSpeedKmh} km/h wind`}
                   {forecast.precipitationChancePct != null &&
                     ` · ${forecast.precipitationChancePct}% rain`}
-                  {!!forecast.precipitationMm && ` (${forecast.precipitationMm} mm)`}
+                  {!!forecast.precipitationMm &&
+                    ` (${forecast.precipitationMm} mm)`}
                   {!!forecast.snowfallCm && ` · ${forecast.snowfallCm} cm snow`}
                 </p>
               )}
             </div>
 
-            <Suspense fallback={<div className="row muted">Loading the map…</div>}>
+            <Suspense
+              fallback={<div className="row muted">Loading the map…</div>}
+            >
               <RouteMap points={results.route.points} />
             </Suspense>
 
-            <div
-              className="stack"
-              style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: "2px" }}
-            >
-              {visibleRiders.map((rider) => (
-                <RiderResultRow key={rider.id} rider={rider} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {event.isOwner && (
-          <div className={`card stack ${styles.opsCard}`}>
-            <h2 className={styles.opsTitle}>Command</h2>
-            <div className="row">
-              {/* "Finish" while live moves to the pinned action bar above the live map
-                  instead — see LiveTracking.tsx — so it isn't duplicated here. */}
-              {next && displayStatus !== "live" && (
-                <button
-                  className={styles.primaryAction}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => changeStatus(next.status)}
+            {/* "if riders are published we will see them" — the organizer's own "Riders list
+                open to view" switch (EventCreatePage.tsx) gates this for everyone else; the
+                organizer still sees their own start list regardless, same as every other
+                owner-only visibility rule on this page. */}
+            {(event.isOwner || event.showParticipants) && (
+              <>
+                <h2 style={{ margin: 0 }}>Riders ({visibleRiders.length})</h2>
+                <div
+                  className="stack"
+                  style={{
+                    maxHeight: "60vh",
+                    overflowY: "auto",
+                    paddingRight: "2px",
+                  }}
                 >
-                  {next.label}
-                </button>
-              )}
-              <button
-                type="button"
-                className={styles.menuTrigger}
-                onClick={() => setMenuOpen(true)}
-                aria-expanded={menuOpen}
-              >
-                <Settings width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
-                Organizer actions
-              </button>
-            </div>
+                  {visibleRiders.map((rider) => (
+                    <RiderResultRow key={rider.id} rider={rider} />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -596,21 +885,17 @@ export function EventDetailPage() {
                   <X width={18} height={18} aria-hidden="true" />
                 </button>
               </div>
-              <Link
-                className={styles.menuItem}
-                to={`/events/${event.id}/edit`}
-                onClick={() => setMenuOpen(false)}
-              >
-                <Pencil width={16} height={16} aria-hidden="true" />
-                Edit event
-              </Link>
+              {/* Edit and Share both moved to standalone header buttons next to this menu
+                  trigger — this sheet is just what's left over: Participants/Groups/Cancel.
+                  While live, "Participants" is relabeled "Manage": it's the same restricted
+                  page (add/remove/check-in riders, pause/stop), not a separate screen. */}
               <Link
                 className={styles.menuItem}
                 to={`/events/${event.id}/participants`}
                 onClick={() => setMenuOpen(false)}
               >
                 <Users width={16} height={16} aria-hidden="true" />
-                Participants
+                {displayStatus === "live" ? "Manage" : "Participants"}
               </Link>
               <Link
                 className={styles.menuItem}
@@ -620,17 +905,6 @@ export function EventDetailPage() {
                 <UsersRound width={16} height={16} aria-hidden="true" />
                 Groups
               </Link>
-              <button
-                type="button"
-                className={styles.menuItem}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setShareOpen(true);
-                }}
-              >
-                <QrCode width={16} height={16} aria-hidden="true" />
-                Share
-              </button>
               {CANCELLABLE.includes(displayStatus) && (
                 <button
                   type="button"

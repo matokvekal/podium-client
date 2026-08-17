@@ -22,6 +22,20 @@
   --hud-amber-dim: rgba(255, 176, 32, 0.4);
   --hud-danger: #ff3b5c;
   --hud-danger-dim: rgba(255, 59, 92, 0.4);
+  --hud-purple: #b026ff;
+  --hud-purple-dim: rgba(176, 38, 255, 0.4);
+
+  /* Difficulty signal-bars — storm-intensity gradient, calmest to fiercest. */
+  --level-beginner: var(--hud-green);
+  --level-beginner-dim: var(--hud-green-dim);
+  --level-intermediate: #c3ff39;
+  --level-intermediate-dim: rgba(195, 255, 57, 0.4);
+  --level-masters: var(--hud-amber);
+  --level-masters-dim: var(--hud-amber-dim);
+  --level-elite: var(--hud-danger);
+  --level-elite-dim: var(--hud-danger-dim);
+  --level-world_tour: var(--hud-purple);
+  --level-world_tour-dim: var(--hud-purple-dim);
 
   --hud-text: #e4fff2;
   --hud-text-dim: #7fb3a6;
@@ -39,10 +53,27 @@
   position: relative;
   padding: var(--space-5);
   background:
-    repeating-linear-gradient(0deg, var(--hud-grid) 0 1px, transparent 1px 34px),
-    repeating-linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 34px),
-    radial-gradient(120% 140% at 12% -10%, rgba(31, 217, 255, 0.12), transparent 55%),
-    radial-gradient(120% 140% at 100% 110%, rgba(255, 47, 166, 0.1), transparent 55%), var(--hud-bg);
+    repeating-linear-gradient(
+      0deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    radial-gradient(
+      120% 140% at 12% -10%,
+      rgba(31, 217, 255, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      120% 140% at 100% 110%,
+      rgba(255, 47, 166, 0.1),
+      transparent 55%
+    ),
+    var(--hud-bg);
   border: 1px solid var(--hud-line);
   border-radius: var(--radius-md);
   box-shadow:
@@ -130,11 +161,11 @@
   width: 52px;
   height: 52px;
   color: var(--hud-bg);
-  background: var(--hud-green);
+  background: var(--hud-pink);
   border-radius: 6px;
   box-shadow:
-    0 0 18px var(--hud-green-dim),
-    0 0 40px var(--hud-green-dim);
+    0 0 18px var(--hud-pink-dim),
+    0 0 40px var(--hud-pink-dim);
   animation: pulse-glow 2.6s ease-in-out infinite;
 }
 
@@ -147,23 +178,14 @@
   0%,
   100% {
     box-shadow:
-      0 0 14px var(--hud-green-dim),
-      0 0 32px var(--hud-green-dim);
+      0 0 14px var(--hud-pink-dim),
+      0 0 32px var(--hud-pink-dim);
   }
   50% {
     box-shadow:
-      0 0 22px var(--hud-green),
-      0 0 54px var(--hud-green-dim);
+      0 0 22px var(--hud-pink),
+      0 0 54px var(--hud-pink-dim);
   }
-}
-
-.eyebrow {
-  margin: 0 0 2px;
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  color: var(--hud-pink);
-  text-shadow: 0 0 10px var(--hud-pink-dim);
 }
 
 .title {
@@ -190,30 +212,10 @@
 .readiness {
   position: relative;
   margin-bottom: var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-line);
-  border-radius: var(--radius-sm);
-}
-
-.readinessHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-2);
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--hud-text-dim);
-}
-
-.readinessPct {
-  color: var(--hud-blue);
-  font-weight: 700;
 }
 
 .readinessTrack {
-  height: 8px;
+  height: 4px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   overflow: hidden;
@@ -239,19 +241,6 @@
   50% {
     box-shadow: 0 0 22px var(--hud-green);
   }
-}
-
-.readinessStatus {
-  margin: var(--space-2) 0 0;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--hud-text-dim);
-}
-
-.readinessStatus[data-armed="true"] {
-  color: var(--hud-green);
-  text-shadow: 0 0 8px var(--hud-green-dim);
 }
 
 /* --- error --------------------------------------------------------------- */
@@ -317,6 +306,29 @@
   gap: 6px;
 }
 
+/* Location and start time stay side by side even on narrow phones — asked for directly, no
+   stacking breakpoint here unlike a typical responsive form row. Start time's column is sized
+   to the datetime input itself rather than an even 1fr split — asked for directly, it doesn't
+   need as much room as location does. */
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.teamRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teamRowInput {
+  flex: 1 1 180px;
+  width: auto;
+}
+
 .fieldLabel {
   display: flex;
   align-items: center;
@@ -342,11 +354,19 @@
   font-size: 14px;
   color: var(--hud-text);
   background: var(--hud-panel);
-  border: 1px solid var(--hud-line);
+  border: 1px solid rgba(120, 255, 210, 0.34);
   border-radius: 4px;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
+}
+
+/* Fixed height on every non-textarea input — a native datetime-local control otherwise
+   renders a touch taller than a plain text input in some browsers, throwing off the
+   side-by-side Rally point/T-minus row even with align-items: start on .fieldRow. */
+.input {
+  height: 42px;
+  box-sizing: border-box;
 }
 
 .input::placeholder,
@@ -363,9 +383,130 @@
     0 0 16px var(--hud-green-dim);
 }
 
+/* Mandatory-on-create fields left unfilled at Save time — cleared the moment the organizer
+   starts fixing it (see the onChange handlers / pickEventToCopy / handleUploadRoute). */
+.inputInvalid {
+  border-color: var(--hud-danger) !important;
+  box-shadow: 0 0 10px var(--hud-danger-dim);
+}
+
+/* Route trigger — no panel chrome at all (no border/background/legend, asked for directly),
+   just the button/picked-track/map-preview it contains, flush against the left edge like any
+   other field. Only gains a border when flagged invalid at Save time. */
+.routeFieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: none;
+}
+
+.routeFieldset[data-invalid="true"] {
+  padding: var(--space-2);
+  border: 1px solid var(--hud-danger);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 14px var(--hud-danger-dim);
+}
+
 .textarea {
   resize: vertical;
   min-height: 5rem;
+}
+
+/* --- difficulty signal bars (cellular-reception style) -------------------- */
+
+.levelRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.levelBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 34px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.levelBar {
+  width: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(228, 255, 242, 0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.levelBar:hover {
+  border-color: var(--hud-blue);
+}
+
+.levelName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  font-family: var(--hud-font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  color: var(--hud-text-dim);
+}
+
+.levelName svg {
+  width: 16px;
+  height: 16px;
+}
+
+.levelName[data-level="beginner"] {
+  color: var(--level-beginner);
+}
+.levelName[data-level="intermediate"] {
+  color: var(--level-intermediate);
+}
+.levelName[data-level="masters"] {
+  color: var(--level-masters);
+}
+.levelName[data-level="elite"] {
+  color: var(--level-elite);
+}
+.levelName[data-level="world_tour"] {
+  color: var(--level-world_tour);
+}
+
+.levelBar:focus-visible {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+.levelBar[data-level="beginner"][data-filled="true"] {
+  background: var(--level-beginner);
+  border-color: var(--level-beginner);
+  box-shadow: 0 0 10px var(--level-beginner-dim);
+}
+.levelBar[data-level="intermediate"][data-filled="true"] {
+  background: var(--level-intermediate);
+  border-color: var(--level-intermediate);
+  box-shadow: 0 0 10px var(--level-intermediate-dim);
+}
+.levelBar[data-level="masters"][data-filled="true"] {
+  background: var(--level-masters);
+  border-color: var(--level-masters);
+  box-shadow: 0 0 10px var(--level-masters-dim);
+}
+.levelBar[data-level="elite"][data-filled="true"] {
+  background: var(--level-elite);
+  border-color: var(--level-elite);
+  box-shadow: 0 0 10px var(--level-elite-dim);
+}
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: var(--level-world_tour);
+  border-color: var(--level-world_tour);
+  box-shadow: 0 0 12px var(--level-world_tour-dim);
 }
 
 .hint {
@@ -441,65 +582,6 @@
   box-shadow: 0 0 14px var(--hud-green-dim);
 }
 
-/* Difficulty class — each tier gets its own glow colour, escalating in intensity from
-   Beginners (calm green, smallest glow) to World Tour (brightest, widest glow) — asked for
-   directly ("each will more glow color"). */
-.chip[data-level="beginner"]:has(.chipInput:checked) {
-  background: var(--hud-green);
-  border-color: var(--hud-green);
-  box-shadow: 0 0 10px var(--hud-green-dim);
-}
-
-.chip[data-level="intermediate"]:has(.chipInput:checked) {
-  background: var(--hud-blue);
-  border-color: var(--hud-blue);
-  box-shadow:
-    0 0 14px var(--hud-blue-dim),
-    0 0 26px var(--hud-blue-dim);
-}
-
-.chip[data-level="masters"]:has(.chipInput:checked) {
-  background: var(--hud-pink);
-  border-color: var(--hud-pink);
-  box-shadow:
-    0 0 16px var(--hud-pink-dim),
-    0 0 32px var(--hud-pink-dim);
-}
-
-.chip[data-level="elite"]:has(.chipInput:checked) {
-  background: var(--hud-amber);
-  border-color: var(--hud-amber);
-  box-shadow:
-    0 0 18px var(--hud-amber-dim),
-    0 0 40px var(--hud-amber-dim);
-}
-
-.chip[data-level="world_tour"]:has(.chipInput:checked) {
-  background: var(--hud-danger);
-  border-color: var(--hud-danger);
-  box-shadow:
-    0 0 20px var(--hud-danger-dim),
-    0 0 50px var(--hud-danger-dim),
-    0 0 70px var(--hud-danger-dim);
-  animation: world-tour-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes world-tour-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 20px var(--hud-danger-dim),
-      0 0 50px var(--hud-danger-dim),
-      0 0 70px var(--hud-danger-dim);
-  }
-  50% {
-    box-shadow:
-      0 0 26px var(--hud-danger),
-      0 0 60px var(--hud-danger-dim),
-      0 0 90px var(--hud-danger-dim);
-  }
-}
-
 .chip:has(.chipInput:focus-visible) {
   outline: 2px solid var(--hud-blue);
   outline-offset: 2px;
@@ -509,6 +591,7 @@
 
 .trackBtn {
   display: inline-flex;
+  align-self: flex-start;
   align-items: center;
   gap: 6px;
   min-height: var(--tap-target);
@@ -520,15 +603,33 @@
   text-transform: uppercase;
   color: var(--hud-blue);
   background: transparent;
-  border: 1px dashed var(--hud-blue-dim);
+  border: 1px dashed var(--hud-blue);
   border-radius: 4px;
   cursor: pointer;
+  box-shadow: 0 0 8px var(--hud-blue-dim);
   transition: all 150ms ease;
 }
 
 .trackBtn:hover {
   border-style: solid;
-  box-shadow: 0 0 12px var(--hud-blue-dim);
+  box-shadow: 0 0 14px var(--hud-blue-dim);
+}
+
+.trackBtn:disabled {
+  color: var(--hud-text-dim);
+  border-color: var(--hud-line);
+  cursor: not-allowed;
+}
+
+.trackBtnIcon {
+  filter: drop-shadow(0 0 3px var(--hud-blue))
+    drop-shadow(0 0 7px var(--hud-blue-dim));
+}
+
+.trackBtnIconPink {
+  color: var(--hud-pink);
+  filter: drop-shadow(0 0 4px var(--hud-pink))
+    drop-shadow(0 0 9px var(--hud-pink-dim));
 }
 
 .trackPicked {
@@ -611,10 +712,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 0;
+  gap: 5px;
+  padding: 6px 0;
   font-family: var(--hud-font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -627,15 +728,15 @@
 }
 
 .commsOption svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .commsOption[data-active="true"] {
   color: var(--hud-bg);
-  background: var(--hud-blue);
-  border-color: var(--hud-blue);
-  box-shadow: 0 0 14px var(--hud-blue-dim);
+  background: var(--hud-danger);
+  border-color: var(--hud-danger);
+  box-shadow: 0 0 14px var(--hud-danger-dim);
 }
 
 .commsOption[data-active="true"][data-tone="broadcast"] {
@@ -701,6 +802,48 @@
   outline-offset: 2px;
 }
 
+/* Positive-tone variant — used for switches where "on" reads as a good/open state (riders
+   list visible), not a restriction, so it lights up green instead of the default pink. */
+.switchInput:checked + .switchTrackPositive {
+  background: rgba(57, 255, 140, 0.14);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 12px var(--hud-green-dim);
+}
+
+.switchInput:checked + .switchTrackPositive .switchThumb {
+  left: 20px;
+  background: var(--hud-green);
+  box-shadow: 0 0 8px var(--hud-green);
+}
+
+/* Explicit Yes/No badge next to each switch — the track color alone wasn't a clear enough
+   "is this on or off" signal, asked for directly. */
+.switchState {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-family: var(--hud-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+}
+
+.switchStateOn {
+  color: var(--hud-bg);
+  background: var(--hud-pink);
+  border-color: var(--hud-pink);
+}
+
+.switchStateOnPositive {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+}
+
 .switchLabel {
   display: flex;
   align-items: center;
@@ -716,57 +859,6 @@
   color: var(--hud-pink);
 }
 
-/* --- go live (edit mode only) -------------------------------------------- */
-
-/* A very clear, separate action from Save — "i must see very clerwaf rok start to manange
-   event or to go live": green (not the create page's green/blue gradient) so it reads
-   unmistakably as "this one starts the event right now," distinct from Save. */
-.goLiveBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: 52px;
-  margin-bottom: var(--space-2);
-  font-family: var(--hud-font-display);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #04120a;
-  background: #39ff8c;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow:
-    0 0 18px rgba(57, 255, 140, 0.45),
-    0 0 40px rgba(57, 255, 140, 0.25);
-  animation: go-live-pulse 2s ease-in-out infinite;
-}
-
-.goLiveBtn:disabled {
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: none;
-  cursor: not-allowed;
-  animation: none;
-}
-
-@keyframes go-live-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 16px rgba(57, 255, 140, 0.4),
-      0 0 32px rgba(57, 255, 140, 0.2);
-  }
-  50% {
-    box-shadow:
-      0 0 26px rgba(57, 255, 140, 0.65),
-      0 0 52px rgba(57, 255, 140, 0.3);
-  }
-}
-
 /* --- launch button ----------------------------------------------------- */
 
 .launchBtn {
@@ -776,24 +868,29 @@
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 56px;
+  min-height: 64px;
   margin-top: var(--space-5);
   font-family: var(--hud-font-display);
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.1em;
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--hud-bg);
   background: linear-gradient(90deg, var(--hud-green), var(--hud-blue));
-  border: none;
-  border-radius: 6px;
+  border: 2px solid var(--hud-text);
+  border-radius: 8px;
   cursor: pointer;
   box-shadow:
-    0 0 20px var(--hud-green-dim),
-    0 0 40px var(--hud-blue-dim);
+    0 0 28px var(--hud-green-dim),
+    0 0 56px var(--hud-blue-dim);
   transition:
     transform 100ms ease,
     box-shadow 150ms ease;
+}
+
+.launchBtn svg {
+  width: 22px;
+  height: 22px;
 }
 
 .launchBtn:active:not(:disabled) {
@@ -815,12 +912,12 @@
   0%,
   100% {
     box-shadow:
-      0 0 16px var(--hud-green-dim),
-      0 0 32px var(--hud-blue-dim);
+      0 0 24px var(--hud-green-dim),
+      0 0 44px var(--hud-blue-dim);
   }
   50% {
     box-shadow:
-      0 0 28px var(--hud-green),
-      0 0 52px var(--hud-blue-dim);
+      0 0 40px var(--hud-green),
+      0 0 72px var(--hud-blue-dim);
   }
 }

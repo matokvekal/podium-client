@@ -6,7 +6,8 @@ import { LEVELS, type RiderLevel } from "../lib/rider-level";
 
 function hashSeed(seed: string): number {
   let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
+  for (let i = 0; i < seed.length; i++)
+    hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
   return Math.abs(hash);
 }
 
@@ -48,7 +49,11 @@ export function figmaStatus(status: EventStatus): FigmaStatus {
 
 export function statusBadgeClass(status: EventStatus): string {
   if (status === "live") return "badge badge--live";
-  if (status === "published" || status === "registration_open" || status === "ready") {
+  if (
+    status === "published" ||
+    status === "registration_open" ||
+    status === "ready"
+  ) {
     return "badge badge--pending";
   }
   if (status === "finished") return "badge badge--finished";
@@ -77,6 +82,33 @@ export function placeholderColorVar(seed: string): string {
 
 export function initialOf(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "?";
+}
+
+// "the event we came from need glow shadow under for 10 seconds to know where we came from" —
+// a card records itself here the instant it's clicked (EventCard.tsx/EventTile.tsx), and
+// EventsListPage.tsx reads + clears it once on mount. sessionStorage (not a store) specifically
+// because it has to survive the full unmount/remount round trip through EventDetailPage and
+// back via browser/back-arrow navigation, which a plain in-memory store would lose.
+const LAST_OPENED_KEY = "podium.lastOpenedEventId";
+
+export function recordOpenedEvent(id: string): void {
+  try {
+    sessionStorage.setItem(LAST_OPENED_KEY, id);
+  } catch {
+    // sessionStorage unavailable (private mode, disabled) — the "came back from" glow just
+    // won't show; nothing else here depends on it.
+  }
+}
+
+/** Reads and clears in one step — the glow is only ever meant to fire once per return trip. */
+export function consumeOpenedEventId(): string | null {
+  try {
+    const id = sessionStorage.getItem(LAST_OPENED_KEY);
+    if (id) sessionStorage.removeItem(LAST_OPENED_KEY);
+    return id;
+  } catch {
+    return null;
+  }
 }
 
 // Level and organizer/club name are client-only (see store/eventExtrasStore.ts) — set on the

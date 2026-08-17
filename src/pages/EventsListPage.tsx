@@ -41,13 +41,28 @@
  * as "stale", not an error; only an error with nothing cached shows the red banner.
  */
 
-import { ArrowUpDown, Bike, Compass, Heart, Map as MapIcon, Plus, Search } from "lucide-react";
+import {
+  ArrowUpDown,
+  Bike,
+  CheckCircle2,
+  Compass,
+  Heart,
+  Map as MapIcon,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { EmptyRidesState } from "../app/EmptyRidesState";
 import { EventCard } from "../app/EventCard";
 import { EventTile } from "../app/EventTile";
-import { FIGMA_TAG_LABEL, type FigmaStatus, figmaStatus } from "../app/event-visuals";
+import {
+  consumeOpenedEventId,
+  FIGMA_TAG_LABEL,
+  type FigmaStatus,
+  figmaStatus,
+} from "../app/event-visuals";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
 import { useEventsStore } from "../store/eventsStore";
@@ -78,7 +93,11 @@ function timestamp(iso: string | null): number {
 
 type SortKey = "date" | "name" | "area";
 const SORT_CYCLE: SortKey[] = ["date", "name", "area"];
-const SORT_LABEL: Record<SortKey, string> = { date: "Date", name: "Name", area: "Area" };
+const SORT_LABEL: Record<SortKey, string> = {
+  date: "Date",
+  name: "Name",
+  area: "Area",
+};
 
 // Home row: most recent My Rides only, before "See All" takes over.
 const HOME_ROW_LIMIT = 10;
@@ -87,7 +106,46 @@ export function EventsListPage() {
   const { status } = useAuth();
   const authed = status === "signed-in";
 
-  const [activeTab, setActiveTab] = useState<EventTab>(authed ? "myRides" : "findRides");
+  // EventCreatePage.tsx lands back here after a successful create (rather than on the new
+  // event's own page, asked for directly) and hands the event id/name along in router state
+  // so this banner can point straight at it instead of making the organizer hunt for it.
+  const location = useLocation();
+  const createdEvent = location.state as {
+    createdEventId?: string;
+    createdEventName?: string;
+  } | null;
+  const [createdBannerDismissed, setCreatedBannerDismissed] = useState(false);
+
+  // The glowing "new" ring on that event's card fades after a few minutes on its own, same as
+  // the banner staying up — asked for directly ("know its new at list for few minutes").
+  const [newHighlightExpired, setNewHighlightExpired] = useState(false);
+  useEffect(() => {
+    if (!createdEvent?.createdEventId) return;
+    const timer = setTimeout(() => setNewHighlightExpired(true), 3 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [createdEvent?.createdEventId]);
+  const newEventId =
+    createdEvent?.createdEventId && !newHighlightExpired
+      ? createdEvent.createdEventId
+      : null;
+
+  // "the event we came from need glow shadow under for 10 seconds to know where we came from"
+  // — whichever card was clicked into (EventCard.tsx/EventTile.tsx record it) lights up again
+  // for 10s once this page remounts from a back navigation. Read once via a lazy initializer,
+  // not an effect, so it's already known on the very first render — an effect would paint one
+  // frame without the glow first.
+  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(
+    () => consumeOpenedEventId(),
+  );
+  useEffect(() => {
+    if (!returnHighlightId) return;
+    const timer = setTimeout(() => setReturnHighlightId(null), 10 * 1000);
+    return () => clearTimeout(timer);
+  }, [returnHighlightId]);
+
+  const [activeTab, setActiveTab] = useState<EventTab>(
+    authed ? "myRides" : "findRides",
+  );
   // A guest (or a session that just expired) can't be sitting on My Rides — everything else
   // (Find Rides, Find Races, Track) is public.
   useEffect(() => {
@@ -103,7 +161,9 @@ export function EventsListPage() {
   const otherError = useEventsStore((state) => state.otherError);
   const loadMyRides = useEventsStore((state) => state.loadMyRides);
   const loadOtherRides = useEventsStore((state) => state.loadOtherRides);
-  const toggleFavoriteRide = useEventsStore((state) => state.toggleFavoriteRide);
+  const toggleFavoriteRide = useEventsStore(
+    (state) => state.toggleFavoriteRide,
+  );
 
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -139,7 +199,10 @@ export function EventsListPage() {
   // Upcoming, then Past, filling in up to HOME_ROW_LIMIT total tiles.
   const homeRow = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const upcomingSlice = upcoming.slice(0, Math.max(0, HOME_ROW_LIMIT - live.length));
+    const upcomingSlice = upcoming.slice(
+      0,
+      Math.max(0, HOME_ROW_LIMIT - live.length),
+    );
     const pastSlice = past.slice(
       0,
       Math.max(0, HOME_ROW_LIMIT - live.length - upcomingSlice.length),
@@ -156,7 +219,8 @@ export function EventsListPage() {
       if (favoritesOnly && !event.favorite) return false;
       if (!q) return true;
       return (
-        event.name.toLowerCase().includes(q) || (event.location ?? "").toLowerCase().includes(q)
+        event.name.toLowerCase().includes(q) ||
+        (event.location ?? "").toLowerCase().includes(q)
       );
     });
     const sorter = (a: EventSummary, b: EventSummary) => {
@@ -171,9 +235,15 @@ export function EventsListPage() {
       return timestamp(b.startsAt) - timestamp(a.startsAt);
     };
     return {
-      live: matches.filter((e) => figmaStatus(e.status) === "live").sort(sorter),
-      upcoming: matches.filter((e) => figmaStatus(e.status) === "upcoming").sort(sorter),
-      past: matches.filter((e) => figmaStatus(e.status) === "finished").sort(sorter),
+      live: matches
+        .filter((e) => figmaStatus(e.status) === "live")
+        .sort(sorter),
+      upcoming: matches
+        .filter((e) => figmaStatus(e.status) === "upcoming")
+        .sort(sorter),
+      past: matches
+        .filter((e) => figmaStatus(e.status) === "finished")
+        .sort(sorter),
       total: matches.length,
     };
   }, [myRides, q, favoritesOnly, sortBy]);
@@ -203,6 +273,38 @@ export function EventsListPage() {
 
   return (
     <div className="stack">
+      {createdEvent?.createdEventId && !createdBannerDismissed && (
+        <div className="banner banner--success" role="status">
+          <span className="row" style={{ gap: 8 }}>
+            <CheckCircle2 aria-hidden="true" />
+            {createdEvent.createdEventName
+              ? `"${createdEvent.createdEventName}" created.`
+              : "Event created."}
+          </span>
+          <span className="row" style={{ gap: 8 }}>
+            <Link
+              className="button button--quiet"
+              to={`/events/${createdEvent.createdEventId}/participants`}
+            >
+              Add riders
+            </Link>
+            <Link
+              className="button"
+              to={`/events/${createdEvent.createdEventId}`}
+            >
+              View event
+            </Link>
+            <button
+              type="button"
+              className="button button--quiet"
+              onClick={() => setCreatedBannerDismissed(true)}
+              aria-label="Dismiss"
+            >
+              <X aria-hidden="true" width={16} height={16} />
+            </button>
+          </span>
+        </div>
+      )}
       <div className={styles.tabBar}>
         {authed && (
           <button
@@ -236,7 +338,11 @@ export function EventsListPage() {
         <section className="stack">
           {showAll ? (
             <div className={styles.toolbarTop}>
-              <button type="button" className={styles.backBtn} onClick={() => setShowAll(false)}>
+              <button
+                type="button"
+                className={styles.backBtn}
+                onClick={() => setShowAll(false)}
+              >
                 ← My Rides
               </button>
             </div>
@@ -244,13 +350,25 @@ export function EventsListPage() {
             <div className="section-header">
               <div className="section-title-row">
                 <h2>My Rides</h2>
-                {myRides.length > 0 && <span className="section-count">{myRides.length}</span>}
+                {myRides.length > 0 && (
+                  <span className="section-count">{myRides.length}</span>
+                )}
               </div>
-              {myRides.length > 0 && (
-                <button type="button" className={styles.backBtn} onClick={() => setShowAll(true)}>
-                  See All
-                </button>
-              )}
+              <div className={styles.toolbarLeft}>
+                {myRides.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.backBtn}
+                    onClick={() => setShowAll(true)}
+                  >
+                    See All
+                  </button>
+                )}
+                <Link className={styles.addBtn} to="/events/new">
+                  <Plus width={15} height={15} aria-hidden="true" />
+                  Add
+                </Link>
+              </div>
             </div>
           )}
 
@@ -279,17 +397,26 @@ export function EventsListPage() {
                     type="button"
                     className={styles.iconBtn}
                     onClick={() =>
-                      setSortBy(SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length])
+                      setSortBy(
+                        SORT_CYCLE[
+                          (SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length
+                        ],
+                      )
                     }
                     title="Sort by date / name / status"
                   >
-                    <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
+                    <ArrowUpDown
+                      className={styles.iconGlyph}
+                      aria-hidden="true"
+                    />
                     <span>{SORT_LABEL[sortBy]}</span>
                   </button>
                   <button
                     type="button"
                     className={
-                      favoritesOnly ? `${styles.iconBtn} ${styles.heartActive}` : styles.iconBtn
+                      favoritesOnly
+                        ? `${styles.iconBtn} ${styles.heartActive}`
+                        : styles.iconBtn
                     }
                     onClick={() => setFavoritesOnly((v) => !v)}
                     aria-label="Show favorites only"
@@ -317,7 +444,12 @@ export function EventsListPage() {
                         Live now
                       </div>
                       {filteredMyRidesByBucket.live.map((event) => (
-                        <EventCard key={event.id} event={event} />
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          isNew={event.id === newEventId}
+                          justOpened={event.id === returnHighlightId}
+                        />
                       ))}
                     </>
                   )}
@@ -325,7 +457,12 @@ export function EventsListPage() {
                     <>
                       <div className={styles.sectionLabel}>Upcoming</div>
                       {filteredMyRidesByBucket.upcoming.map((event) => (
-                        <EventCard key={event.id} event={event} />
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          isNew={event.id === newEventId}
+                          justOpened={event.id === returnHighlightId}
+                        />
                       ))}
                     </>
                   )}
@@ -333,7 +470,12 @@ export function EventsListPage() {
                     <>
                       <div className={styles.sectionLabel}>Past</div>
                       {filteredMyRidesByBucket.past.map((event) => (
-                        <EventCard key={event.id} event={event} />
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          isNew={event.id === newEventId}
+                          justOpened={event.id === returnHighlightId}
+                        />
                       ))}
                     </>
                   )}
@@ -355,13 +497,17 @@ export function EventsListPage() {
                       key={event.id}
                       event={event}
                       onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
                     />
                   ))}
                 </>
               )}
               {homeRow.upcoming.length > 0 && (
                 <>
-                  <div className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}>
+                  <div
+                    className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}
+                  >
                     Upcoming
                   </div>
                   {homeRow.upcoming.map((event) => (
@@ -369,18 +515,26 @@ export function EventsListPage() {
                       key={event.id}
                       event={event}
                       onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
                     />
                   ))}
                 </>
               )}
               {homeRow.past.length > 0 && (
                 <>
-                  <div className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}>Past</div>
+                  <div
+                    className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}
+                  >
+                    Past
+                  </div>
                   {homeRow.past.map((event) => (
                     <EventTile
                       key={event.id}
                       event={event}
                       onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
                     />
                   ))}
                 </>
@@ -408,10 +562,6 @@ export function EventsListPage() {
               >
                 <Search className={styles.iconGlyph} aria-hidden="true" />
               </button>
-              <Link className={styles.addBtn} to="/events/new">
-                <Plus width={15} height={15} aria-hidden="true" />
-                Add
-              </Link>
             </div>
           </div>
 
@@ -432,7 +582,9 @@ export function EventsListPage() {
               <button
                 key={item.value}
                 type="button"
-                className={item.value === findFilter ? styles.pillActive : styles.pill}
+                className={
+                  item.value === findFilter ? styles.pillActive : styles.pill
+                }
                 onClick={() => setFindFilter(item.value)}
               >
                 {item.label}
@@ -456,7 +608,11 @@ export function EventsListPage() {
           ) : (
             <div className="stack event-card-list">
               {visibleFindRides.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  justOpened={event.id === returnHighlightId}
+                />
               ))}
             </div>
           )}

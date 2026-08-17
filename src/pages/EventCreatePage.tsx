@@ -9,13 +9,14 @@
  *           the one thing never prefilled in edit mode: it was never persisted anywhere on
  *           create either (see the Track section's doc comment below), so there's nothing
  *           real to show back — picking a new one just replaces whatever the event has today.
- * Actions:  create: POST /events. Edit: PATCH /events/:eventId, plus a separate "Go live now"
- *           button (PATCH .../status) — asked for directly, a one-tap shortcut distinct from
- *           Save, deliberately skipping EventDetailPage's staged draft→…→live chain (that
- *           page's own Command menu still has the step-by-step version).
- * State:    the form fields; `isEditing`/`eventStatus`/`loadingEvent` track edit-mode loading
- * Calls:    POST /events (create), PATCH /events/:eventId + PATCH /events/:eventId/status
- *           (edit)
+ * Actions:  create: POST /events. Edit: PATCH /events/:eventId. Going live is deliberately not
+ *           an action here — moved to EventDetailPage's header ("go live and start not at the
+ *           edit mode it at the page afetr i edit," confirmed directly): this page is
+ *           create/edit only, one of three modes an event's pages split into (create/edit,
+ *           view, live — see App.tsx's routes), and starting the ride belongs to view/live,
+ *           not edit.
+ * State:    the form fields; `isEditing`/`loadingEvent` track edit-mode loading
+ * Calls:    POST /events (create), PATCH /events/:eventId (edit)
  *
  * Race-only fields are hidden on this form on purpose, direct decision: this app is starting
  * with rides only, races come later (by converting a ride or adding real race support — not
@@ -95,30 +96,44 @@
 import {
   AlertTriangle,
   Bike,
+  Check,
   Clock,
   Compass,
+  Eye,
   FileText,
   Gauge,
   Lock,
+  Map as MapIcon,
   MapPin,
-  Plus,
   Radio,
-  Route as RouteIcon,
   ShieldCheck,
   Target,
   Users,
 } from "lucide-react";
-import { type FormEvent, lazy, Suspense, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
 import { type EventRoute, getEventResults } from "../lib/mock-results";
-import type { SurfaceType } from "../lib/mock-tracks";
+import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/mock-tracks";
 import { parseQuickAdd, toDatetimeLocalValue } from "../lib/quick-add-parser";
-import { LEVELS, type RiderLevel } from "../lib/rider-level";
+import {
+  LEVEL_ICON,
+  LEVEL_LABEL,
+  LEVELS,
+  type RiderLevel,
+} from "../lib/rider-level";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
+import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCreatePage.module.css";
 
@@ -136,6 +151,8 @@ interface ExistingEvent {
   startsAt: string | null;
   location: string | null;
   description: string | null;
+  requiresApproval: boolean;
+  showParticipants: boolean;
 }
 
 const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
@@ -156,42 +173,78 @@ export function EventCreatePage() {
   const [searchParams] = useSearchParams();
   const setEventLevel = useEventExtrasStore((s) => s.setLevel);
   const setOrganizerGroup = useEventExtrasStore((s) => s.setOrganizerGroup);
-  const setRequiresApprovalExtra = useEventExtrasStore((s) => s.setRequiresApproval);
   const setEventTeam = useEventExtrasStore((s) => s.setTeam);
   const setEventActivityType = useEventExtrasStore((s) => s.setActivityType);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
+  const setLastDefaults = useLastEventDefaultsStore((s) => s.setDefaults);
 
-  const myTeams = Object.values(teams).filter((t) => profile != null && t.createdBy === profile.id);
+  const myTeams = Object.values(teams).filter(
+    (t) => profile != null && t.createdBy === profile.id,
+  );
+
+  // Pre-fill from the last event this organizer created — "all data from my previous will
+  // auto fill again but i can change" — so a recurring ride doesn't start from a blank form.
+  // Only for create mode; edit mode prefills from the event being edited instead (see effect
+  // below). Read once via getState() (not a subscribed hook) since this is only ever used to
+  // seed initial state on mount, not to react to later changes.
+  const lastDefaults = isEditing
+    ? null
+    : useLastEventDefaultsStore.getState().defaults;
+  const initialTeamId =
+    searchParams.get("team") ??
+    (lastDefaults?.teamId && teams[lastDefaults.teamId]
+      ? lastDefaults.teamId
+      : "");
 
   const [name, setName] = useState("");
-  const [activityType, setActivityType] = useState<SurfaceType>("road");
-  const [level, setLevel] = useState<RiderLevel | null>(null);
-  const [teamId, setTeamId] = useState<string>(searchParams.get("team") ?? "");
+  const [activityType, setActivityType] = useState<SurfaceType>(
+    lastDefaults?.activityType ?? "mtb",
+  );
+  const [level, setLevel] = useState<RiderLevel | null>(
+    lastDefaults?.level ?? "intermediate",
+  );
+  const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
-  const [organizerGroup, setOrganizerGroupInput] = useState("");
-  const [requiresApproval, setRequiresApproval] = useState(false);
-  const [visibility, setVisibility] = useState<"public" | "private">("private");
+  const [organizerGroup, setOrganizerGroupInput] = useState(
+    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : "",
+  );
+  const [requiresApproval, setRequiresApproval] = useState(
+    lastDefaults?.requiresApproval ?? false,
+  );
+  const [ridersListVisible, setRidersListVisible] = useState(
+    lastDefaults?.ridersListVisible ?? true,
+  );
+  const [visibility, setVisibility] = useState<"public" | "private">(
+    lastDefaults?.visibility ?? "private",
+  );
   const [startsAt, setStartsAt] = useState("");
   const [startsAtEdited, setStartsAtEdited] = useState(false);
   const [dateHint, setDateHint] = useState<string | null>(null);
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(lastDefaults?.location ?? "");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mandatory-on-create fields (name/map/date) — asked for directly. Clicking Save with any
+  // of these unfilled shows a red border instead of blocking the click outright; typing in
+  // that field (or picking a route) clears its flag right away, not just on next submit.
+  const [invalidName, setInvalidName] = useState(false);
+  const [invalidStartsAt, setInvalidStartsAt] = useState(false);
+  const [invalidRoute, setInvalidRoute] = useState(false);
 
   const [copySheetOpen, setCopySheetOpen] = useState(false);
   const [copiedFrom, setCopiedFrom] = useState<EventSummary | null>(null);
   const [copiedRoute, setCopiedRoute] = useState<EventRoute | null>(null);
   const [copyLoading, setCopyLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [uploadedRestStops, setUploadedRestStops] = useState<[number, number][]>([]);
+  const [uploadedRestStops, setUploadedRestStops] = useState<
+    [number, number][]
+  >([]);
 
   const [loadingEvent, setLoadingEvent] = useState(isEditing);
-  const [eventStatus, setEventStatus] = useState<string | null>(null);
-  const [goingLive, setGoingLive] = useState(false);
 
   // Edit mode — load the existing event + its client-only extras and prefill every field,
   // "edit event take us to like the create so i change anything." Route/track is
@@ -207,18 +260,35 @@ export function EventCreatePage() {
         setName(cached.name);
         setLocation(cached.location ?? "");
         setVisibility(cached.visibility);
-        if (cached.startsAt) setStartsAt(toDatetimeLocalValue(new Date(cached.startsAt)));
-        setEventStatus(cached.status);
+        if (cached.startsAt)
+          setStartsAt(toDatetimeLocalValue(new Date(cached.startsAt)));
       }
       try {
         const found = await apiRequest<ExistingEvent>(`/events/${eventId}`);
         if (cancelled) return;
+        // The server rejects PATCH /events/:eventId once live/finished (Manage mode is
+        // add/remove riders + pause/stop only, not general details) — redirect here rather
+        // than let the save button fail after a full form load.
+        if (found.status === "live" || found.status === "finished") {
+          navigate(`/events/${eventId}`, {
+            replace: true,
+            state: {
+              message:
+                found.status === "live"
+                  ? "This event is live — use Manage to add/remove riders or stop it."
+                  : "This event has finished and can no longer be edited.",
+            },
+          });
+          return;
+        }
         setName(found.name);
         setLocation(found.location ?? "");
         setDescription(found.description ?? "");
         setVisibility(found.visibility);
-        if (found.startsAt) setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
-        setEventStatus(found.status);
+        if (found.startsAt)
+          setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
+        setRequiresApproval(found.requiresApproval);
+        setRidersListVisible(found.showParticipants);
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -230,8 +300,8 @@ export function EventCreatePage() {
       const existingExtras = useEventExtrasStore.getState().byEvent[eventId];
       if (existingExtras && !cancelled) {
         if (existingExtras.level) setLevel(existingExtras.level);
-        if (existingExtras.activityType) setActivityType(existingExtras.activityType);
-        if (existingExtras.requiresApproval) setRequiresApproval(true);
+        if (existingExtras.activityType)
+          setActivityType(existingExtras.activityType);
         if (existingExtras.teamId) setTeamId(existingExtras.teamId);
         else if (existingExtras.organizerGroup)
           setOrganizerGroupInput(existingExtras.organizerGroup);
@@ -240,11 +310,12 @@ export function EventCreatePage() {
     return () => {
       cancelled = true;
     };
-    // Deliberately only [eventId]: this must run once on mount for a given event, not every
-    // time extras change afterward (e.g. from picking a team mid-edit), or it would stomp on
-    // what the organizer just typed. Extras are read via getState() above specifically so
-    // they aren't a reactive dependency here.
-  }, [eventId]);
+    // Deliberately only [eventId, navigate]: this must run once on mount for a given event, not
+    // every time extras change afterward (e.g. from picking a team mid-edit), or it would stomp
+    // on what the organizer just typed. Extras are read via getState() above specifically so
+    // they aren't a reactive dependency here. `navigate` is referentially stable (react-router),
+    // so including it doesn't change when this effect actually re-runs.
+  }, [eventId, navigate]);
 
   // Default to the organizer's own team once it's loaded — asked for directly ("if i alredy
   // have my team it bee as default"). Only when nothing was already picked (no ?team= param,
@@ -257,16 +328,19 @@ export function EventCreatePage() {
 
   // Readiness meter: a dopamine touch, not a gate — the submit button below is still only
   // disabled on an empty name, same rule as before this page had a cockpit skin.
-  const readinessFields = [name.trim(), location.trim(), startsAt, description.trim()];
+  const readinessFields = [
+    activityType,
+    name.trim(),
+    location.trim(),
+    startsAt,
+    description.trim(),
+    copiedFrom || uploadedFileName ? "route" : "",
+  ];
   const readinessCount = readinessFields.filter(Boolean).length;
-  const readinessPct = Math.round((readinessCount / readinessFields.length) * 100);
+  const readinessPct = Math.round(
+    (readinessCount / readinessFields.length) * 100,
+  );
   const armed = readinessPct === 100;
-  const readinessStatus =
-    readinessCount === 0
-      ? "SYSTEMS OFFLINE — AWAITING INPUT"
-      : armed
-        ? "ARMED — READY FOR LAUNCH"
-        : "PRE-RIDE CHECKS IN PROGRESS";
 
   async function pickEventToCopy(event: EventSummary) {
     setCopiedFrom(event);
@@ -274,6 +348,7 @@ export function EventCreatePage() {
     setUploadedRestStops([]);
     setCopySheetOpen(false);
     setCopyLoading(true);
+    setInvalidRoute(false);
 
     // "Copy all elements except the date" — everything about the source event carries over
     // except startsAt, which stays whatever the organizer already set (or leaves blank to set
@@ -284,7 +359,11 @@ export function EventCreatePage() {
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
       setTeamId(sourceExtras.teamId);
-    } else if (!teamId && !organizerGroup.trim() && sourceExtras?.organizerGroup) {
+    } else if (
+      !teamId &&
+      !organizerGroup.trim() &&
+      sourceExtras?.organizerGroup
+    ) {
       setOrganizerGroupInput(sourceExtras.organizerGroup);
     }
 
@@ -310,6 +389,7 @@ export function EventCreatePage() {
     setCopiedRoute(uploaded.route);
     setUploadedFileName(uploaded.fileName);
     setUploadedRestStops(uploaded.restStops);
+    setInvalidRoute(false);
   }
 
   function handleDescriptionChange(value: string) {
@@ -328,10 +408,19 @@ export function EventCreatePage() {
     );
   }
 
+  // Creates the team right away instead of waiting for the whole event to save — asked for
+  // directly. Switches the dropdown over to the real team the moment it exists, same as
+  // picking any other team, so "New team name" and its Save button both disappear.
+  function saveNewTeam() {
+    if (!newTeamName.trim() || !profile) return;
+    const team = createTeam(newTeamName, profile.id);
+    setTeamId(team.id);
+    setNewTeamName("");
+  }
+
   function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
-    setRequiresApprovalExtra(id, requiresApproval);
 
     if (teamId === NEW_TEAM_OPTION && newTeamName.trim() && profile) {
       const team = createTeam(newTeamName, profile.id);
@@ -345,8 +434,36 @@ export function EventCreatePage() {
     }
   }
 
+  // Enter in any single-line field (name, location, team name, …) would otherwise submit the
+  // form natively and jump the page — asked to require an explicit button click instead.
+  // Textarea is exempt: Enter there is just a newline, never a submit trigger to begin with.
+  function blockEnterSubmit(keyEvent: KeyboardEvent<HTMLFormElement>) {
+    if (
+      keyEvent.key === "Enter" &&
+      (keyEvent.target as HTMLElement).tagName !== "TEXTAREA"
+    ) {
+      keyEvent.preventDefault();
+    }
+  }
+
   async function submit(formEvent: FormEvent) {
     formEvent.preventDefault();
+
+    // Mandatory on create: name, map/route, and date — asked for directly. Edit mode only
+    // ever requires a name, same as before: route is never prefilled back in edit (see the
+    // Track section's doc comment above), so demanding one there would trap every edit behind
+    // re-picking a track it already has.
+    const missingName = name.trim().length === 0;
+    const missingStartsAt = !isEditing && startsAt.trim().length === 0;
+    const missingRoute = !isEditing && !copiedFrom && !uploadedFileName;
+    setInvalidName(missingName);
+    setInvalidStartsAt(missingStartsAt);
+    setInvalidRoute(missingRoute);
+    if (missingName || missingStartsAt || missingRoute) {
+      setError("Fill in the highlighted fields before saving.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -362,6 +479,8 @@ export function EventCreatePage() {
             description: description || undefined,
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
+            requiresApproval,
+            showParticipants: ridersListVisible,
           },
         });
         saveExtras(eventId);
@@ -383,77 +502,77 @@ export function EventCreatePage() {
           startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
           location: location || undefined,
           description: description || undefined,
+          requiresApproval,
+          showParticipants: ridersListVisible,
         },
       });
       saveExtras(created.id);
-      navigate(`/events/${created.id}`);
+      setLastDefaults({
+        location,
+        activityType,
+        level,
+        teamId: teamId === NEW_TEAM_OPTION ? "" : teamId,
+        organizerGroup,
+        visibility,
+        requiresApproval,
+        ridersListVisible,
+      });
+      // Land back on the home screen instead of the new event's own page — asked for
+      // directly. The event id/name ride along in router state so the home screen can point
+      // straight at it (a banner linking to it) instead of making the organizer hunt for it
+      // in the list.
+      navigate("/", {
+        state: { createdEventId: created.id, createdEventName: name },
+      });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save. Try again.");
+      setError(
+        err instanceof ApiError ? err.message : "Could not save. Try again.",
+      );
     } finally {
       setBusy(false);
-    }
-  }
-
-  // "add buton green to live to start event" — a direct shortcut to live from the edit
-  // screen, separate from Save. Skips EventDetailPage's staged draft→…→live chain on purpose
-  // (asked for as a one-tap action here); that page's own Command menu still has the
-  // step-by-step version for anyone who wants it.
-  async function goLive() {
-    if (!eventId) return;
-    setGoingLive(true);
-    setError(null);
-    try {
-      await apiRequest<ExistingEvent>(`/events/${eventId}/status`, {
-        method: "PATCH",
-        body: { status: "live" },
-      });
-      navigate(`/events/${eventId}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not go live. Try again.");
-      setGoingLive(false);
     }
   }
 
   return (
     <section className={styles.page}>
       <div className={styles.cockpit}>
-        <span className={`${styles.corner} ${styles.cornerTl}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerTr}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerBl}`} aria-hidden="true" />
-        <span className={`${styles.corner} ${styles.cornerBr}`} aria-hidden="true" />
+        <span
+          className={`${styles.corner} ${styles.cornerTl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerTr}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBr}`}
+          aria-hidden="true"
+        />
 
         <header className={styles.header}>
           <div className={styles.headerIcon}>
-            <Bike aria-hidden="true" />
+            {(() => {
+              const TerrainIcon = SURFACE_TYPE_ICON[activityType];
+              return <TerrainIcon aria-hidden="true" />;
+            })()}
           </div>
           <div>
-            <p className={styles.eyebrow}>{isEditing ? "// EDIT MODE" : "// NEW MISSION"}</p>
-            <h1 className={styles.title}>{isEditing ? "Manage Ride" : "Launch a Ride"}</h1>
+            <h1 className={styles.title}>
+              {isEditing ? "Manage Ride" : "Create new event"}
+            </h1>
             <p className={styles.subtitle}>
               {isEditing
-                ? "Change anything, then save — or go live right now."
+                ? "Change anything, then save."
                 : "Set the ride plan — riders join with your code."}
             </p>
           </div>
         </header>
 
-        {isEditing && eventStatus && eventStatus !== "live" && eventStatus !== "finished" && (
-          <button
-            type="button"
-            className={styles.goLiveBtn}
-            onClick={goLive}
-            disabled={goingLive || loadingEvent}
-          >
-            <Radio aria-hidden="true" />
-            {goingLive ? "Going live…" : "Go live now — start event"}
-          </button>
-        )}
-
         <div className={styles.readiness}>
-          <div className={styles.readinessHead}>
-            <span>MISSION READINESS</span>
-            <span className={styles.readinessPct}>{readinessPct}%</span>
-          </div>
           <div className={styles.readinessTrack}>
             <div
               className={styles.readinessFill}
@@ -461,9 +580,6 @@ export function EventCreatePage() {
               style={{ width: `${readinessPct}%` }}
             />
           </div>
-          <p className={styles.readinessStatus} data-armed={armed}>
-            {readinessStatus}
-          </p>
         </div>
 
         {error && (
@@ -478,118 +594,215 @@ export function EventCreatePage() {
 
         {loadingEvent && (
           <p className={styles.hint}>
-            <span className="spinner" aria-hidden="true" style={{ marginRight: 6 }} />
+            <span
+              className="spinner"
+              aria-hidden="true"
+              style={{ marginRight: 6 }}
+            />
             Loading event…
           </p>
         )}
 
-        <form onSubmit={submit}>
+        <form onSubmit={submit} onKeyDown={blockEnterSubmit}>
+          <fieldset
+            className={styles.panel}
+            style={{ border: "none", marginBottom: "var(--space-4)" }}
+          >
+            <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
+              <Compass aria-hidden="true" />
+              Terrain
+            </legend>
+            <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
+              {ACTIVITY_TYPES.map((activity) => (
+                <label key={activity.value} className={styles.chip}>
+                  <input
+                    type="radio"
+                    name="activityType"
+                    className={styles.chipInput}
+                    checked={activityType === activity.value}
+                    onChange={() => setActivityType(activity.value)}
+                  />
+                  {activity.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div
+            className={styles.field}
+            style={{ marginBottom: "var(--space-4)" }}
+          >
+            <label className={styles.fieldLabel} htmlFor="name">
+              <Target aria-hidden="true" />
+              Event name
+            </label>
+            <input
+              id="name"
+              className={`${styles.input} ${invalidName ? styles.inputInvalid : ""}`}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (e.target.value.trim()) setInvalidName(false);
+              }}
+              placeholder="e.g. Saturday ride"
+              required
+            />
+          </div>
+
+          <fieldset
+            className={styles.routeFieldset}
+            data-invalid={invalidRoute}
+          >
+            {copiedFrom || uploadedFileName ? (
+              <div className={styles.trackPicked}>
+                <div>
+                  <div className={styles.trackPickedName}>
+                    {copiedFrom
+                      ? `Copied from ${copiedFrom.name}`
+                      : `Uploaded ${uploadedFileName}`}
+                  </div>
+                  <div className={styles.trackPickedMeta}>
+                    {copyLoading
+                      ? "Loading route…"
+                      : copiedRoute &&
+                        `${copiedRoute.distanceKm} km${copiedRoute.elevationM != null ? ` · ${copiedRoute.elevationM} m climb` : ""}${uploadedRestStops.length > 0 ? ` · ${uploadedRestStops.length} rest stop${uploadedRestStops.length === 1 ? "" : "s"}` : ""}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={styles.trackRemove}
+                  onClick={clearCopiedTrack}
+                  aria-label="Remove track"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : null}
+            {copiedRoute && (
+              <div className={styles.mapFrame}>
+                <Suspense
+                  fallback={
+                    <div className={styles.mapLoading}>Scanning route…</div>
+                  }
+                >
+                  <RouteMap
+                    points={copiedRoute.points}
+                    heightPx={160}
+                    restStops={uploadedRestStops}
+                  />
+                </Suspense>
+              </div>
+            )}
+            {!copiedFrom && !uploadedFileName && (
+              <button
+                type="button"
+                className={styles.trackBtn}
+                onClick={() => setCopySheetOpen(true)}
+              >
+                <MapIcon
+                  aria-hidden="true"
+                  size={16}
+                  className={styles.trackBtnIcon}
+                />
+                Select map or upload track file
+                <MapIcon
+                  aria-hidden="true"
+                  size={16}
+                  className={styles.trackBtnIconPink}
+                />
+              </button>
+            )}
+          </fieldset>
+
           <div className={styles.grid}>
             <div className={styles.colMain}>
               <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="name">
-                  <Target aria-hidden="true" />
-                  Event name
-                </label>
-                <input
-                  id="name"
-                  className={styles.input}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>
+                <label className={styles.fieldLabel} htmlFor="team">
                   <Users aria-hidden="true" />
                   Squad / team (optional)
-                </span>
-                <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
-                  <label className={styles.chip}>
-                    <input
-                      type="radio"
-                      name="team"
-                      className={styles.chipInput}
-                      checked={teamId === ""}
-                      onChange={() => setTeamId("")}
-                    />
-                    No team
-                  </label>
-                  {myTeams.map((t) => (
-                    <label key={t.id} className={styles.chip}>
+                </label>
+                {/* A dropdown, not a row of chips — asked for directly: "no team"/"new team"
+                    as chips wasn't clear, and a chip row doesn't scale once an organizer
+                    belongs to several teams. Every choice (none / each team / start a new one)
+                    lives in the one list. */}
+                <div className={styles.teamRow}>
+                  <select
+                    id="team"
+                    className={`${styles.input} ${styles.teamRowInput}`}
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                  >
+                    <option value="">No team</option>
+                    {myTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                    <option value={NEW_TEAM_OPTION}>+ Start a new team…</option>
+                  </select>
+                  {teamId === NEW_TEAM_OPTION && (
+                    <>
                       <input
-                        type="radio"
-                        name="team"
-                        className={styles.chipInput}
-                        checked={teamId === t.id}
-                        onChange={() => setTeamId(t.id)}
+                        className={`${styles.input} ${styles.teamRowInput}`}
+                        value={newTeamName}
+                        onChange={(e) => setNewTeamName(e.target.value)}
+                        placeholder="New team name"
+                        required
                       />
-                      <Users aria-hidden="true" size={12} />
-                      {t.name}
-                    </label>
-                  ))}
-                  <label className={styles.chip}>
+                      <button
+                        type="button"
+                        className={styles.trackBtn}
+                        onClick={saveNewTeam}
+                        disabled={!newTeamName.trim()}
+                      >
+                        <Check aria-hidden="true" size={14} />
+                        Save team
+                      </button>
+                    </>
+                  )}
+                  {!teamId && (
                     <input
-                      type="radio"
-                      name="team"
-                      className={styles.chipInput}
-                      checked={teamId === NEW_TEAM_OPTION}
-                      onChange={() => setTeamId(NEW_TEAM_OPTION)}
+                      className={`${styles.input} ${styles.teamRowInput}`}
+                      value={organizerGroup}
+                      onChange={(e) => setOrganizerGroupInput(e.target.value)}
+                      placeholder="Or just a name, e.g. Galilee Cycling Club"
                     />
-                    <Plus aria-hidden="true" size={12} />
-                    New team
-                  </label>
+                  )}
                 </div>
-                {teamId === NEW_TEAM_OPTION && (
-                  <input
-                    className={styles.input}
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    placeholder="New team name"
-                    required
-                  />
-                )}
-                {!teamId && (
-                  <input
-                    className={styles.input}
-                    value={organizerGroup}
-                    onChange={(e) => setOrganizerGroupInput(e.target.value)}
-                    placeholder="Or just a name, e.g. Galilee Cycling Club"
-                  />
-                )}
               </div>
 
-              <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="location">
-                  <MapPin aria-hidden="true" />
-                  Rally point / location
-                </label>
-                <input
-                  id="location"
-                  className={styles.input}
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </div>
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="location">
+                    <MapPin aria-hidden="true" />
+                    Location
+                  </label>
+                  <input
+                    id="location"
+                    className={styles.input}
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
+                </div>
 
-              <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="startsAt">
-                  <Clock aria-hidden="true" />
-                  T-minus / start time
-                </label>
-                <input
-                  id="startsAt"
-                  type="datetime-local"
-                  className={styles.input}
-                  value={startsAt}
-                  onChange={(e) => {
-                    setStartsAt(e.target.value);
-                    setStartsAtEdited(true);
-                    setDateHint(null);
-                  }}
-                />
-                <p className={styles.hint}>Shown to riders in their own local time.</p>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="startsAt">
+                    <Clock aria-hidden="true" />
+                    Date/time
+                  </label>
+                  <input
+                    id="startsAt"
+                    type="datetime-local"
+                    className={`${styles.input} ${invalidStartsAt ? styles.inputInvalid : ""}`}
+                    value={startsAt}
+                    onChange={(e) => {
+                      setStartsAt(e.target.value);
+                      setStartsAtEdited(true);
+                      setDateHint(null);
+                      if (e.target.value) setInvalidStartsAt(false);
+                    }}
+                  />
+                </div>
               </div>
 
               <div className={styles.field}>
@@ -601,125 +814,81 @@ export function EventCreatePage() {
                   id="description"
                   rows={3}
                   className={styles.textarea}
-                  placeholder={'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'}
+                  placeholder={
+                    'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'
+                  }
                   value={description}
                   onChange={(e) => handleDescriptionChange(e.target.value)}
                 />
                 {dateHint && (
-                  <p className={`${styles.hint} ${styles["hint--active"]}`}>{dateHint}</p>
+                  <p className={`${styles.hint} ${styles["hint--active"]}`}>
+                    {dateHint}
+                  </p>
                 )}
               </div>
             </div>
 
             <div className={styles.colSide}>
-              <fieldset className={styles.panel} style={{ border: "none" }}>
-                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
-                  <Compass aria-hidden="true" />
-                  Terrain
-                </legend>
-                <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
-                  {ACTIVITY_TYPES.map((activity) => (
-                    <label key={activity.value} className={styles.chip}>
-                      <input
-                        type="radio"
-                        name="activityType"
-                        className={styles.chipInput}
-                        checked={activityType === activity.value}
-                        onChange={() => setActivityType(activity.value)}
-                      />
-                      {activity.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className={styles.panel} style={{ border: "none" }}>
-                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel} id="levelLabel">
                   <Gauge aria-hidden="true" />
                   Difficulty class
-                </legend>
-                <div className={styles.chipGroup}>
-                  <label className={styles.chip}>
-                    <input
-                      type="radio"
-                      name="level"
-                      className={styles.chipInput}
-                      checked={level === null}
-                      onChange={() => setLevel(null)}
-                    />
-                    Not specified
-                  </label>
-                  {LEVELS.map((l) => (
-                    <label key={l.value} className={styles.chip} data-level={l.value}>
-                      <input
-                        type="radio"
-                        name="level"
-                        className={styles.chipInput}
-                        checked={level === l.value}
-                        onChange={() => setLevel(l.value)}
-                      />
-                      <l.icon aria-hidden="true" size={12} />
-                      {l.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className={styles.panel} style={{ border: "none" }}>
-                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
-                  <RouteIcon aria-hidden="true" />
-                  Route
-                </legend>
-                {copiedFrom || uploadedFileName ? (
-                  <div className={styles.trackPicked}>
-                    <div>
-                      <div className={styles.trackPickedName}>
-                        {copiedFrom
-                          ? `Copied from ${copiedFrom.name}`
-                          : `Uploaded ${uploadedFileName}`}
-                      </div>
-                      <div className={styles.trackPickedMeta}>
-                        {copyLoading
-                          ? "Loading route…"
-                          : copiedRoute &&
-                            `${copiedRoute.distanceKm} km${copiedRoute.elevationM != null ? ` · ${copiedRoute.elevationM} m climb` : ""}${uploadedRestStops.length > 0 ? ` · ${uploadedRestStops.length} rest stop${uploadedRestStops.length === 1 ? "" : "s"}` : ""}`}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.trackRemove}
-                      onClick={clearCopiedTrack}
-                      aria-label="Remove track"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : null}
-                {copiedRoute && (
-                  <div className={styles.mapFrame}>
-                    <Suspense fallback={<div className={styles.mapLoading}>Scanning route…</div>}>
-                      <RouteMap
-                        points={copiedRoute.points}
-                        heightPx={160}
-                        restStops={uploadedRestStops}
-                      />
-                    </Suspense>
-                  </div>
-                )}
-                {!copiedFrom && !uploadedFileName && (
-                  <button
-                    type="button"
-                    className={styles.trackBtn}
-                    onClick={() => setCopySheetOpen(true)}
+                </span>
+                {/* Signal-bars picker, not a dropdown — asked for directly: short stair-step
+                    bars like a phone's cellular reception icon, colored like a storm-intensity
+                    map (green → purple) as the level climbs toward World Tour. Only one bar
+                    lights up at a time — the picked level, not a cumulative fill — with its
+                    name written out to the right, large; tapping the already-lit bar again
+                    clears back to "not specified," same escape hatch the old dropdown's blank
+                    option gave. */}
+                <div className={styles.levelRow}>
+                  <div
+                    className={styles.levelBars}
+                    role="radiogroup"
+                    aria-labelledby="levelLabel"
                   >
-                    <RouteIcon aria-hidden="true" size={14} />
-                    Copy track from an existing event
-                  </button>
-                )}
-              </fieldset>
+                    {LEVELS.map((l, i) => (
+                      <button
+                        key={l.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={level === l.value}
+                        aria-label={l.label}
+                        title={l.label}
+                        className={styles.levelBar}
+                        data-level={l.value}
+                        data-filled={level === l.value}
+                        style={{ height: `${10 + i * 6}px` }}
+                        onClick={() =>
+                          setLevel(level === l.value ? null : l.value)
+                        }
+                      />
+                    ))}
+                  </div>
+                  <span
+                    className={styles.levelName}
+                    data-level={level ?? undefined}
+                  >
+                    {level ? (
+                      <>
+                        {(() => {
+                          const LevelIcon = LEVEL_ICON[level];
+                          return <LevelIcon aria-hidden="true" size={16} />;
+                        })()}
+                        {LEVEL_LABEL[level]}
+                      </>
+                    ) : (
+                      "Not specified"
+                    )}
+                  </span>
+                </div>
+              </div>
 
               <fieldset className={styles.panel} style={{ border: "none" }}>
-                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
+                <legend
+                  className={styles.fieldLabel}
+                  style={{ marginBottom: 4 }}
+                >
                   <Radio aria-hidden="true" />
                   Comms channel
                 </legend>
@@ -754,30 +923,47 @@ export function EventCreatePage() {
                   <span className={styles.switchTrack}>
                     <span className={styles.switchThumb} />
                   </span>
+                  <span
+                    className={`${styles.switchState} ${requiresApproval ? styles.switchStateOn : ""}`}
+                  >
+                    {requiresApproval ? "Yes" : "No"}
+                  </span>
                   <span className={styles.switchLabel}>
                     <ShieldCheck aria-hidden="true" />
                     {visibility === "public"
-                      ? "Require my approval before a rider who joins is confirmed"
-                      : "Require my approval, even for riders I invite — off means an invite is instant approval"}
+                      ? "Approve riders before they join"
+                      : "Approve invites too"}
+                  </span>
+                </label>
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={ridersListVisible}
+                    onChange={(e) => setRidersListVisible(e.target.checked)}
+                  />
+                  <span
+                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
+                  >
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${ridersListVisible ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {ridersListVisible ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <Eye aria-hidden="true" />
+                    Riders list visible
                   </span>
                 </label>
               </fieldset>
             </div>
           </div>
 
-          <button
-            className={styles.launchBtn}
-            type="submit"
-            disabled={busy || name.trim().length === 0}
-          >
+          <button className={styles.launchBtn} type="submit" disabled={busy}>
             <Bike aria-hidden="true" />
-            {isEditing
-              ? busy
-                ? "Saving…"
-                : "Save changes"
-              : busy
-                ? "Launching…"
-                : "Launch mission"}
+            {busy ? "Saving…" : "Save event"}
           </button>
         </form>
 

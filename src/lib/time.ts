@@ -12,11 +12,9 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
+const dayMonthFormat = new Intl.DateTimeFormat(undefined, {
   day: "2-digit",
   month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
 });
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
@@ -33,19 +31,31 @@ function toDate(utcIso: string | Date | null | undefined): Date | null {
 }
 
 /** 14:32 — for anything happening today, like a last-seen time on the live map. */
-export function formatLocalTime(utcIso: string | Date | null | undefined): string {
+export function formatLocalTime(
+  utcIso: string | Date | null | undefined,
+): string {
   const date = toDate(utcIso);
   return date ? timeFormat.format(date) : "—";
 }
 
-/** 13 Aug, 14:32 — for event lists and history. */
-export function formatLocalDateTime(utcIso: string | Date | null | undefined): string {
+/** 13 Aug, 14:32 — for event lists and history. Built from two separate formatters and
+ * concatenated in a fixed order rather than one Intl.DateTimeFormat with all four fields —
+ * asked for directly after a locale/engine rendered day-time-month instead of day-month-time
+ * ("date format not good we se 16 then time then month"); Intl's own field ordering for a
+ * combined day+month+hour+minute pattern isn't guaranteed the same everywhere. */
+export function formatLocalDateTime(
+  utcIso: string | Date | null | undefined,
+): string {
   const date = toDate(utcIso);
-  return date ? dateTimeFormat.format(date) : "—";
+  return date
+    ? `${dayMonthFormat.format(date)}, ${timeFormat.format(date)}`
+    : "—";
 }
 
 /** Wed, 13 Aug 2026 — for headings. */
-export function formatLocalDate(utcIso: string | Date | null | undefined): string {
+export function formatLocalDate(
+  utcIso: string | Date | null | undefined,
+): string {
   const date = toDate(utcIso);
   return date ? dateFormat.format(date) : "—";
 }
@@ -54,14 +64,19 @@ export function formatLocalDate(utcIso: string | Date | null | undefined): strin
  * Intl.DateTimeFormat's month style, since that varies by locale ("Mar 2026" vs "2026年3月")
  * and this was asked for as an exact numeric format. Still converts from UTC to the viewer's
  * own local date first, same as every other formatter here. */
-export function formatLocalMonthYear(utcIso: string | Date | null | undefined): string {
+export function formatLocalMonthYear(
+  utcIso: string | Date | null | undefined,
+): string {
   const date = toDate(utcIso);
   if (!date) return "—";
   return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
 /** "4 min ago" — how fresh a rider's position is. Deliberately coarse. */
-export function formatAge(utcIso: string | Date | null | undefined, now = Date.now()): string {
+export function formatAge(
+  utcIso: string | Date | null | undefined,
+  now = Date.now(),
+): string {
   const date = toDate(utcIso);
   if (!date) return "never";
 
@@ -81,5 +96,7 @@ export function formatDuration(milliseconds: number): string {
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
   const pad = (value: number) => String(value).padStart(2, "0");
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+  return hours > 0
+    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
+    : `${minutes}:${pad(seconds)}`;
 }

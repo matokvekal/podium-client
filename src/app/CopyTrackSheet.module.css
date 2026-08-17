@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgb(5 11 22 / 0.55);
+  background: rgb(5 11 22 / 0.75);
 }
 
 .sheet {
@@ -31,13 +31,21 @@
 .sheetHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   background: var(--surface);
+}
+
+.sheetHeaderIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-strong);
+  filter: drop-shadow(0 0 4px var(--accent-strong))
+    drop-shadow(0 0 9px var(--accent));
 }
 
 .sheetBody {
@@ -108,6 +116,17 @@
 .rowMeta {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.rowStats {
+  font-size: 0.78rem;
+  color: var(--accent-strong);
+}
+
+/* Invisible trigger row for the infinite-scroll observer — see the effect in
+   CopyTrackSheet.tsx that watches this coming into view within .list. */
+.scrollSentinel {
+  height: 1px;
 }
 
 .mapBtn {

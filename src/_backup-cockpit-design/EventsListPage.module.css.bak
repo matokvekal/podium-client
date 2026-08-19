@@ -169,11 +169,7 @@
   gap: 8px;
   min-height: 40px;
   padding: 8px 16px;
-  background: linear-gradient(
-    150deg,
-    var(--status-live),
-    var(--status-live-strong)
-  );
+  background: linear-gradient(150deg, var(--status-live), var(--status-live-strong));
   border: 1px solid rgba(24, 143, 102, 0.22);
   border-radius: 12px;
   font-size: 13px;
@@ -227,52 +223,26 @@
   color: var(--text-inverse);
 }
 
-/* Live / Upcoming / Past Rides, each its own section with its own See All — matching a
-   reference screenshot supplied directly (was one mixed horizontally-scrolling tile row
-   before). Live always first and called out in colour (the group itself is what blinks, via
-   EventTile's liveBar, not this heading). */
-.sections {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.cardSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.sectionHeading {
-  margin: 0;
-  font-size: 1rem;
+/* Live / Upcoming / Past section labels within My Rides — Meetup-style grouping, with Live
+   always first and called out in colour (the group itself is what blinks, via EventTile's
+   liveBar / EventCard's liveDot, not this label). */
+.sectionLabel {
+  padding: 4px 2px;
+  font-size: 11px;
   font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.sectionHeading[data-tone="live"] {
+.sectionLabel[data-tone="live"] {
   color: var(--status-live-strong);
 }
 
-.seeAllLink {
-  padding: 0;
-  font-size: 0.85rem;
-  font-weight: var(--weight-medium);
-  color: var(--accent-strong);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.seeAllLink:hover {
-  text-decoration: underline;
-}
-
-/* One card per row — "Upcoming" gets the large EventTile, "Past Rides" the compact one
-   (EventTile's `compact` prop), both full width rather than a 3-column grid. */
-.cardList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+/* .tileRow is a CSS grid — a label needs to span every column to read as a divider instead
+   of sitting inside the first tile's cell. */
+.sectionLabelGrid {
+  grid-column: 1 / -1;
 }
 
 .noResults {
@@ -304,23 +274,41 @@
   padding-right: 2px;
 }
 
+/* Compact home-row tiles: a 3-column grid that scrolls vertically within a box, instead of
+   one long horizontally-scrolling row. max-height is 90vh (viewport-relative, not a guessed
+   pixel number, asked for directly) so it scales with the actual screen instead of being
+   tuned for one device — a short My Rides (1 row or less) still doesn't reserve the full 90vh
+   and leave a dead gap; it only caps out and starts scrolling once there's actually enough
+   content to fill it. The footer itself is a fixed bar (global.css's .app-footer), always
+   pinned to the true bottom of the screen regardless of this box's height — so this cap is
+   purely about not letting a very long My Rides list grow the page past the screen, not about
+   footer position. */
+.tileRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
 .list > *,
-.cardList > * {
+.tileRow > * {
   animation: riseIn var(--beat-3) ease-out backwards;
 }
 .list > *:nth-child(2),
-.cardList > *:nth-child(2) {
+.tileRow > *:nth-child(2) {
   animation-delay: var(--stagger);
 }
 .list > *:nth-child(3),
-.cardList > *:nth-child(3) {
+.tileRow > *:nth-child(3) {
   animation-delay: calc(var(--stagger) * 2);
 }
 .list > *:nth-child(4),
-.cardList > *:nth-child(4) {
+.tileRow > *:nth-child(4) {
   animation-delay: calc(var(--stagger) * 3);
 }
 .list > *:nth-child(5),
-.cardList > *:nth-child(5) {
+.tileRow > *:nth-child(5) {
   animation-delay: calc(var(--stagger) * 4);
 }

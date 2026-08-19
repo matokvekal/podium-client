@@ -1,671 +1,577 @@
 /*
- * Ops-deck HUD skin for the event page — same cockpit language AND palette as
- * EventCreatePage.module.css now (dark field, green/blue/pink neon glow, mono display font,
- * corner brackets, scanline). Used to run its own amber/purple/cyan "mission control" palette
- * to read as related-but-distinct from Create; reversed directly ("evnt look very bad must be
- * very similar to toe edit like f35 cockpit but in ready mode not edit") — this is deliberately
- * the *same* green/blue/pink now, just steady ("ready") rather than Create's pulsing
- * launch-armed animations. Scoped entirely to this page via `.page`'s own custom properties,
- * same isolation approach as the create page.
- *
- * The global `.card`/`.badge`/`.button`/`.muted` overrides below are what let the rest of this
- * page's markup (RiderResultRow, weather/condition badges, the results/route card, etc.) pick
- * up the new look without every one of those elements needing its own HUD-specific className —
- * only the page shell, header, and the new Command/menu UI got bespoke markup.
+ * Clean hero-card layout — replaces the earlier neon "cockpit" skin, matching a reference
+ * screenshot supplied directly. Uses the app's normal light/dark tokens (tokens.css), not a
+ * page-scoped custom palette, so this page finally looks like the rest of the app instead of
+ * a themed one-off. The previous version is kept at
+ * src/_backup-cockpit-design/EventDetailPage.module.css.bak.
  */
 
 .page {
-  --hud-bg: #030405;
-  --hud-panel: rgba(6, 16, 14, 0.82);
-  --hud-panel-raised: rgba(10, 24, 21, 0.9);
-  --hud-line: rgba(120, 255, 210, 0.14);
-  --hud-grid: rgba(0, 255, 170, 0.05);
-
-  --hud-primary: #39ff8c;
-  --hud-primary-dim: rgba(57, 255, 140, 0.35);
-  --hud-secondary: #ff2fa6;
-  --hud-secondary-dim: rgba(255, 47, 166, 0.4);
-  --hud-accent: #1fd9ff;
-  --hud-accent-dim: rgba(31, 217, 255, 0.35);
-  --hud-danger: #ff3b5c;
-  --hud-danger-dim: rgba(255, 59, 92, 0.4);
-
-  --hud-text: #e4fff2;
-  --hud-text-dim: #7fb3a6;
-
-  --hud-font-display: "Orbitron", var(--font-sans);
-  --hud-font-mono: "Share Tech Mono", var(--font-mono);
-
-  display: block;
-  max-width: 52rem;
+  position: relative;
+  max-width: 40rem;
   margin: 0 auto;
 }
 
-.deck {
+/* --- hero ------------------------------------------------------------------------------ */
+
+.hero {
   position: relative;
+  height: 260px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background:
-    repeating-linear-gradient(
-      0deg,
-      var(--hud-grid) 0 1px,
-      transparent 1px 34px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      var(--hud-grid) 0 1px,
-      transparent 1px 34px
-    ),
-    radial-gradient(
-      120% 140% at 12% -10%,
-      rgba(31, 217, 255, 0.12),
-      transparent 55%
-    ),
-    radial-gradient(
-      120% 140% at 100% 110%,
-      rgba(255, 47, 166, 0.1),
-      transparent 55%
-    ),
-    var(--hud-bg);
-  border: 1px solid var(--hud-line);
-  border-radius: var(--radius-md);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.4),
-    0 30px 60px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(31, 217, 255, 0.08);
-  overflow: hidden;
+  justify-content: space-between;
+  color: #fff;
 }
 
-.deck::after {
-  content: "";
+/* No real cover-image field exists yet (see event-visuals.ts's placeholderColorVar doc
+   comment) — a large faint terrain icon stands in for a photo, same honest-placeholder rule
+   EventCard/EventTile already use, just bigger since this hero has room for it. */
+.heroWatermark {
+  position: absolute;
+  top: 50%;
+  right: -10%;
+  width: 260px;
+  height: 260px;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.heroScrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    rgba(57, 255, 140, 0.06) 45%,
-    rgba(57, 255, 140, 0.14) 50%,
-    rgba(57, 255, 140, 0.06) 55%,
-    transparent 100%
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.75) 100%
   );
-  background-size: 100% 240%;
-  animation: deck-scan-sweep 6s linear infinite;
-  pointer-events: none;
-  mix-blend-mode: screen;
-}
-
-@keyframes deck-scan-sweep {
-  from {
-    background-position: 0 -140%;
-  }
-  to {
-    background-position: 0 140%;
-  }
-}
-
-.corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  filter: drop-shadow(0 0 4px var(--hud-accent));
   pointer-events: none;
 }
-.cornerTl {
-  top: 10px;
-  left: 10px;
-  border-top: 2px solid var(--hud-accent);
-  border-left: 2px solid var(--hud-accent);
-}
-.cornerTr {
-  top: 10px;
-  right: 10px;
-  border-top: 2px solid var(--hud-accent);
-  border-right: 2px solid var(--hud-accent);
-}
-.cornerBl {
-  bottom: 10px;
-  left: 10px;
-  border-bottom: 2px solid var(--hud-accent);
-  border-left: 2px solid var(--hud-accent);
-}
-.cornerBr {
-  bottom: 10px;
-  right: 10px;
-  border-bottom: 2px solid var(--hud-accent);
-  border-right: 2px solid var(--hud-accent);
-}
 
-/* --- header --------------------------------------------------------------- */
-
-/* Three stacked rows — name+icon, then actions, then the join code — asked for directly
-   ("second row all butons like start edit share then the event id"). Each row is its own
-   flex line, so nothing has to fight the others for width (that fight was squeezing the name
-   down to one letter per line before). */
-.header {
+.heroTop,
+.heroBottom {
   position: relative;
+  z-index: 1;
+}
+
+.heroTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-3);
+}
+
+.dateBadge {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  align-items: center;
+  width: 46px;
+  padding: 5px 0;
+  background: rgba(15, 20, 30, 0.65);
+  backdrop-filter: blur(3px);
+  border-radius: var(--radius-sm);
+  line-height: 1.15;
 }
 
-.headerTop {
+.dateBadgeMonth {
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffb020;
+}
+
+.dateBadgeDay {
+  font-size: 17px;
+  font-weight: var(--weight-bold);
+}
+
+.heroTopRight {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: 8px;
 }
 
-.headerActions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.headerIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  color: var(--hud-bg);
-  background: var(--hud-primary);
-  border-radius: 6px;
-  box-shadow:
-    0 0 18px var(--hud-primary-dim),
-    0 0 40px var(--hud-primary-dim);
-}
-
-.headerIcon svg {
-  width: 26px;
-  height: 26px;
-}
-
-.headerText {
-  min-width: 0;
-  flex: 1;
-}
-
-/* Standalone Share icon — the join code + QR were only reachable through the overflow menu
-   before; this puts them one tap away from the header instead ("share link icon", asked for
-   directly). Opens the same ShareEventSheet the overflow menu's Share item does. */
-.shareBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  width: 40px;
-  height: 40px;
-  color: var(--hud-primary);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-primary-dim);
-  border-radius: 6px;
-  cursor: pointer;
-  transition:
-    box-shadow 150ms ease,
-    border-color 150ms ease;
-}
-
-.shareBtn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.shareBtn:hover {
-  border-color: var(--hud-primary);
-  box-shadow: 0 0 14px var(--hud-primary-dim);
-}
-
-/* Same shape as .shareBtn, accent-colored instead — a direct header shortcut to editing,
-   asked for directly rather than leaving it buried in the Command menu further down. */
-.editBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  width: 40px;
-  height: 40px;
-  color: var(--hud-accent);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-accent-dim);
-  border-radius: 6px;
-  cursor: pointer;
-  transition:
-    box-shadow 150ms ease,
-    border-color 150ms ease;
-}
-
-.editBtn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.editBtn:hover {
-  border-color: var(--hud-accent);
-  box-shadow: 0 0 14px var(--hud-accent-dim);
-}
-
-.eyebrow {
-  margin: 0 0 2px;
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  color: var(--hud-secondary);
-  text-shadow: 0 0 10px var(--hud-secondary-dim);
-}
-
-/* Same "// LABEL" language as .eyebrow, reused for in-card section labels (Mission Brief,
-   Conditions) so they read as this page's one consistent heading style. */
-.infoLabel {
-  margin: 0 0 2px;
-  font-family: var(--hud-font-mono);
+.statusPill {
+  padding: 4px 10px;
   font-size: 11px;
-  letter-spacing: 0.14em;
-  color: var(--hud-secondary);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: rgba(15, 20, 30, 0.55);
+  backdrop-filter: blur(3px);
 }
 
-.infoBlock {
-  padding-top: 4px;
-  border-top: 1px solid var(--hud-line);
+.statusPill[data-bucket="live"] {
+  background: var(--status-live-strong);
+  color: #04150f;
 }
 
-/* Location and start time — the two facts a rider actually needs to show up — get bigger
-   text and a glow instead of the plain muted rows everything else uses, asked for directly. */
-.highlightRow {
-  font-family: var(--hud-font-mono);
-  font-size: 1rem;
-  font-weight: var(--weight-medium);
-  color: var(--hud-text);
-  text-shadow: 0 0 10px var(--hud-accent-dim);
+.statusPill[data-bucket="upcoming"] {
+  background: var(--status-live);
+  color: #04150f;
 }
 
-.highlightRow svg {
-  color: var(--hud-accent);
-  filter: drop-shadow(0 0 4px var(--hud-accent-dim));
+.statusPill[data-bucket="finished"] {
+  background: rgba(15, 20, 30, 0.65);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.heroIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  background: rgba(15, 20, 30, 0.5);
+  backdrop-filter: blur(3px);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.heroIconBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.heroIconBtn:hover {
+  background: rgba(15, 20, 30, 0.7);
+}
+
+.heroBottom {
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .title {
   margin: 0 0 6px;
-  font-family: var(--hud-font-display);
-  font-weight: 900;
-  font-size: clamp(1.4rem, 4vw, 2rem);
-  letter-spacing: 0.01em;
-  color: var(--hud-text);
-  text-shadow:
-    0 0 8px var(--hud-accent-dim),
-    0 0 24px var(--hud-accent-dim);
+  font-size: 1.4rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
   overflow-wrap: anywhere;
 }
 
-.codeTag {
-  display: inline-block;
-  align-self: flex-start;
-  padding: 3px 9px;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--hud-primary);
-  background: rgba(57, 255, 140, 0.12);
-  border: 1px solid var(--hud-primary-dim);
-  border-radius: 4px;
+.organizerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
 }
 
-/* --- global overrides: everything else on this page rides on these -------- */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  border-radius: 50%;
+}
 
-.page :global(.card) {
+/* --- body ------------------------------------------------------------------------------ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-line);
-  border-radius: var(--radius-sm);
-  color: var(--hud-text);
 }
 
-.page :global(h2) {
-  font-family: var(--hud-font-display);
-  font-size: 1rem;
-  letter-spacing: 0.04em;
-  color: var(--hud-text);
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
 }
 
-.page :global(.muted) {
-  color: var(--hud-text-dim);
+.statItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
 }
 
-.page :global(.banner--error) {
-  background: rgba(255, 59, 92, 0.1);
-  border: 1px solid var(--hud-danger);
-  color: var(--hud-danger);
+.statItem svg {
+  color: var(--accent-strong);
 }
 
-.page :global(.badge) {
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--hud-line);
+/* --- tags row: status / visibility / difficulty stairs ---------------------------------- */
+
+.tagsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.page :global(.badge--live) {
-  color: #39ff8c;
-  background: rgba(57, 255, 140, 0.12);
-  border-color: rgba(57, 255, 140, 0.4);
-  box-shadow: 0 0 10px rgba(57, 255, 140, 0.25);
+.tagsRowSpacer {
+  margin-left: auto;
 }
 
-.page :global(.badge--finished) {
-  color: var(--hud-accent);
-  background: rgba(31, 217, 255, 0.12);
-  border-color: var(--hud-accent-dim);
+.pill {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: var(--weight-medium);
+  text-transform: capitalize;
+  border-radius: 999px;
+  border: 1px solid transparent;
 }
 
-.page :global(.badge--danger) {
-  color: var(--hud-danger);
-  background: rgba(255, 59, 92, 0.12);
-  border-color: var(--hud-danger-dim);
+.pill[data-tone="ready"] {
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 16%, transparent);
 }
 
-.page :global(.badge--pending) {
-  color: var(--hud-primary);
-  background: rgba(57, 255, 140, 0.12);
-  border-color: var(--hud-primary-dim);
+.pill[data-tone="live"] {
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 22%, transparent);
 }
 
-/* Difficulty "stairs" — same read-only-signal-bars idea and storm-intensity color-per-level
-   scheme as EventCreatePage.module.css's difficulty picker, asked for directly ("insted of
-   intemidiate show the level step as the create"). Only the current level's bar is lit. */
+.pill[data-tone="neutral"] {
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+
+.pill[data-tone="danger"] {
+  color: var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 14%, transparent);
+}
+
+/* Difficulty "stairs" — same read-only signal-bars idea and storm-intensity color-per-level
+   scheme used on the create page's difficulty picker and the ride cards. Only the current
+   level's bar is lit. */
 .levelBars {
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
   height: 22px;
-  padding: 0 2px;
 }
 
 .levelBar {
-  width: 7px;
+  width: 6px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid var(--hud-line);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {
-  background: #39ff8c;
-  border-color: #39ff8c;
-  box-shadow: 0 0 6px rgba(57, 255, 140, 0.6);
+  background: #39c97c;
+  border-color: #39c97c;
 }
-
 .levelBar[data-level="intermediate"][data-filled="true"] {
-  background: #c3ff39;
-  border-color: #c3ff39;
-  box-shadow: 0 0 6px rgba(195, 255, 57, 0.6);
+  background: #a8d93a;
+  border-color: #a8d93a;
 }
-
 .levelBar[data-level="masters"][data-filled="true"] {
   background: #ffb020;
   border-color: #ffb020;
-  box-shadow: 0 0 6px rgba(255, 176, 32, 0.6);
 }
-
 .levelBar[data-level="elite"][data-filled="true"] {
-  background: #ff3b5c;
-  border-color: #ff3b5c;
-  box-shadow: 0 0 6px rgba(255, 59, 92, 0.6);
+  background: #ef4a6b;
+  border-color: #ef4a6b;
 }
-
 .levelBar[data-level="world_tour"][data-filled="true"] {
-  background: #b026ff;
-  border-color: #b026ff;
-  box-shadow: 0 0 6px rgba(176, 38, 255, 0.6);
+  background: #9b3ef0;
+  border-color: #9b3ef0;
 }
 
-.page :global(.button) {
-  font-family: var(--hud-font-mono);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--hud-bg);
-  background: linear-gradient(90deg, var(--hud-primary), var(--hud-accent));
-  border: none;
-  box-shadow: 0 0 14px var(--hud-primary-dim);
+/* --- owner actions ----------------------------------------------------------------------- */
+
+.ownerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.page :global(.button--quiet) {
-  font-family: var(--hud-font-mono);
+.editBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.editBtn:hover {
+  border-color: var(--accent);
+}
+
+.startBtn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-bold);
   letter-spacing: 0.02em;
-  color: var(--hud-text);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--hud-line);
+  text-transform: uppercase;
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border: none;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
 }
 
-.page :global(.button--quiet:hover) {
-  border-color: var(--hud-accent-dim);
+.startBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* --- condition badges (weather/air/traffic) — dark-panel-friendly versions --- */
+.stopBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-bold);
+  color: var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 12%, transparent);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
 
-/* A proper glowing button, not a plain inline link — "also need to see the waze button",
-   asked for directly. Blue (--hud-accent), same family as the header's Edit button. */
+.stopBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- inline confirm bar: swaps in for Start/Stop on the two consequential transitions
+   (go live, finish) instead of a window.confirm() popup. Small Cancel/Confirm pair, not the
+   full-size action buttons above. -------------------------------------------------------- */
+
+.confirmBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  animation: confirm-bar-in 120ms ease-out;
+}
+
+@keyframes confirm-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirmMessage {
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmCancelBtn,
+.confirmOkBtn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 0.85rem;
+  font-weight: var(--weight-bold);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.confirmCancelBtn {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+
+.confirmOkBtn {
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border: none;
+}
+
+.confirmOkBtn[data-tone="danger"] {
+  color: var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 14%, transparent);
+  border: 1px solid var(--status-danger);
+}
+
+.confirmCancelBtn:disabled,
+.confirmOkBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- at-a-glance card ---------------------------------------------------------------------- */
+
+.highlightRow {
+  font-size: 0.95rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
 .navLink {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 5px 11px;
-  font-family: var(--hud-font-mono);
-  font-weight: 700;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  border-radius: 6px;
-  background: rgba(31, 217, 255, 0.1);
-  border: 1px solid var(--hud-accent-dim);
-  color: var(--hud-accent);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
   text-decoration: none;
-  white-space: nowrap;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
 }
 
 .navLink:hover {
-  border-color: var(--hud-accent);
-  box-shadow: 0 0 12px var(--hud-accent-dim);
+  border-color: var(--accent);
 }
+
+.infoLabel {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.infoBlock {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* --- conditions ------------------------------------------------------------------------- */
 
 .conditionBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 3px 9px;
-  border-radius: 999px;
   font-size: 0.78rem;
   font-weight: var(--weight-medium);
+  border-radius: 999px;
   white-space: nowrap;
 }
 
 .conditionGood {
-  background: rgba(57, 255, 140, 0.14);
-  color: #39ff8c;
+  background: color-mix(in srgb, var(--status-live) 16%, transparent);
+  color: var(--status-live-strong);
 }
 
-/* Amber/caution, independent of --hud-primary (now green, "good") — this is a real-world
-   semantic (moderate air quality/traffic), not a brand accent, so it keeps its own literal
-   color instead of following the page's green/blue/pink remap. */
 .conditionModerate {
   background: rgba(255, 176, 32, 0.16);
-  color: #ffb020;
+  color: #b45309;
 }
 
 .conditionBad {
-  background: rgba(255, 59, 92, 0.14);
-  color: var(--hud-danger);
+  background: color-mix(in srgb, var(--status-danger) 14%, transparent);
+  color: var(--status-danger);
 }
 
-/* --- Command (organizer actions) — now in the header, next to Edit/Share -------------- */
+/* --- sticky bottom CTA -------------------------------------------------------------------- */
 
-/* Start/LIVE — the one organizer action that isn't a plain icon button, so it gets a text
-   label and stands out as *the* primary action. Becomes the "LIVE" link once the ride is
-   actually live (plus a separate .stopBtn next to it then). Light blue with a light-sweep
-   animation crossing it every 3s — "glowing lite blue button and the light pass every 3 sec",
-   asked for directly, in place of the earlier plain pink glow. */
-/* Wider than the icon buttons around it — "the go live/start wide but only for creator",
-   asked for directly. Owner-only already (see the isOwner guard around its two JSX forms). */
-.startBtn {
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
+.bottomBarSpacer {
+  height: 76px;
+}
+
+.bottomBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  min-width: 140px;
-  height: 40px;
-  padding: 0 var(--space-5);
-  font-family: var(--hud-font-mono);
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: var(--hud-bg);
-  background: var(--hud-accent);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow:
-    0 0 14px var(--hud-accent-dim),
-    0 0 28px var(--hud-accent-dim);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
 }
 
-.startBtn::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    120deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.6) 50%,
-    transparent 65%
-  );
-  background-size: 250% 100%;
-  animation: start-btn-sweep 3s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes start-btn-sweep {
-  from {
-    background-position: 140% 0;
-  }
-  to {
-    background-position: -140% 0;
-  }
-}
-
-.startBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.startBtn:disabled::after {
-  animation: none;
-}
-
-/* Stop — only ever shown next to the LIVE link while the ride is actually live, asked for
-   directly ("i need some stop event that make it past"). Danger red, no sweep: the light
-   animation is reserved for the "start something" action, not "end something." */
-.stopBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  height: 40px;
-  padding: 0 var(--space-4);
-  font-family: var(--hud-font-mono);
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--hud-danger);
-  background: rgba(255, 59, 92, 0.1);
-  border: 1px solid var(--hud-danger);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.stopBtn:hover {
-  background: rgba(255, 59, 92, 0.18);
-}
-
-.stopBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Overflow trigger for what's left in the Command sheet (Participants/Groups/Cancel) — same
-   40x40 icon-button shape as Edit/Share, muted rather than accent-colored since it's "more
-   actions," not a primary one. */
-.menuTriggerIcon {
+.ctaBtn {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  width: 40px;
-  height: 40px;
-  color: var(--hud-text-dim);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-line);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: border-color 150ms ease;
-}
-
-.menuTriggerIcon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.menuTriggerIcon:hover {
-  border-color: var(--hud-text-dim);
-  color: var(--hud-text);
-}
-
-.primaryAction {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
-  font-family: var(--hud-font-mono);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--hud-bg);
-  background: linear-gradient(90deg, var(--hud-primary), var(--hud-accent));
+  min-height: 48px;
+  font-size: 1rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  color: #04150f;
+  background: var(--status-live);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
+  text-decoration: none;
   cursor: pointer;
-  box-shadow: 0 0 16px var(--hud-primary-dim);
 }
 
-.primaryAction:disabled {
-  opacity: 0.5;
+.ctaBtn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
-/* Bottom sheet, ~1/3 of the viewport tall — a small dropdown here was getting missed
-   ("the organizer action not seen"); asked for directly: a bottom-up modal instead. Same
-   z-index scale as every other sheet in this app (CopyTrackSheet etc.). */
+.ctaStatus {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-radius: 999px;
+}
+
+.ctaStatus[data-status="approved"],
+.ctaStatus[data-status="registered"] {
+  color: var(--status-live-strong);
+}
+
+.ctaStatus[data-status="rejected"] {
+  color: var(--status-danger);
+}
+
+/* --- organizer "more actions" sheet -------------------------------------------------------- */
+
 .menuOverlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgb(5 4 10 / 0.6);
+  background: rgb(5 4 10 / 0.5);
 }
 
 .menu {
@@ -676,15 +582,12 @@
   z-index: 1001;
   display: flex;
   flex-direction: column;
-  height: 33vh;
-  min-height: 260px;
+  max-height: 60vh;
   padding: 6px;
-  background: var(--hud-panel-raised);
-  border-top: 1px solid var(--hud-secondary-dim);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   border-radius: 16px 16px 0 0;
-  box-shadow:
-    0 -12px 30px rgba(0, 0, 0, 0.5),
-    0 0 24px var(--hud-secondary-dim);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
 }
 
@@ -693,11 +596,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 10px 6px;
-  font-family: var(--hud-font-mono);
   font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--hud-text-dim);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
 }
 
 .menuClose {
@@ -706,7 +607,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  color: var(--hud-text-dim);
+  color: var(--text-muted);
   background: none;
   border: none;
   border-radius: 4px;
@@ -714,8 +615,8 @@
 }
 
 .menuClose:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--hud-text);
+  background: var(--surface-raised);
+  color: var(--text);
 }
 
 .menuItem {
@@ -724,28 +625,24 @@
   gap: 10px;
   width: 100%;
   padding: 12px 10px;
-  font-family: var(--hud-font-mono);
   font-size: 0.9rem;
-  color: var(--hud-text);
+  color: var(--text);
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   text-align: left;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .menuItem:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--hud-accent);
+  background: var(--surface-raised);
 }
 
 .menuItemDanger {
-  color: var(--hud-danger);
+  color: var(--status-danger);
 }
 
 .menuItemDanger:hover {
-  background: rgba(255, 59, 92, 0.12);
-  color: var(--hud-danger);
+  background: color-mix(in srgb, var(--status-danger) 10%, transparent);
 }

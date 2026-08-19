@@ -15,8 +15,9 @@
  *
  * "My rides"/"Others" are toggle buttons, not two stacked sections — asked for directly.
  *
- * "Upload file" parses a CSV of points client-side (lib/track-csv.ts) — deliberately CSV
- * only, not Excel/GPX/FIT, see that file's doc comment for why. Hands the parsed route back
+ * "Upload file" parses a CSV of points (lib/track-csv.ts) or a Garmin GPX export
+ * (lib/track-gpx.ts) client-side, picked by file extension/content — see those files' doc
+ * comments for why the format support stops there (no Excel/FIT). Hands the parsed route back
  * via `onUploadRoute` rather than `onPick`, since there's no source EventSummary for a file —
  * the caller treats the two as alternative ways to end up with a route, not related.
  */
@@ -38,6 +39,7 @@ import { type EventRoute, getEventResults } from "../lib/mock-results";
 import { LEVEL_LABEL } from "../lib/rider-level";
 import { formatLocalMonthYear } from "../lib/time";
 import { parseTrackCsv } from "../lib/track-csv";
+import { parseTrackGpx } from "../lib/track-gpx";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import styles from "./CopyTrackSheet.module.css";
@@ -138,10 +140,13 @@ export function CopyTrackSheet({
     setUploadError(null);
     try {
       const text = await file.text();
-      const parsed = parseTrackCsv(text);
+      const isGpx = /\.gpx$/i.test(file.name) || /^\s*<\?xml/.test(text);
+      const parsed = isGpx ? parseTrackGpx(text) : parseTrackCsv(text);
       if (!parsed) {
         setUploadError(
-          "Couldn't read any points from that file — expected a CSV of lat/lon rows.",
+          isGpx
+            ? "Couldn't read any track points from that GPX file."
+            : "Couldn't read any points from that file — expected a CSV of lat/lon rows.",
         );
         return;
       }
@@ -334,12 +339,12 @@ export function CopyTrackSheet({
                   aria-hidden="true"
                   style={{ marginRight: 6 }}
                 />
-                Upload CSV (points file)
+                Upload track (CSV or GPX)
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.gpx,application/gpx+xml"
                 onChange={handleFileChange}
                 style={{ display: "none" }}
               />

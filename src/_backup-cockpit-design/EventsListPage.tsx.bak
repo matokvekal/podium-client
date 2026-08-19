@@ -483,82 +483,61 @@ export function EventsListPage() {
               )}
             </div>
           ) : (
-            /* "Upcoming" (large cards) and "Past Rides" (compact list), each with its own
-               See All — matching a reference screenshot supplied directly, replacing the
-               single mixed horizontal tile row this used to be. Both See All links open the
-               same combined list below (still grouped by Live/Upcoming/Past there); splitting
-               that into two fully separate searchable views wasn't asked for. */
-            <div className={styles.sections}>
+            <div className={styles.tileRow}>
               {homeRow.live.length > 0 && (
-                <div className={styles.cardSection}>
-                  <div className="section-header">
-                    <h3 className={styles.sectionHeading} data-tone="live">
-                      Live now
-                    </h3>
+                <>
+                  <div
+                    className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}
+                    data-tone="live"
+                  >
+                    Live now
                   </div>
-                  <div className={styles.cardList}>
-                    {homeRow.live.map((event) => (
-                      <EventTile
-                        key={event.id}
-                        event={event}
-                        onToggleFavorite={handleToggleFavorite}
-                        isNew={event.id === newEventId}
-                        justOpened={event.id === returnHighlightId}
-                      />
-                    ))}
-                  </div>
-                </div>
+                  {homeRow.live.map((event) => (
+                    <EventTile
+                      key={event.id}
+                      event={event}
+                      onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
+                    />
+                  ))}
+                </>
               )}
               {homeRow.upcoming.length > 0 && (
-                <div className={styles.cardSection}>
-                  <div className="section-header">
-                    <h3 className={styles.sectionHeading}>Upcoming</h3>
-                    <button
-                      type="button"
-                      className={styles.seeAllLink}
-                      onClick={() => setShowAll(true)}
-                    >
-                      See All
-                    </button>
+                <>
+                  <div
+                    className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}
+                  >
+                    Upcoming
                   </div>
-                  <div className={styles.cardList}>
-                    {homeRow.upcoming.map((event) => (
-                      <EventTile
-                        key={event.id}
-                        event={event}
-                        onToggleFavorite={handleToggleFavorite}
-                        isNew={event.id === newEventId}
-                        justOpened={event.id === returnHighlightId}
-                      />
-                    ))}
-                  </div>
-                </div>
+                  {homeRow.upcoming.map((event) => (
+                    <EventTile
+                      key={event.id}
+                      event={event}
+                      onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
+                    />
+                  ))}
+                </>
               )}
               {homeRow.past.length > 0 && (
-                <div className={styles.cardSection}>
-                  <div className="section-header">
-                    <h3 className={styles.sectionHeading}>Past Rides</h3>
-                    <button
-                      type="button"
-                      className={styles.seeAllLink}
-                      onClick={() => setShowAll(true)}
-                    >
-                      See All
-                    </button>
+                <>
+                  <div
+                    className={`${styles.sectionLabel} ${styles.sectionLabelGrid}`}
+                  >
+                    Past
                   </div>
-                  <div className={styles.cardList}>
-                    {homeRow.past.map((event) => (
-                      <EventTile
-                        key={event.id}
-                        event={event}
-                        onToggleFavorite={handleToggleFavorite}
-                        isNew={event.id === newEventId}
-                        justOpened={event.id === returnHighlightId}
-                        compact
-                      />
-                    ))}
-                  </div>
-                </div>
+                  {homeRow.past.map((event) => (
+                    <EventTile
+                      key={event.id}
+                      event={event}
+                      onToggleFavorite={handleToggleFavorite}
+                      isNew={event.id === newEventId}
+                      justOpened={event.id === returnHighlightId}
+                    />
+                  ))}
+                </>
               )}
             </div>
           )}

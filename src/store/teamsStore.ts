@@ -1,9 +1,12 @@
 // Teams (clubs) — "pro teams have rides a few times a week, some standard, some new tracks,
 // all members can see schedule, sometimes I invite new [riders] and I approve them." A team is
-// a real linkable entity (not just a free-text name) so its rides can be gathered into one
-// shared schedule — see TeamDetailPage.tsx. Entirely new territory, not in any plan/ doc at
-// all before this — see plan/server-tasks.md for what real support needs. Persisted to
-// localStorage, same pattern as store/eventGroupsStore.ts / participantsStore.ts.
+// a real linkable entity (not just a free-text name) so its rides can be gathered under one
+// name (EventCreatePage.tsx's team picker, via addEventToTeam) instead of each just carrying a
+// free-text organizer string. TeamDetailPage.tsx itself is membership-only, not a schedule
+// view — a team's rides show up wherever a rider's rides normally do, not a second list here
+// (asked for directly). Entirely new territory, not in any plan/ doc at all before this — see
+// plan/server-tasks.md for what real support needs. Persisted to localStorage, same pattern as
+// store/eventGroupsStore.ts / participantsStore.ts.
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -43,11 +46,18 @@ interface TeamsState {
   // Organizer-added members are pre-approved, same convention as participantsStore.addParticipant
   // — a direct add IS the approval ("or i approved by invitation").
   addMember(teamId: string, input: NewMemberInput): void;
+  // Bulk variant for the file-import and phone-contacts add methods on TeamDetailPage.tsx —
+  // one store write for N rows instead of N, and rows with no name are silently dropped rather
+  // than each needing its own validation error.
+  addMembers(teamId: string, inputs: NewMemberInput[]): void;
   removeMember(teamId: string, memberId: string): void;
-  setMemberStatus(teamId: string, memberId: string, status: TeamMemberStatus): void;
+  setMemberStatus(
+    teamId: string,
+    memberId: string,
+    status: TeamMemberStatus,
+  ): void;
 
   addEventToTeam(teamId: string, eventId: string): void;
-  removeEventFromTeam(teamId: string, eventId: string): void;
 }
 
 let localId = 0;
@@ -96,11 +106,35 @@ export const useTeamsStore = create<TeamsState>()(
         }));
       },
 
+      addMembers(teamId, inputs) {
+        set((state) => {
+          const newMembers: TeamMember[] = inputs
+            .filter((input) => input.name.trim())
+            .map((input) => ({
+              id: `member-${++localId}`,
+              userId: null,
+              name: input.name.trim(),
+              phone: input.phone?.trim() || null,
+              email: input.email?.trim() || null,
+              status: "approved",
+            }));
+          if (newMembers.length === 0) return state;
+          return {
+            members: {
+              ...state.members,
+              [teamId]: [...(state.members[teamId] ?? []), ...newMembers],
+            },
+          };
+        });
+      },
+
       removeMember(teamId, memberId) {
         set((state) => ({
           members: {
             ...state.members,
-            [teamId]: (state.members[teamId] ?? []).filter((m) => m.id !== memberId),
+            [teamId]: (state.members[teamId] ?? []).filter(
+              (m) => m.id !== memberId,
+            ),
           },
         }));
       },
@@ -120,17 +154,10 @@ export const useTeamsStore = create<TeamsState>()(
         set((state) => {
           const existing = state.eventIds[teamId] ?? [];
           if (existing.includes(eventId)) return state;
-          return { eventIds: { ...state.eventIds, [teamId]: [...existing, eventId] } };
+          return {
+            eventIds: { ...state.eventIds, [teamId]: [...existing, eventId] },
+          };
         });
-      },
-
-      removeEventFromTeam(teamId, eventId) {
-        set((state) => ({
-          eventIds: {
-            ...state.eventIds,
-            [teamId]: (state.eventIds[teamId] ?? []).filter((id) => id !== eventId),
-          },
-        }));
       },
     }),
     { name: "podium.teams" },

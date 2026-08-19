@@ -1,156 +1,30 @@
 /*
- * Cockpit HUD skin for the create-event flow — asked for directly: "F-35 aircraft cockpit
- * view for a pilot," black field, neon pink/blue/fluorescent-green glow, exciting/dopamine.
- * Scoped entirely to this page via the .cockpit wrapper's own custom properties — does not
- * touch src/styles/tokens.css, so every other screen keeps the calm light/dark theme.
+ * Clean form styling — replaces the earlier neon "cockpit" skin, matching the redesigned
+ * EventDetailPage.tsx/EventTile.tsx. Uses the app's normal light/dark tokens (tokens.css), not
+ * a page-scoped custom palette. The previous version is kept at
+ * src/_backup-cockpit-design/EventCreatePage.module.css.bak.
  */
 
 .page {
-  --hud-bg: #030405;
-  --hud-panel: rgba(6, 16, 14, 0.82);
-  --hud-panel-raised: rgba(10, 24, 21, 0.9);
-  --hud-line: rgba(120, 255, 210, 0.14);
-  --hud-grid: rgba(0, 255, 170, 0.05);
-
-  --hud-green: #39ff8c;
-  --hud-green-dim: rgba(57, 255, 140, 0.35);
-  --hud-blue: #1fd9ff;
-  --hud-blue-dim: rgba(31, 217, 255, 0.35);
-  --hud-pink: #ff2fa6;
-  --hud-pink-dim: rgba(255, 47, 166, 0.4);
-  --hud-amber: #ffb020;
-  --hud-amber-dim: rgba(255, 176, 32, 0.4);
-  --hud-danger: #ff3b5c;
-  --hud-danger-dim: rgba(255, 59, 92, 0.4);
-  --hud-purple: #b026ff;
-  --hud-purple-dim: rgba(176, 38, 255, 0.4);
-
-  /* Difficulty signal-bars — storm-intensity gradient, calmest to fiercest. */
-  --level-beginner: var(--hud-green);
-  --level-beginner-dim: var(--hud-green-dim);
-  --level-intermediate: #c3ff39;
-  --level-intermediate-dim: rgba(195, 255, 57, 0.4);
-  --level-masters: var(--hud-amber);
-  --level-masters-dim: var(--hud-amber-dim);
-  --level-elite: var(--hud-danger);
-  --level-elite-dim: var(--hud-danger-dim);
-  --level-world_tour: var(--hud-purple);
-  --level-world_tour-dim: var(--hud-purple-dim);
-
-  --hud-text: #e4fff2;
-  --hud-text-dim: #7fb3a6;
-
-  --hud-font-display: "Orbitron", var(--font-sans);
-  --hud-font-mono: "Share Tech Mono", var(--font-mono);
-
-  max-width: 52rem;
+  max-width: 40rem;
   margin: 0 auto;
 }
 
-/* --- frame ------------------------------------------------------------- */
-
-.cockpit {
-  position: relative;
-  padding: var(--space-5);
-  background:
-    repeating-linear-gradient(
-      0deg,
-      var(--hud-grid) 0 1px,
-      transparent 1px 34px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      var(--hud-grid) 0 1px,
-      transparent 1px 34px
-    ),
-    radial-gradient(
-      120% 140% at 12% -10%,
-      rgba(31, 217, 255, 0.12),
-      transparent 55%
-    ),
-    radial-gradient(
-      120% 140% at 100% 110%,
-      rgba(255, 47, 166, 0.1),
-      transparent 55%
-    ),
-    var(--hud-bg);
-  border: 1px solid var(--hud-line);
+.deck {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.4),
-    0 30px 60px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(31, 217, 255, 0.08);
-  overflow: hidden;
-}
-
-.cockpit::after {
-  /* scanline sweep */
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(57, 255, 140, 0.06) 45%,
-    rgba(57, 255, 140, 0.14) 50%,
-    rgba(57, 255, 140, 0.06) 55%,
-    transparent 100%
-  );
-  background-size: 100% 240%;
-  animation: scan-sweep 5.5s linear infinite;
-  pointer-events: none;
-  mix-blend-mode: screen;
-}
-
-@keyframes scan-sweep {
-  from {
-    background-position: 0 -140%;
-  }
-  to {
-    background-position: 0 140%;
-  }
-}
-
-.corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  filter: drop-shadow(0 0 4px var(--hud-blue));
-  pointer-events: none;
-}
-.cornerTl {
-  top: 10px;
-  left: 10px;
-  border-top: 2px solid var(--hud-blue);
-  border-left: 2px solid var(--hud-blue);
-}
-.cornerTr {
-  top: 10px;
-  right: 10px;
-  border-top: 2px solid var(--hud-blue);
-  border-right: 2px solid var(--hud-blue);
-}
-.cornerBl {
-  bottom: 10px;
-  left: 10px;
-  border-bottom: 2px solid var(--hud-blue);
-  border-left: 2px solid var(--hud-blue);
-}
-.cornerBr {
-  bottom: 10px;
-  right: 10px;
-  border-bottom: 2px solid var(--hud-blue);
-  border-right: 2px solid var(--hud-blue);
+  box-shadow: var(--shadow-sm);
 }
 
 /* --- header -------------------------------------------------------------- */
 
 .header {
-  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .headerIcon {
@@ -158,89 +32,52 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  color: var(--hud-bg);
-  background: var(--hud-pink);
-  border-radius: 6px;
-  box-shadow:
-    0 0 18px var(--hud-pink-dim),
-    0 0 40px var(--hud-pink-dim);
-  animation: pulse-glow 2.6s ease-in-out infinite;
+  width: 46px;
+  height: 46px;
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-radius: var(--radius-sm);
 }
 
 .headerIcon svg {
-  width: 26px;
-  height: 26px;
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 14px var(--hud-pink-dim),
-      0 0 32px var(--hud-pink-dim);
-  }
-  50% {
-    box-shadow:
-      0 0 22px var(--hud-pink),
-      0 0 54px var(--hud-pink-dim);
-  }
+  width: 22px;
+  height: 22px;
 }
 
 .title {
-  margin: 0 0 4px;
-  font-family: var(--hud-font-display);
-  font-weight: 900;
-  font-size: clamp(1.5rem, 4vw, 2.1rem);
-  letter-spacing: 0.02em;
-  color: var(--hud-text);
-  text-shadow:
-    0 0 8px var(--hud-blue-dim),
-    0 0 24px var(--hud-blue-dim);
+  margin: 0 0 2px;
+  font-size: 1.3rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
 }
 
 .subtitle {
   margin: 0;
-  font-family: var(--hud-font-mono);
-  font-size: 13px;
-  color: var(--hud-text-dim);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 /* --- readiness meter ------------------------------------------------------ */
 
 .readiness {
-  position: relative;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .readinessTrack {
   height: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-raised);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .readinessFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--hud-blue), var(--hud-green));
-  box-shadow: 0 0 12px var(--hud-green-dim);
+  background: var(--accent);
   transition: width 260ms ease;
 }
 
 .readinessFill[data-armed="true"] {
-  background: linear-gradient(90deg, var(--hud-green), var(--hud-green));
-  animation: armed-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes armed-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 10px var(--hud-green-dim);
-  }
-  50% {
-    box-shadow: 0 0 22px var(--hud-green);
-  }
+  background: var(--status-live);
 }
 
 /* --- error --------------------------------------------------------------- */
@@ -251,11 +88,10 @@
   gap: var(--space-2);
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background: rgba(255, 59, 92, 0.08);
-  border: 1px solid var(--hud-danger);
+  background: color-mix(in srgb, var(--status-danger) 10%, transparent);
+  border: 1px solid var(--status-danger);
   border-radius: var(--radius-sm);
-  color: var(--hud-danger);
-  box-shadow: 0 0 16px rgba(255, 59, 92, 0.15);
+  color: var(--status-danger);
 }
 
 .errorBanner svg {
@@ -263,17 +99,9 @@
   margin-top: 2px;
 }
 
-.errorBanner strong {
-  display: block;
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  letter-spacing: 0.1em;
-}
-
 .errorBanner p {
-  margin: 2px 0 0;
-  font-size: 13px;
-  color: var(--hud-text);
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 /* --- layout ---------------------------------------------------------------- */
@@ -309,10 +137,11 @@
 /* Location and start time stay side by side even on narrow phones — asked for directly, no
    stacking breakpoint here unlike a typical responsive form row. Start time's column is sized
    to the datetime input itself rather than an even 1fr split — asked for directly, it doesn't
-   need as much room as location does. */
+   need as much room as location does. 190px (was 150px) — 150 clipped the native
+   datetime-local widget's hour/minute segment ("cant see the hours"). */
 .fieldRow {
   display: grid;
-  grid-template-columns: 1fr 150px;
+  grid-template-columns: 1fr 190px;
   align-items: start;
   gap: var(--space-3);
 }
@@ -333,12 +162,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--hud-blue);
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
 }
 
 .fieldLabel svg {
@@ -350,12 +176,12 @@
 .textarea {
   width: 100%;
   padding: 10px 12px;
-  font-family: var(--hud-font-mono);
-  font-size: 14px;
-  color: var(--hud-text);
-  background: var(--hud-panel);
-  border: 1px solid rgba(120, 255, 210, 0.34);
-  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
@@ -363,7 +189,7 @@
 
 /* Fixed height on every non-textarea input — a native datetime-local control otherwise
    renders a touch taller than a plain text input in some browsers, throwing off the
-   side-by-side Rally point/T-minus row even with align-items: start on .fieldRow. */
+   side-by-side Location/Date-time row even with align-items: start on .fieldRow. */
 .input {
   height: 42px;
   box-sizing: border-box;
@@ -371,28 +197,25 @@
 
 .input::placeholder,
 .textarea::placeholder {
-  color: var(--hud-text-dim);
+  color: var(--text-muted);
 }
 
 .input:focus-visible,
 .textarea:focus-visible {
   outline: none;
-  border-color: var(--hud-green);
-  box-shadow:
-    0 0 0 1px var(--hud-green),
-    0 0 16px var(--hud-green-dim);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* Mandatory-on-create fields left unfilled at Save time — cleared the moment the organizer
    starts fixing it (see the onChange handlers / pickEventToCopy / handleUploadRoute). */
 .inputInvalid {
-  border-color: var(--hud-danger) !important;
-  box-shadow: 0 0 10px var(--hud-danger-dim);
+  border-color: var(--status-danger) !important;
 }
 
-/* Route trigger — no panel chrome at all (no border/background/legend, asked for directly),
-   just the button/picked-track/map-preview it contains, flush against the left edge like any
-   other field. Only gains a border when flagged invalid at Save time. */
+/* Route trigger — no panel chrome at all (no border/background, asked for directly), just the
+   button/picked-track/map-preview it contains, flush against the left edge like any other
+   field. Only gains a border when flagged invalid at Save time. */
 .routeFieldset {
   display: flex;
   flex-direction: column;
@@ -404,9 +227,8 @@
 
 .routeFieldset[data-invalid="true"] {
   padding: var(--space-2);
-  border: 1px solid var(--hud-danger);
+  border: 1px solid var(--status-danger);
   border-radius: var(--radius-sm);
-  box-shadow: 0 0 14px var(--hud-danger-dim);
 }
 
 .textarea {
@@ -434,15 +256,20 @@
 .levelBar {
   width: 32px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(228, 255, 242, 0.55);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
   cursor: pointer;
   transition: all 150ms ease;
 }
 
 .levelBar:hover {
-  border-color: var(--hud-blue);
+  border-color: var(--accent);
+}
+
+.levelBar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .levelName {
@@ -450,11 +277,9 @@
   align-items: center;
   gap: 6px;
   padding-bottom: 4px;
-  font-family: var(--hud-font-display);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   font-size: 18px;
-  letter-spacing: 0.03em;
-  color: var(--hud-text-dim);
+  color: var(--text-muted);
 }
 
 .levelName svg {
@@ -462,62 +287,53 @@
   height: 16px;
 }
 
+/* Same storm-intensity color-per-level scheme as EventDetailPage.module.css/EventCard.module.css's
+   difficulty "stairs" — calmest to fiercest. */
 .levelName[data-level="beginner"] {
-  color: var(--level-beginner);
+  color: #39c97c;
 }
 .levelName[data-level="intermediate"] {
-  color: var(--level-intermediate);
+  color: #a8d93a;
 }
 .levelName[data-level="masters"] {
-  color: var(--level-masters);
+  color: #ffb020;
 }
 .levelName[data-level="elite"] {
-  color: var(--level-elite);
+  color: #ef4a6b;
 }
 .levelName[data-level="world_tour"] {
-  color: var(--level-world_tour);
-}
-
-.levelBar:focus-visible {
-  outline: 2px solid var(--hud-blue);
-  outline-offset: 2px;
+  color: #9b3ef0;
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {
-  background: var(--level-beginner);
-  border-color: var(--level-beginner);
-  box-shadow: 0 0 10px var(--level-beginner-dim);
+  background: #39c97c;
+  border-color: #39c97c;
 }
 .levelBar[data-level="intermediate"][data-filled="true"] {
-  background: var(--level-intermediate);
-  border-color: var(--level-intermediate);
-  box-shadow: 0 0 10px var(--level-intermediate-dim);
+  background: #a8d93a;
+  border-color: #a8d93a;
 }
 .levelBar[data-level="masters"][data-filled="true"] {
-  background: var(--level-masters);
-  border-color: var(--level-masters);
-  box-shadow: 0 0 10px var(--level-masters-dim);
+  background: #ffb020;
+  border-color: #ffb020;
 }
 .levelBar[data-level="elite"][data-filled="true"] {
-  background: var(--level-elite);
-  border-color: var(--level-elite);
-  box-shadow: 0 0 10px var(--level-elite-dim);
+  background: #ef4a6b;
+  border-color: #ef4a6b;
 }
 .levelBar[data-level="world_tour"][data-filled="true"] {
-  background: var(--level-world_tour);
-  border-color: var(--level-world_tour);
-  box-shadow: 0 0 12px var(--level-world_tour-dim);
+  background: #9b3ef0;
+  border-color: #9b3ef0;
 }
 
 .hint {
   margin: 0;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  color: var(--hud-text-dim);
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .hint--active {
-  color: var(--hud-green);
+  color: var(--status-live-strong);
 }
 
 /* --- panel (side-column groups) ------------------------------------------ */
@@ -527,12 +343,12 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
-  background: var(--hud-panel);
-  border: 1px solid var(--hud-line);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 
-/* --- chips (activity type / level) --------------------------------------- */
+/* --- chips (activity type) --------------------------------------- */
 
 .chipGroup {
   display: flex;
@@ -540,8 +356,7 @@
   gap: 6px;
 }
 
-/* Terrain — asked to stay on one row rather than wrap. No overflow-x/absolutely-positioned
-   child mix here (unlike TracksPage.module.css's dropdown bug), so a plain scroll is safe. */
+/* Terrain — asked to stay on one row rather than wrap. */
 .chipGroupRow {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -553,16 +368,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 11px;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--hud-line);
-  border-radius: 3px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
   cursor: pointer;
   transition: all 150ms ease;
 }
@@ -576,60 +388,65 @@
 }
 
 .chip:has(.chipInput:checked) {
-  color: var(--hud-bg);
-  background: var(--hud-green);
-  border-color: var(--hud-green);
-  box-shadow: 0 0 14px var(--hud-green-dim);
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .chip:has(.chipInput:focus-visible) {
-  outline: 2px solid var(--hud-blue);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* --- track / flight path -------------------------------------------------- */
+/* --- route / track picker -------------------------------------------------- */
 
+/* Full-width, not a small self-start pill (was easy to miss on the form — asked for directly:
+   "select ride button not seen ... add icon ... that its the map"). Dashed border reads as a
+   drop-zone/picker affordance, and the large Route icon on the right is the "this is the map"
+   cue, on the same side a Waze/road icon would sit. */
 .trackBtn {
-  display: inline-flex;
-  align-self: flex-start;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-3);
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--hud-blue);
-  background: transparent;
-  border: 1px dashed var(--hud-blue);
-  border-radius: 4px;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  box-shadow: 0 0 8px var(--hud-blue-dim);
   transition: all 150ms ease;
 }
 
 .trackBtn:hover {
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--accent) 10%);
   border-style: solid;
-  box-shadow: 0 0 14px var(--hud-blue-dim);
 }
 
 .trackBtn:disabled {
-  color: var(--hud-text-dim);
-  border-color: var(--hud-line);
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-color: var(--border);
   cursor: not-allowed;
 }
 
-.trackBtnIcon {
-  filter: drop-shadow(0 0 3px var(--hud-blue))
-    drop-shadow(0 0 7px var(--hud-blue-dim));
+.trackBtnLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.trackBtnIconPink {
-  color: var(--hud-pink);
-  filter: drop-shadow(0 0 4px var(--hud-pink))
-    drop-shadow(0 0 9px var(--hud-pink-dim));
+.trackBtnIcon {
+  flex-shrink: 0;
+}
+
+.trackBtnAccent {
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .trackPicked {
@@ -638,69 +455,49 @@
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--hud-panel-raised);
-  border: 1px solid var(--hud-green-dim);
-  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .trackPickedName {
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--hud-green);
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
 }
 
 .trackPickedMeta {
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  color: var(--hud-text-dim);
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .trackRemove {
   flex-shrink: 0;
   padding: 6px 10px;
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--hud-danger);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--status-danger);
   background: transparent;
-  border: 1px solid var(--hud-danger);
-  border-radius: 4px;
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .mapFrame {
-  position: relative;
   padding: 4px;
-  border: 1px solid var(--hud-green-dim);
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-}
-
-.mapFrame::before {
-  content: "ROUTE SCAN";
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  z-index: 5;
-  font-family: var(--hud-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--hud-green);
-  text-shadow: 0 0 6px var(--hud-bg);
-  pointer-events: none;
 }
 
 .mapLoading {
   padding: var(--space-3);
-  font-family: var(--hud-font-mono);
-  font-size: 11px;
-  color: var(--hud-text-dim);
+  font-size: 0.8rem;
+  color: var(--text-muted);
   text-align: center;
 }
 
-/* --- comms (visibility) segmented toggle ----------------------------------- */
+/* --- visibility segmented toggle ----------------------------------- */
 
 .comms {
   display: grid;
@@ -713,40 +510,35 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 6px 0;
-  font-family: var(--hud-font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--hud-line);
-  border-radius: 4px;
+  padding: 8px 0;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 150ms ease;
 }
 
 .commsOption svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
 .commsOption[data-active="true"] {
-  color: var(--hud-bg);
-  background: var(--hud-danger);
-  border-color: var(--hud-danger);
-  box-shadow: 0 0 14px var(--hud-danger-dim);
+  color: var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 12%, transparent);
+  border-color: var(--status-danger);
 }
 
 .commsOption[data-active="true"][data-tone="broadcast"] {
-  color: var(--hud-bg);
-  background: var(--hud-green);
-  border-color: var(--hud-green);
-  box-shadow: 0 0 14px var(--hud-green-dim);
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 16%, transparent);
+  border-color: var(--status-live-strong);
 }
 
-/* --- switch (clearance / approval) ----------------------------------------- */
+/* --- switch (approval / riders-list-visible) ----------------------------------- */
 
 .switchRow {
   display: flex;
@@ -768,8 +560,8 @@
   flex-shrink: 0;
   width: 40px;
   height: 22px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--hud-line);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   transition: all 150ms ease;
 }
@@ -780,40 +572,36 @@
   left: 2px;
   width: 16px;
   height: 16px;
-  background: var(--hud-text-dim);
+  background: var(--text-muted);
   border-radius: 50%;
   transition: all 150ms ease;
 }
 
 .switchInput:checked + .switchTrack {
-  background: rgba(255, 47, 166, 0.14);
-  border-color: var(--hud-pink);
-  box-shadow: 0 0 12px var(--hud-pink-dim);
+  background: color-mix(in srgb, var(--status-danger) 16%, transparent);
+  border-color: var(--status-danger);
 }
 
 .switchInput:checked + .switchTrack .switchThumb {
   left: 20px;
-  background: var(--hud-pink);
-  box-shadow: 0 0 8px var(--hud-pink);
+  background: var(--status-danger);
 }
 
 .switchInput:focus-visible + .switchTrack {
-  outline: 2px solid var(--hud-blue);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* Positive-tone variant — used for switches where "on" reads as a good/open state (riders
-   list visible), not a restriction, so it lights up green instead of the default pink. */
+   list visible), not a restriction, so it lights up green instead of the default danger tone. */
 .switchInput:checked + .switchTrackPositive {
-  background: rgba(57, 255, 140, 0.14);
-  border-color: var(--hud-green);
-  box-shadow: 0 0 12px var(--hud-green-dim);
+  background: color-mix(in srgb, var(--status-live) 18%, transparent);
+  border-color: var(--status-live-strong);
 }
 
 .switchInput:checked + .switchTrackPositive .switchThumb {
   left: 20px;
-  background: var(--hud-green);
-  box-shadow: 0 0 8px var(--hud-green);
+  background: var(--status-live-strong);
 }
 
 /* Explicit Yes/No badge next to each switch — the track color alone wasn't a clear enough
@@ -821,76 +609,66 @@
 .switchState {
   flex-shrink: 0;
   padding: 2px 7px;
-  font-family: var(--hud-font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--hud-line);
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: 3px;
 }
 
 .switchStateOn {
-  color: var(--hud-bg);
-  background: var(--hud-pink);
-  border-color: var(--hud-pink);
+  color: #fff;
+  background: var(--status-danger);
+  border-color: var(--status-danger);
 }
 
 .switchStateOnPositive {
-  color: var(--hud-bg);
-  background: var(--hud-green);
-  border-color: var(--hud-green);
+  color: #04150f;
+  background: var(--status-live);
+  border-color: var(--status-live);
 }
 
 .switchLabel {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--hud-font-mono);
-  font-size: 12px;
-  color: var(--hud-text-dim);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .switchLabel svg {
   width: 14px;
   height: 14px;
-  color: var(--hud-pink);
+  color: var(--text-muted);
 }
 
-/* --- launch button ----------------------------------------------------- */
+/* --- save button ----------------------------------------------------- */
 
 .launchBtn {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 64px;
+  min-height: 52px;
   margin-top: var(--space-5);
-  font-family: var(--hud-font-display);
-  font-weight: 900;
-  font-size: 19px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--hud-bg);
-  background: linear-gradient(90deg, var(--hud-green), var(--hud-blue));
-  border: 2px solid var(--hud-text);
-  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: var(--weight-bold);
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  box-shadow:
-    0 0 28px var(--hud-green-dim),
-    0 0 56px var(--hud-blue-dim);
-  transition:
-    transform 100ms ease,
-    box-shadow 150ms ease;
+  box-shadow: var(--shadow-sm);
+  transition: transform 100ms ease;
 }
 
 .launchBtn svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .launchBtn:active:not(:disabled) {
@@ -898,26 +676,8 @@
 }
 
 .launchBtn:disabled {
-  color: var(--hud-text-dim);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  background: var(--surface-raised);
   box-shadow: none;
   cursor: not-allowed;
-}
-
-.launchBtn:not(:disabled) {
-  animation: launch-ready 2.2s ease-in-out infinite;
-}
-
-@keyframes launch-ready {
-  0%,
-  100% {
-    box-shadow:
-      0 0 24px var(--hud-green-dim),
-      0 0 44px var(--hud-blue-dim);
-  }
-  50% {
-    box-shadow:
-      0 0 40px var(--hud-green),
-      0 0 72px var(--hud-blue-dim);
-  }
 }

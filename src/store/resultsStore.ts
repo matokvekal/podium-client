@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import { type EventResults, getEventResults } from "../lib/mock-results";
+import { getEventRoute } from "./eventRouteStore";
 
 interface ResultsState {
   results: EventResults | null;
@@ -26,7 +27,13 @@ export const useResultsStore = create<ResultsState>((set) => ({
     try {
       const results = await getEventResults(eventId);
       if (thisRequest !== requestId) return;
-      set({ results, loading: false });
+      // The organizer's actually-picked route wins over the deterministic mock — see
+      // eventRouteStore.ts's doc comment.
+      const pickedRoute = getEventRoute(eventId);
+      set({
+        results: pickedRoute ? { ...results, route: pickedRoute } : results,
+        loading: false,
+      });
     } catch {
       if (thisRequest !== requestId) return;
       set({ error: "Could not load results right now.", loading: false });

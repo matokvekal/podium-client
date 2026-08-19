@@ -22,8 +22,11 @@ import { AppDrawer } from "./AppDrawer";
 
 // The event detail page ("/events/:eventId", but not the "new"/"edit"/sub-route variants)
 // swaps the hamburger for a back arrow here, next to the wordmark — asked for directly ("back
-// aroe up near the El Nini title"). Every other screen keeps the hamburger.
+// aroe up near the El Nini title"). Teams get the same treatment — asked for directly ("at
+// teams i need arow back") — both the team list and one team's own page. Every other screen
+// keeps the hamburger.
 const EVENT_DETAIL_PATH = /^\/events\/[^/]+$/;
+const TEAMS_PATH = /^\/teams(\/[^/]+)?$/;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnlineStatus();
@@ -33,8 +36,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const showBackArrow =
-    EVENT_DETAIL_PATH.test(location.pathname) &&
-    location.pathname !== "/events/new";
+    (EVENT_DETAIL_PATH.test(location.pathname) &&
+      location.pathname !== "/events/new") ||
+    TEAMS_PATH.test(location.pathname);
 
   return (
     <div className="app-shell">

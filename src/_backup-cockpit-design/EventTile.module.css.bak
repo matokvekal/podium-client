@@ -1,0 +1,268 @@
+/* Ported from Figma (new-commissaire, "Today" > Card/1 & Card/2) — full-bleed cards with
+ * title/time/location overlaid at the bottom over a dark gradient, replacing race-pwa's small
+ * vertical RaceTile this used to be. Taller than the original 219x147 Figma spec — asked for
+ * directly, so the home row fills more of the screen and leaves less dead space above the
+ * sticky footer on short My Rides lists (see global.css's .app-main doc comment). */
+
+.tile {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 185px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(62, 221, 164, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(99, 166, 252, 0.15),
+    0 0 14px rgba(62, 221, 164, 0.18);
+  transition:
+    transform 0.15s,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(62, 221, 164, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(99, 166, 252, 0.3),
+    0 0 20px rgba(62, 221, 164, 0.32),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.tile:active {
+  transform: scale(0.98);
+}
+
+/* Flags the ride just created on EventCreatePage.tsx, same signal as EventCard's — see
+   EventsListPage.tsx for how long "isNew" stays true. */
+.tile[data-new] {
+  box-shadow:
+    0 0 0 2px var(--accent-strong),
+    0 0 15px 15px rgba(63, 134, 231, 0.4);
+  animation: new-tile-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes new-tile-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent-strong),
+      0 0 15px 12px rgba(63, 134, 231, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent-strong),
+      0 0 15px 18px rgba(63, 134, 231, 0.5);
+  }
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.initial {
+  font-size: 48px;
+  font-weight: var(--weight-bold);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 24%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+}
+
+/* Small top-left pill, not a full-width bar — keeps clear of .favBtn, which sits top-right. */
+.liveBar {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  background: rgba(62, 221, 164, 0.9);
+  color: #04140d;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 5px;
+  animation: live-bar-pulse 1.6s ease-in-out infinite;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #04140d;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes live-bar-pulse {
+  0%,
+  100% {
+    background: rgba(62, 221, 164, 0.85);
+  }
+  50% {
+    background: rgba(62, 221, 164, 1);
+  }
+}
+
+.favBtn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8facd4;
+  backdrop-filter: blur(4px);
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.favActive {
+  color: #e04a7a;
+}
+
+/* Sits directly below .favBtn — only rendered for a ride this rider owns that hasn't started
+   yet (see EventTile.tsx's canEdit). */
+.editBtn {
+  position: absolute;
+  top: 39px;
+  right: 7px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8facd4;
+  backdrop-filter: blur(4px);
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editBtn:hover {
+  color: var(--accent-strong);
+}
+
+.info {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaIcon {
+  width: 14px;
+  height: 14px;
+  color: #7cf0c4;
+  flex-shrink: 0;
+}
+
+/* Difficulty "stairs" — same idea as EventCard.module.css/EventDetailPage.module.css's copy,
+   sized for this tile's smaller meta row. Unfilled bars are brighter here (vs those two)
+   since they sit over a photo scrim, not a plain surface. */
+.levelBars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 15px;
+}
+
+.levelBar {
+  width: 5px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.levelBar[data-level="beginner"][data-filled="true"] {
+  background: #39ff8c;
+  border-color: #39ff8c;
+}
+
+.levelBar[data-level="intermediate"][data-filled="true"] {
+  background: #c3ff39;
+  border-color: #c3ff39;
+}
+
+.levelBar[data-level="masters"][data-filled="true"] {
+  background: #ffb020;
+  border-color: #ffb020;
+}
+
+.levelBar[data-level="elite"][data-filled="true"] {
+  background: #ff3b5c;
+  border-color: #ff3b5c;
+}
+
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: #b026ff;
+  border-color: #b026ff;
+}
+
+/* The date must never truncate — asked for directly ("can't see the date good"). Location
+   (if present) shares the row and shrinks/ellipsizes instead; it's the less critical of the
+   two at this tile width. */
+.dateItem {
+  flex-shrink: 0;
+}

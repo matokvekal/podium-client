@@ -1,10 +1,9 @@
-// Upload-your-own-track, CSV only — "also can upload file like google csv excel of garmin
-// points with start end and brakpoint rest." Deliberately scoped down to CSV: Excel (.xlsx)
-// needs a real parsing library (e.g. `xlsx`, not installed, a real dependency decision) and
-// Garmin's native formats (FIT binary, or GPX/TCX XML) each need their own parser — none of
-// that is built here. A CSV of points (optionally exported from any of those tools) is the one
-// format parseable with plain string splitting, no new dependency. See
-// plan/server-tasks.md Part C §3 for the fuller upload feature this is a first slice of.
+// Upload-your-own-track, CSV — "also can upload file like google csv excel of garmin
+// points with start end and brakpoint rest." Garmin's native GPX export is handled separately
+// by lib/track-gpx.ts; this file covers the CSV-of-points case (e.g. exported from a
+// spreadsheet). Excel (.xlsx) and FIT (binary) remain out of scope — Excel needs a real parsing
+// library (e.g. `xlsx`, not installed, a real dependency decision) and FIT needs its own binary
+// parser. See plan/server-tasks.md Part C §3 for the fuller upload feature this is a slice of.
 //
 // Expected columns, in any order, matched by name (case-insensitive) if a header row is
 // present: lat/latitude, lon/lng/longitude, and an optional type/marker/stop column — any row

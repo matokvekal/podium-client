@@ -1,0 +1,923 @@
+/*
+ * Cockpit HUD skin for the create-event flow — asked for directly: "F-35 aircraft cockpit
+ * view for a pilot," black field, neon pink/blue/fluorescent-green glow, exciting/dopamine.
+ * Scoped entirely to this page via the .cockpit wrapper's own custom properties — does not
+ * touch src/styles/tokens.css, so every other screen keeps the calm light/dark theme.
+ */
+
+.page {
+  --hud-bg: #030405;
+  --hud-panel: rgba(6, 16, 14, 0.82);
+  --hud-panel-raised: rgba(10, 24, 21, 0.9);
+  --hud-line: rgba(120, 255, 210, 0.14);
+  --hud-grid: rgba(0, 255, 170, 0.05);
+
+  --hud-green: #39ff8c;
+  --hud-green-dim: rgba(57, 255, 140, 0.35);
+  --hud-blue: #1fd9ff;
+  --hud-blue-dim: rgba(31, 217, 255, 0.35);
+  --hud-pink: #ff2fa6;
+  --hud-pink-dim: rgba(255, 47, 166, 0.4);
+  --hud-amber: #ffb020;
+  --hud-amber-dim: rgba(255, 176, 32, 0.4);
+  --hud-danger: #ff3b5c;
+  --hud-danger-dim: rgba(255, 59, 92, 0.4);
+  --hud-purple: #b026ff;
+  --hud-purple-dim: rgba(176, 38, 255, 0.4);
+
+  /* Difficulty signal-bars — storm-intensity gradient, calmest to fiercest. */
+  --level-beginner: var(--hud-green);
+  --level-beginner-dim: var(--hud-green-dim);
+  --level-intermediate: #c3ff39;
+  --level-intermediate-dim: rgba(195, 255, 57, 0.4);
+  --level-masters: var(--hud-amber);
+  --level-masters-dim: var(--hud-amber-dim);
+  --level-elite: var(--hud-danger);
+  --level-elite-dim: var(--hud-danger-dim);
+  --level-world_tour: var(--hud-purple);
+  --level-world_tour-dim: var(--hud-purple-dim);
+
+  --hud-text: #e4fff2;
+  --hud-text-dim: #7fb3a6;
+
+  --hud-font-display: "Orbitron", var(--font-sans);
+  --hud-font-mono: "Share Tech Mono", var(--font-mono);
+
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+/* --- frame ------------------------------------------------------------- */
+
+.cockpit {
+  position: relative;
+  padding: var(--space-5);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--hud-grid) 0 1px,
+      transparent 1px 34px
+    ),
+    radial-gradient(
+      120% 140% at 12% -10%,
+      rgba(31, 217, 255, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      120% 140% at 100% 110%,
+      rgba(255, 47, 166, 0.1),
+      transparent 55%
+    ),
+    var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 30px 60px rgba(0, 0, 0, 0.55),
+    0 0 60px rgba(31, 217, 255, 0.08);
+  overflow: hidden;
+}
+
+.cockpit::after {
+  /* scanline sweep */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(57, 255, 140, 0.06) 45%,
+    rgba(57, 255, 140, 0.14) 50%,
+    rgba(57, 255, 140, 0.06) 55%,
+    transparent 100%
+  );
+  background-size: 100% 240%;
+  animation: scan-sweep 5.5s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes scan-sweep {
+  from {
+    background-position: 0 -140%;
+  }
+  to {
+    background-position: 0 140%;
+  }
+}
+
+.corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 0 4px var(--hud-blue));
+  pointer-events: none;
+}
+.cornerTl {
+  top: 10px;
+  left: 10px;
+  border-top: 2px solid var(--hud-blue);
+  border-left: 2px solid var(--hud-blue);
+}
+.cornerTr {
+  top: 10px;
+  right: 10px;
+  border-top: 2px solid var(--hud-blue);
+  border-right: 2px solid var(--hud-blue);
+}
+.cornerBl {
+  bottom: 10px;
+  left: 10px;
+  border-bottom: 2px solid var(--hud-blue);
+  border-left: 2px solid var(--hud-blue);
+}
+.cornerBr {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 2px solid var(--hud-blue);
+  border-right: 2px solid var(--hud-blue);
+}
+
+/* --- header -------------------------------------------------------------- */
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  color: var(--hud-bg);
+  background: var(--hud-pink);
+  border-radius: 6px;
+  box-shadow:
+    0 0 18px var(--hud-pink-dim),
+    0 0 40px var(--hud-pink-dim);
+  animation: pulse-glow 2.6s ease-in-out infinite;
+}
+
+.headerIcon svg {
+  width: 26px;
+  height: 26px;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px var(--hud-pink-dim),
+      0 0 32px var(--hud-pink-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 22px var(--hud-pink),
+      0 0 54px var(--hud-pink-dim);
+  }
+}
+
+.title {
+  margin: 0 0 4px;
+  font-family: var(--hud-font-display);
+  font-weight: 900;
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  letter-spacing: 0.02em;
+  color: var(--hud-text);
+  text-shadow:
+    0 0 8px var(--hud-blue-dim),
+    0 0 24px var(--hud-blue-dim);
+}
+
+.subtitle {
+  margin: 0;
+  font-family: var(--hud-font-mono);
+  font-size: 13px;
+  color: var(--hud-text-dim);
+}
+
+/* --- readiness meter ------------------------------------------------------ */
+
+.readiness {
+  position: relative;
+  margin-bottom: var(--space-5);
+}
+
+.readinessTrack {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.readinessFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--hud-blue), var(--hud-green));
+  box-shadow: 0 0 12px var(--hud-green-dim);
+  transition: width 260ms ease;
+}
+
+.readinessFill[data-armed="true"] {
+  background: linear-gradient(90deg, var(--hud-green), var(--hud-green));
+  animation: armed-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes armed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px var(--hud-green-dim);
+  }
+  50% {
+    box-shadow: 0 0 22px var(--hud-green);
+  }
+}
+
+/* --- error --------------------------------------------------------------- */
+
+.errorBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 59, 92, 0.08);
+  border: 1px solid var(--hud-danger);
+  border-radius: var(--radius-sm);
+  color: var(--hud-danger);
+  box-shadow: 0 0 16px rgba(255, 59, 92, 0.15);
+}
+
+.errorBanner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.errorBanner strong {
+  display: block;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.errorBanner p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--hud-text);
+}
+
+/* --- layout ---------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: start;
+  }
+}
+
+.colMain,
+.colSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* --- fields ------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Location and start time stay side by side even on narrow phones — asked for directly, no
+   stacking breakpoint here unlike a typical responsive form row. Start time's column is sized
+   to the datetime input itself rather than an even 1fr split — asked for directly, it doesn't
+   need as much room as location does. */
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.teamRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teamRowInput {
+  flex: 1 1 180px;
+  width: auto;
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hud-blue);
+}
+
+.fieldLabel svg {
+  width: 14px;
+  height: 14px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--hud-font-mono);
+  font-size: 14px;
+  color: var(--hud-text);
+  background: var(--hud-panel);
+  border: 1px solid rgba(120, 255, 210, 0.34);
+  border-radius: 4px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+/* Fixed height on every non-textarea input — a native datetime-local control otherwise
+   renders a touch taller than a plain text input in some browsers, throwing off the
+   side-by-side Rally point/T-minus row even with align-items: start on .fieldRow. */
+.input {
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--hud-text-dim);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--hud-green);
+  box-shadow:
+    0 0 0 1px var(--hud-green),
+    0 0 16px var(--hud-green-dim);
+}
+
+/* Mandatory-on-create fields left unfilled at Save time — cleared the moment the organizer
+   starts fixing it (see the onChange handlers / pickEventToCopy / handleUploadRoute). */
+.inputInvalid {
+  border-color: var(--hud-danger) !important;
+  box-shadow: 0 0 10px var(--hud-danger-dim);
+}
+
+/* Route trigger — no panel chrome at all (no border/background/legend, asked for directly),
+   just the button/picked-track/map-preview it contains, flush against the left edge like any
+   other field. Only gains a border when flagged invalid at Save time. */
+.routeFieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: none;
+}
+
+.routeFieldset[data-invalid="true"] {
+  padding: var(--space-2);
+  border: 1px solid var(--hud-danger);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 14px var(--hud-danger-dim);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+/* --- difficulty signal bars (cellular-reception style) -------------------- */
+
+.levelRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.levelBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 34px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.levelBar {
+  width: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(228, 255, 242, 0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.levelBar:hover {
+  border-color: var(--hud-blue);
+}
+
+.levelName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  font-family: var(--hud-font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  color: var(--hud-text-dim);
+}
+
+.levelName svg {
+  width: 16px;
+  height: 16px;
+}
+
+.levelName[data-level="beginner"] {
+  color: var(--level-beginner);
+}
+.levelName[data-level="intermediate"] {
+  color: var(--level-intermediate);
+}
+.levelName[data-level="masters"] {
+  color: var(--level-masters);
+}
+.levelName[data-level="elite"] {
+  color: var(--level-elite);
+}
+.levelName[data-level="world_tour"] {
+  color: var(--level-world_tour);
+}
+
+.levelBar:focus-visible {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+.levelBar[data-level="beginner"][data-filled="true"] {
+  background: var(--level-beginner);
+  border-color: var(--level-beginner);
+  box-shadow: 0 0 10px var(--level-beginner-dim);
+}
+.levelBar[data-level="intermediate"][data-filled="true"] {
+  background: var(--level-intermediate);
+  border-color: var(--level-intermediate);
+  box-shadow: 0 0 10px var(--level-intermediate-dim);
+}
+.levelBar[data-level="masters"][data-filled="true"] {
+  background: var(--level-masters);
+  border-color: var(--level-masters);
+  box-shadow: 0 0 10px var(--level-masters-dim);
+}
+.levelBar[data-level="elite"][data-filled="true"] {
+  background: var(--level-elite);
+  border-color: var(--level-elite);
+  box-shadow: 0 0 10px var(--level-elite-dim);
+}
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: var(--level-world_tour);
+  border-color: var(--level-world_tour);
+  box-shadow: 0 0 12px var(--level-world_tour-dim);
+}
+
+.hint {
+  margin: 0;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+}
+
+.hint--active {
+  color: var(--hud-green);
+}
+
+/* --- panel (side-column groups) ------------------------------------------ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--radius-sm);
+}
+
+/* --- chips (activity type / level) --------------------------------------- */
+
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Terrain — asked to stay on one row rather than wrap. No overflow-x/absolutely-positioned
+   child mix here (unlike TracksPage.module.css's dropdown bug), so a plain scroll is safe. */
+.chipGroupRow {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.chipInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip:has(.chipInput:checked) {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 14px var(--hud-green-dim);
+}
+
+.chip:has(.chipInput:focus-visible) {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+/* --- track / flight path -------------------------------------------------- */
+
+.trackBtn {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-blue);
+  background: transparent;
+  border: 1px dashed var(--hud-blue);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--hud-blue-dim);
+  transition: all 150ms ease;
+}
+
+.trackBtn:hover {
+  border-style: solid;
+  box-shadow: 0 0 14px var(--hud-blue-dim);
+}
+
+.trackBtn:disabled {
+  color: var(--hud-text-dim);
+  border-color: var(--hud-line);
+  cursor: not-allowed;
+}
+
+.trackBtnIcon {
+  filter: drop-shadow(0 0 3px var(--hud-blue))
+    drop-shadow(0 0 7px var(--hud-blue-dim));
+}
+
+.trackBtnIconPink {
+  color: var(--hud-pink);
+  filter: drop-shadow(0 0 4px var(--hud-pink))
+    drop-shadow(0 0 9px var(--hud-pink-dim));
+}
+
+.trackPicked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--hud-panel-raised);
+  border: 1px solid var(--hud-green-dim);
+  border-radius: 4px;
+}
+
+.trackPickedName {
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hud-green);
+}
+
+.trackPickedMeta {
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+}
+
+.trackRemove {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-danger);
+  background: transparent;
+  border: 1px solid var(--hud-danger);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mapFrame {
+  position: relative;
+  padding: 4px;
+  border: 1px solid var(--hud-green-dim);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mapFrame::before {
+  content: "ROUTE SCAN";
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 5;
+  font-family: var(--hud-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--hud-green);
+  text-shadow: 0 0 6px var(--hud-bg);
+  pointer-events: none;
+}
+
+.mapLoading {
+  padding: var(--space-3);
+  font-family: var(--hud-font-mono);
+  font-size: 11px;
+  color: var(--hud-text-dim);
+  text-align: center;
+}
+
+/* --- comms (visibility) segmented toggle ----------------------------------- */
+
+.comms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.commsOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 0;
+  font-family: var(--hud-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--hud-line);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.commsOption svg {
+  width: 12px;
+  height: 12px;
+}
+
+.commsOption[data-active="true"] {
+  color: var(--hud-bg);
+  background: var(--hud-danger);
+  border-color: var(--hud-danger);
+  box-shadow: 0 0 14px var(--hud-danger-dim);
+}
+
+.commsOption[data-active="true"][data-tone="broadcast"] {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 14px var(--hud-green-dim);
+}
+
+/* --- switch (clearance / approval) ----------------------------------------- */
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.switchInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switchTrack {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--hud-line);
+  border-radius: 999px;
+  transition: all 150ms ease;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--hud-text-dim);
+  border-radius: 50%;
+  transition: all 150ms ease;
+}
+
+.switchInput:checked + .switchTrack {
+  background: rgba(255, 47, 166, 0.14);
+  border-color: var(--hud-pink);
+  box-shadow: 0 0 12px var(--hud-pink-dim);
+}
+
+.switchInput:checked + .switchTrack .switchThumb {
+  left: 20px;
+  background: var(--hud-pink);
+  box-shadow: 0 0 8px var(--hud-pink);
+}
+
+.switchInput:focus-visible + .switchTrack {
+  outline: 2px solid var(--hud-blue);
+  outline-offset: 2px;
+}
+
+/* Positive-tone variant — used for switches where "on" reads as a good/open state (riders
+   list visible), not a restriction, so it lights up green instead of the default pink. */
+.switchInput:checked + .switchTrackPositive {
+  background: rgba(57, 255, 140, 0.14);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 12px var(--hud-green-dim);
+}
+
+.switchInput:checked + .switchTrackPositive .switchThumb {
+  left: 20px;
+  background: var(--hud-green);
+  box-shadow: 0 0 8px var(--hud-green);
+}
+
+/* Explicit Yes/No badge next to each switch — the track color alone wasn't a clear enough
+   "is this on or off" signal, asked for directly. */
+.switchState {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-family: var(--hud-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+}
+
+.switchStateOn {
+  color: var(--hud-bg);
+  background: var(--hud-pink);
+  border-color: var(--hud-pink);
+}
+
+.switchStateOnPositive {
+  color: var(--hud-bg);
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+}
+
+.switchLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hud-font-mono);
+  font-size: 12px;
+  color: var(--hud-text-dim);
+}
+
+.switchLabel svg {
+  width: 14px;
+  height: 14px;
+  color: var(--hud-pink);
+}
+
+/* --- launch button ----------------------------------------------------- */
+
+.launchBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 64px;
+  margin-top: var(--space-5);
+  font-family: var(--hud-font-display);
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hud-bg);
+  background: linear-gradient(90deg, var(--hud-green), var(--hud-blue));
+  border: 2px solid var(--hud-text);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow:
+    0 0 28px var(--hud-green-dim),
+    0 0 56px var(--hud-blue-dim);
+  transition:
+    transform 100ms ease,
+    box-shadow 150ms ease;
+}
+
+.launchBtn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.launchBtn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.launchBtn:disabled {
+  color: var(--hud-text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.launchBtn:not(:disabled) {
+  animation: launch-ready 2.2s ease-in-out infinite;
+}
+
+@keyframes launch-ready {
+  0%,
+  100% {
+    box-shadow:
+      0 0 24px var(--hud-green-dim),
+      0 0 44px var(--hud-blue-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 40px var(--hud-green),
+      0 0 72px var(--hud-blue-dim);
+  }
+}

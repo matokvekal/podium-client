@@ -86,12 +86,11 @@
  * ("if ther is not to much memory just sujest"), see that file's doc comment. Never overwrites
  * a start time the organizer already set by hand (see `startsAtEdited`).
  *
- * Visuals: redesigned from a neon "cockpit" skin to the app's normal clean light/dark theme
- * (tokens.css), matching EventDetailPage.tsx/EventTile.tsx's redesign — asked for directly.
- * The previous cockpit version is kept at
- * src/_backup-cockpit-design/EventCreatePage.tsx.bak. The readiness meter below the header is
- * a dopamine touch, not a validation gate — the submit button's disabled rule is unrelated
- * (see the mandatory-field check inside `submit`).
+ * Visuals: cockpit-HUD skin ("F-35 pilot view," black field, neon pink/blue/fluorescent-green
+ * glow — asked for directly), scoped to EventCreatePage.module.css's `.page` wrapper only, so
+ * every other screen keeps the app's normal light/dark theme. The readiness meter below the
+ * header is a dopamine touch, not a validation gate — the submit button's disabled rule is
+ * still just `name` non-empty, same as before this pass.
  */
 
 import {
@@ -107,7 +106,6 @@ import {
   Map as MapIcon,
   MapPin,
   Radio,
-  Route,
   ShieldCheck,
   Target,
   Users,
@@ -135,7 +133,6 @@ import {
   type RiderLevel,
 } from "../lib/rider-level";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
-import { useEventRouteStore } from "../store/eventRouteStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCreatePage.module.css";
@@ -179,7 +176,6 @@ export function EventCreatePage() {
   const setEventTeam = useEventExtrasStore((s) => s.setTeam);
   const setEventActivityType = useEventExtrasStore((s) => s.setActivityType);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
-  const setEventRoute = useEventRouteStore((s) => s.setRoute);
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
@@ -425,7 +421,6 @@ export function EventCreatePage() {
   function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
-    if (copiedRoute) setEventRoute(id, copiedRoute);
 
     if (teamId === NEW_TEAM_OPTION && newTeamName.trim() && profile) {
       const team = createTeam(newTeamName, profile.id);
@@ -540,7 +535,24 @@ export function EventCreatePage() {
 
   return (
     <section className={styles.page}>
-      <div className={styles.deck}>
+      <div className={styles.cockpit}>
+        <span
+          className={`${styles.corner} ${styles.cornerTl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerTr}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBr}`}
+          aria-hidden="true"
+        />
+
         <header className={styles.header}>
           <div className={styles.headerIcon}>
             {(() => {
@@ -573,7 +585,10 @@ export function EventCreatePage() {
         {error && (
           <div className={styles.errorBanner} role="alert">
             <AlertTriangle aria-hidden="true" />
-            <p>{error}</p>
+            <div>
+              <strong>MISSION ABORT</strong>
+              <p>{error}</p>
+            </div>
           </div>
         )}
 
@@ -684,21 +699,16 @@ export function EventCreatePage() {
                 className={styles.trackBtn}
                 onClick={() => setCopySheetOpen(true)}
               >
-                <span className={styles.trackBtnLabel}>
-                  <MapIcon
-                    aria-hidden="true"
-                    size={18}
-                    className={styles.trackBtnIcon}
-                  />
-                  Select map or upload track file
-                </span>
-                {/* A bigger, second icon on its own — purely so this button reads as "the map
-                    picker" at a glance instead of blending into the rest of the form; asked
-                    for directly ("not seen ... add icon ... that its the map"). */}
-                <Route
+                <MapIcon
                   aria-hidden="true"
-                  size={30}
-                  className={styles.trackBtnAccent}
+                  size={16}
+                  className={styles.trackBtnIcon}
+                />
+                Select map or upload track file
+                <MapIcon
+                  aria-hidden="true"
+                  size={16}
+                  className={styles.trackBtnIconPink}
                 />
               </button>
             )}
@@ -798,7 +808,7 @@ export function EventCreatePage() {
               <div className={styles.field}>
                 <label className={styles.fieldLabel} htmlFor="description">
                   <FileText aria-hidden="true" />
-                  Description
+                  Mission brief
                 </label>
                 <textarea
                   id="description"
@@ -880,7 +890,7 @@ export function EventCreatePage() {
                   style={{ marginBottom: 4 }}
                 >
                   <Radio aria-hidden="true" />
-                  Visibility
+                  Comms channel
                 </legend>
                 <div className={styles.comms}>
                   <button

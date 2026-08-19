@@ -1,110 +1,145 @@
+/*
+ * Live map page — redesigned to match a reference screenshot supplied directly: a real header
+ * row, an elapsed-time/elevation overlay on the map, a stats strip, and Riders/Groups tabs
+ * below instead of a bottom-sheet drawer. Uses the app's normal light/dark tokens (tokens.css).
+ * The previous version is kept at src/_backup-cockpit-design/LiveEventPage.{tsx,module.css}.bak.
+ */
+
 .wrap {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-/* The map is the page — most of the viewport, not a panel in a longer scroll. */
+/* --- header --------------------------------------------------------------------------- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.backBtn,
+.headerIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.backBtn svg,
+.headerIconBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.livePill {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 18%, transparent);
+  border-radius: 999px;
+}
+
+.livePill[data-paused] {
+  color: var(--status-pending);
+  background: color-mix(in srgb, var(--status-pending) 18%, transparent);
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerSub {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* --- map ------------------------------------------------------------------------------ */
+
 .mapArea {
   position: relative;
-  height: min(78vh, 760px);
-  min-height: 420px;
+  height: min(56vh, 520px);
+  min-height: 320px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   isolation: isolate;
 }
 
-/* Shared look for every floating control: large, round, thumb-reachable, high-contrast
-   against the map underneath it — matching the map's own marker visual language (solid fill,
-   white outline, drop shadow) rather than a small text button. */
-.backBtn,
-.manageBtn,
-.othersBtn,
-.shareLocationBtn,
-.ridersBtn {
+.elapsedBadge {
   position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  padding: 6px 12px;
+  background: rgba(15, 20, 30, 0.72);
+  backdrop-filter: blur(3px);
+  border-radius: var(--radius-sm);
+  color: #fff;
+}
+
+.elapsedTime {
+  font-size: 1rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.elapsedLabel {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.elevationBadge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: var(--tap-target, 44px);
-  height: var(--tap-target, 44px);
-  border-radius: 50%;
-  border: 2px solid #fff;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.backBtn {
-  top: 12px;
-  left: 12px;
-  font-size: 28px;
-  line-height: 1;
-  font-weight: var(--weight-bold);
-  padding-bottom: 3px;
-}
-
-.manageBtn {
-  top: 12px;
-  right: 12px;
-  background: var(--accent);
-  color: var(--accent-text);
-  border-color: var(--accent);
-}
-
-.othersBtn,
-.shareLocationBtn,
-.ridersBtn {
-  width: 52px;
-  height: 52px;
-  right: 12px;
-}
-
-.othersBtn {
-  bottom: 128px;
-}
-
-.shareLocationBtn[aria-pressed="true"] {
-  background: var(--status-live);
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
   color: #fff;
-  border-color: var(--status-live);
-}
-
-.shareLocationBtn {
-  bottom: 70px;
-}
-
-.ridersBtn {
-  bottom: 12px;
-  background: var(--accent-strong);
-  color: var(--accent-text);
-  border-color: var(--accent-strong);
-}
-
-.ridersBadge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  background: rgba(15, 20, 30, 0.55);
+  backdrop-filter: blur(3px);
   border-radius: 999px;
-  background: var(--status-danger);
-  color: #fff;
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--surface);
 }
 
 .pausedBanner {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -120,61 +155,252 @@
   box-shadow: var(--shadow-sm);
 }
 
-.drawerOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.drawer {
-  position: fixed;
-  z-index: 31;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-height: 60vh;
+.mapControls {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--card-padding) var(--space-4);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
+  gap: 8px;
 }
 
-.drawerHandle {
+.mapControlBtn {
   display: flex;
+  align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 4px 0;
+  width: 36px;
+  height: 36px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.9);
   border: none;
-  background: none;
-  color: var(--text-muted);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 
-.drawerHeader {
+.mapControlBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mapControlBtn[data-active] {
+  background: var(--status-live);
+  color: #04150f;
+}
+
+/* Always mounted (not conditionally rendered) so the transform below can actually animate a
+   slide in/out — asked for directly: "modal slide from left 40%." Off-screen by default;
+   pointer-events stays off until open so it can't intercept map clicks while hidden. */
+.ridersModal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(40%, 320px);
+  min-width: 220px;
+  background: rgba(15, 20, 30, 0.92);
+  backdrop-filter: blur(6px);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: translateX(-100%);
+  pointer-events: none;
+  transition: transform 220ms ease;
+}
+
+.ridersModal[data-open] {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.ridersModalHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ridersModalTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: var(--weight-bold);
+}
+
+.ridersModalActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ridersModalUncheckAll {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ridersModalClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.ridersModalList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.ridersModalNote {
+  margin: 8px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.ridersModalRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ridersModalRow[data-selected] {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ridersModalRow[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ridersModalName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
   font-weight: var(--weight-medium);
 }
 
-.drawerClose {
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
+/* --- stats strip ------------------------------------------------------------------------ */
+
+.statsRow {
   display: flex;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
+
+.statCell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: 0.65rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.statValue {
+  font-size: 0.95rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* --- Riders / Groups tabs --------------------------------------------------------------- */
+
+.tabsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.tabActive {
+  padding: 8px 2px;
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tab {
+  color: var(--text-muted);
+}
+
+.tabActive {
+  color: var(--status-live-strong);
+  border-bottom-color: var(--status-live-strong);
+}
+
+.tabIconBtn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.tabIconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* --- rider list ------------------------------------------------------------------------- */
 
 .riderList {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  overflow-y: auto;
-  padding-right: 2px;
 }
 
 .riderRow {
@@ -189,22 +415,169 @@
   cursor: pointer;
 }
 
+.riderRow[data-selected] {
+  border-color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 6%, var(--surface));
+}
+
 .riderRow[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.riderRowSelected {
-  border-color: var(--accent);
+.riderCheckbox {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #fff;
   background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+
+.riderCheckbox[data-checked="true"] {
+  background: var(--status-live-strong);
+  border-color: var(--status-live-strong);
+}
+
+.riderCheckbox input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.riderDot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.riderAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  font-size: 0.8rem;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  border-radius: 50%;
+}
+
+.riderInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.riderNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .riderName {
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.9rem;
   font-weight: var(--weight-medium);
+}
+
+.leaderBadge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-weight: var(--weight-bold);
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 18%, transparent);
+  border-radius: 999px;
+}
+
+.riderSub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.riderStats {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.riderSpeedValue {
+  font-size: 0.9rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.riderStatsUnit {
+  font-size: 0.7rem;
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
+.riderGapValue {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.riderGap {
+  color: var(--status-live-strong);
+}
+
+/* --- groups tab ------------------------------------------------------------------------- */
+
+.groupRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.groupIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 50%;
+}
+
+/* --- bottom bar ------------------------------------------------------------------------- */
+
+.rideInfoBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  font-size: 0.95rem;
+  font-weight: var(--weight-bold);
+  color: #04150f;
+  background: var(--status-live);
+  border-radius: 999px;
+  text-decoration: none;
 }

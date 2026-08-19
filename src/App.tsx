@@ -131,7 +131,7 @@ export function App() {
           Open, same as the detail page: a public event's live locations (if show_live_locations
           allows it) are viewable by a guest, not just a signed-in participant. */}
       <Route
-        path="/events/:eventId/live"
+        path="/events/live/:eventId"
         element={
           <OpenHome>
             <LiveEventPage />

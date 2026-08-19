@@ -20,12 +20,17 @@ interface LiveTrackingProps {
 
 export function LiveTracking({ eventId, isPaused }: LiveTrackingProps) {
   return (
-    <div className="card row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+    <div
+      className="card row"
+      style={{ justifyContent: "space-between", flexWrap: "wrap" }}
+    >
       <span className="row" style={{ gap: 8 }}>
         <Radio width={16} height={16} aria-hidden="true" />
-        {isPaused ? "Live tracking is paused by the organizer" : "This event is live now"}
+        {isPaused
+          ? "Live tracking is paused by the organizer"
+          : "This event is live now"}
       </span>
-      <Link className="button" to={`/events/${eventId}/live`}>
+      <Link className="button" to={`/events/live/${eventId}`}>
         Open live map
       </Link>
     </div>

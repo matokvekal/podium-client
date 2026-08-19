@@ -1,23 +1,28 @@
-/* Ported from Figma (new-commissaire, "Today" > Card/1 & Card/2) — full-bleed cards with
- * title/time/location overlaid at the bottom over a dark gradient, replacing race-pwa's small
- * vertical RaceTile this used to be. Taller than the original 219x147 Figma spec — asked for
- * directly, so the home row fills more of the screen and leaves less dead space above the
- * sticky footer on short My Rides lists (see global.css's .app-main doc comment). */
+/*
+ * Two card sizes sharing one photo+body structure — "Upcoming" gets the large card, "Past
+ * Rides" the compact one — matching a reference screenshot supplied directly. Replaces the
+ * earlier full-bleed tile where everything (name, stats, date) was crammed into the photo
+ * overlay itself. The previous version is kept at
+ * src/_backup-cockpit-design/EventTile.module.css.bak.
+ */
 
-.tile {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  height: 185px;
-  border-radius: 10px;
-  overflow: hidden;
+.card,
+.cardCompact {
   display: block;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  /* A visibly stronger edge than the app's default hairline border, brightened into a glowing
+     shadow rather than a flat line — asked for directly ("border ... more shiny like bright
+     shadow"). Builds on the earlier "BORDER more bright" ask below with an accent-colored glow
+     at rest, not just on hover. */
+  border: 1.5px solid var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent) 32%, transparent),
+    var(--shadow-md);
   text-decoration: none;
   color: inherit;
-  border: 1px solid rgba(62, 221, 164, 0.4);
-  box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.15),
-    0 0 14px rgba(62, 221, 164, 0.18);
   transition:
     transform 0.15s,
     box-shadow 150ms ease,
@@ -25,40 +30,58 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.tile:hover {
+.card:hover,
+.cardCompact:hover {
   transform: translateY(-2px);
-  border-color: rgba(62, 221, 164, 0.75);
+  border-color: var(--accent-strong);
   box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.3),
-    0 0 20px rgba(62, 221, 164, 0.32),
-    0 8px 18px rgba(0, 0, 0, 0.18);
+    0 0 0 1px color-mix(in srgb, var(--accent-strong) 45%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent-strong) 45%, transparent),
+    0 10px 26px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.tile:active {
-  transform: scale(0.98);
+.card:active,
+.cardCompact:active {
+  transform: scale(0.99);
 }
 
-/* Flags the ride just created on EventCreatePage.tsx, same signal as EventCard's — see
-   EventsListPage.tsx for how long "isNew" stays true. */
-.tile[data-new] {
+/* Flags the ride just created on EventCreatePage.tsx — see EventsListPage.tsx for how long
+   "isNew" stays true. */
+.card[data-new],
+.cardCompact[data-new] {
   box-shadow:
     0 0 0 2px var(--accent-strong),
-    0 0 15px 15px rgba(63, 134, 231, 0.4);
-  animation: new-tile-glow 1.8s ease-in-out infinite;
+    0 0 15px 12px color-mix(in srgb, var(--accent-strong) 30%, transparent);
+  animation: new-card-glow 1.8s ease-in-out infinite;
 }
 
-@keyframes new-tile-glow {
+@keyframes new-card-glow {
   0%,
   100% {
     box-shadow:
       0 0 0 2px var(--accent-strong),
-      0 0 15px 12px rgba(63, 134, 231, 0.3);
+      0 0 15px 10px color-mix(in srgb, var(--accent-strong) 24%, transparent);
   }
   50% {
     box-shadow:
       0 0 0 2px var(--accent-strong),
-      0 0 15px 18px rgba(63, 134, 231, 0.5);
+      0 0 15px 16px color-mix(in srgb, var(--accent-strong) 42%, transparent);
   }
+}
+
+/* --- photo header --------------------------------------------------------------------- */
+
+.photo {
+  position: relative;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.cardCompact .photo {
+  height: 92px;
 }
 
 .bg {
@@ -67,12 +90,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 20px;
 }
 
-.initial {
-  font-size: 48px;
+.heroName {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  font-size: 22px;
   font-weight: var(--weight-bold);
-  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.2;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.cardCompact .heroName {
+  font-size: 16px;
+  -webkit-line-clamp: 1;
 }
 
 .scrim {
@@ -80,28 +117,89 @@
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0) 24%,
-    rgba(0, 0, 0, 0.6) 100%
+    rgba(0, 0, 0, 0) 20%,
+    rgba(0, 0, 0, 0.72) 100%
   );
 }
 
-/* Small top-left pill, not a full-width bar — keeps clear of .favBtn, which sits top-right. */
-.liveBar {
-  position: absolute;
-  top: 7px;
-  left: 7px;
+.photoTop,
+.photoBottom {
+  position: relative;
   z-index: 1;
+}
+
+.photoTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px;
+}
+
+.dateBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 36px;
+  padding: 3px 0;
+  background: rgba(15, 20, 30, 0.65);
+  backdrop-filter: blur(3px);
+  border-radius: 6px;
+  line-height: 1.1;
+}
+
+.dateBadgeMonth {
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #ffb020;
+}
+
+.dateBadgeDay {
+  font-size: 14px;
+  font-weight: var(--weight-bold);
+}
+
+.photoTopRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusPill {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: rgba(15, 20, 30, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.statusPill[data-bucket="upcoming"] {
+  background: var(--status-live);
+  color: #04150f;
+}
+
+.statusPill[data-bucket="finished"] {
+  background: rgba(15, 20, 30, 0.65);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Small pill, not a full-width bar — keeps clear of the icon buttons beside it. */
+.liveBar {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 7px;
-  background: rgba(62, 221, 164, 0.9);
-  color: #04140d;
+  padding: 3px 8px;
+  background: var(--status-live);
+  color: #04150f;
   font-size: 10px;
   font-weight: var(--weight-bold);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  border-radius: 5px;
+  border-radius: 999px;
   animation: live-bar-pulse 1.6s ease-in-out infinite;
 }
 
@@ -116,96 +214,89 @@
 @keyframes live-bar-pulse {
   0%,
   100% {
-    background: rgba(62, 221, 164, 0.85);
+    background: var(--status-live);
   }
   50% {
-    background: rgba(62, 221, 164, 1);
+    background: var(--status-live-strong);
   }
 }
 
-.favBtn {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  z-index: 1;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  border: none;
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.photoIconBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: none;
   color: #8facd4;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(3px);
   padding: 0;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.photoIconBtn:hover {
+  color: var(--accent-strong);
 }
 
 .favActive {
   color: #e04a7a;
 }
 
-/* Sits directly below .favBtn — only rendered for a ride this rider owns that hasn't started
-   yet (see EventTile.tsx's canEdit). */
-.editBtn {
-  position: absolute;
-  top: 39px;
-  right: 7px;
-  z-index: 1;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #8facd4;
-  backdrop-filter: blur(4px);
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
+.photoBottom {
+  padding: 8px 12px 10px;
 }
 
-.editBtn:hover {
-  color: var(--accent-strong);
-}
-
-.info {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.name {
-  font-size: 16px;
-  font-weight: var(--weight-bold);
-  color: #fff;
+.organizerRow {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* --- card body: stats + difficulty + date, below the photo, not overlaid on it -------- */
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+}
+
 .metaRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 12px;
   min-width: 0;
+}
+
+.metaRowSpacer {
+  margin-left: auto;
 }
 
 .metaItem {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -214,13 +305,11 @@
 .metaIcon {
   width: 14px;
   height: 14px;
-  color: #7cf0c4;
+  color: var(--accent-strong);
   flex-shrink: 0;
 }
 
-/* Difficulty "stairs" — same idea as EventCard.module.css/EventDetailPage.module.css's copy,
-   sized for this tile's smaller meta row. Unfilled bars are brighter here (vs those two)
-   since they sit over a photo scrim, not a plain surface. */
+/* Difficulty "stairs" — same idea as EventCard.module.css/EventDetailPage.module.css's copy. */
 .levelBars {
   display: inline-flex;
   align-items: flex-end;
@@ -231,18 +320,18 @@
 .levelBar {
   width: 5px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {
-  background: #39ff8c;
-  border-color: #39ff8c;
+  background: #39c97c;
+  border-color: #39c97c;
 }
 
 .levelBar[data-level="intermediate"][data-filled="true"] {
-  background: #c3ff39;
-  border-color: #c3ff39;
+  background: #a8d93a;
+  border-color: #a8d93a;
 }
 
 .levelBar[data-level="masters"][data-filled="true"] {
@@ -251,18 +340,11 @@
 }
 
 .levelBar[data-level="elite"][data-filled="true"] {
-  background: #ff3b5c;
-  border-color: #ff3b5c;
+  background: #ef4a6b;
+  border-color: #ef4a6b;
 }
 
 .levelBar[data-level="world_tour"][data-filled="true"] {
-  background: #b026ff;
-  border-color: #b026ff;
-}
-
-/* The date must never truncate — asked for directly ("can't see the date good"). Location
-   (if present) shares the row and shrinks/ellipsizes instead; it's the less critical of the
-   two at this tile width. */
-.dateItem {
-  flex-shrink: 0;
+  background: #9b3ef0;
+  border-color: #9b3ef0;
 }

@@ -32,14 +32,6 @@
  * instantly while the real fetch is still in flight, and stays on screen if that fetch
  * fails — "isOwner" is simply false for anyone who isn't signed in as the owner, which
  * already hides every management action below without any extra auth check here.
- *
- * Visuals: redesigned from a neon "cockpit" skin to a clean hero-photo-style layout, matching
- * a reference screenshot supplied directly — full-bleed colored hero (no real cover-image
- * field exists yet, see event-visuals.ts's placeholderColorVar) with the date/status pinned to
- * its corners and the name/organizer overlaid at the bottom, then a stats row, a tags row
- * (status/visibility/difficulty), owner actions, an at-a-glance card, conditions, route
- * preview, riders, and a sticky bottom CTA for a browsing rider. The previous cockpit-styled
- * version is kept at src/_backup-cockpit-design/EventDetailPage.tsx.bak, asked for directly.
  */
 
 import {
@@ -66,15 +58,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  FIGMA_TAG_LABEL,
-  figmaStatus,
-  initialOf,
-  mockLevel,
-  mockOrganizerName,
-  placeholderColorVar,
-} from "../app/event-visuals";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { mockLevel, mockOrganizerName } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RiderResultRow } from "../app/RiderResultRow";
 import { useAuth } from "../auth/AuthContext";
@@ -97,12 +82,6 @@ import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./EventDetailPage.module.css";
-
-// For the hero date badge (month/day shown as two separate stacked lines, not one combined
-// string) — kept as two formatters, not one, so there's no risk of the field-order bug
-// formatLocalDateTime hit (lib/time.ts's own doc comment).
-const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
-const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
@@ -144,15 +123,13 @@ interface EventDetail {
   myParticipant: MyParticipant | null;
 }
 
-/** Mirrors the server's transition graph (event.service.ts): published (and any older event
- * still sitting in registration_open/ready) can go straight to live — those two are optional
- * waypoints, not required steps before Go Live. */
+/** Mirrors the server's transition graph (event.service.ts) with a button label per step. */
 const NEXT_STATUS: Partial<
   Record<EventStatus, { status: EventStatus; label: string }>
 > = {
   draft: { status: "published", label: "Publish" },
-  published: { status: "live", label: "Start — go live" },
-  registration_open: { status: "live", label: "Start — go live" },
+  published: { status: "registration_open", label: "Open registration" },
+  registration_open: { status: "ready", label: "Mark ready" },
   ready: { status: "live", label: "Start — go live" },
   live: { status: "finished", label: "Finish" },
 };
@@ -195,7 +172,6 @@ function detailFromCachedSummary(
 
 export function EventDetailPage() {
   const { eventId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const redirectMessage =
     (location.state as { message?: string } | null)?.message ?? null;
@@ -206,11 +182,6 @@ export function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Which consequential action (go live / finish) is awaiting an in-place confirm tap —
-  // replaces the two window.confirm() popups asked to be swapped for real UI ("not just
-  // simple alert"). null means the normal action button(s) show; otherwise the owner-actions
-  // row swaps to a small message + Cancel/Confirm pair for that one action.
-  const [confirming, setConfirming] = useState<"live" | "finish" | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
@@ -302,12 +273,16 @@ export function EventDetailPage() {
     };
   }, [event]);
 
-  // The two consequential transitions (going live, and finishing/stopping) are confirmed via
-  // the inline confirm bar below (see `confirming` state) rather than a window.confirm() popup
-  // — asked for directly ("good ui ux like small button... not just simple alert"). The
-  // earlier low-stakes steps (Publish, Open registration, Mark ready) stay one-tap.
-  async function changeStatus(nextStatus: EventStatus) {
+  // confirmMessage is only passed for the two consequential transitions (going live, and
+  // finishing/stopping) — asked for directly ("it ask are you sure also for start"). The
+  // earlier low-stakes steps (Publish, Open registration, Mark ready) stay one-tap, same as
+  // Cancel's own window.confirm above.
+  async function changeStatus(
+    nextStatus: EventStatus,
+    confirmMessage?: string,
+  ) {
     if (!eventId) return;
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
     setBusy(true);
     setError(null);
     try {
@@ -319,24 +294,7 @@ export function EventDetailPage() {
         },
       );
       setEvent(updated);
-      // Clicking "Start — go live" only re-labeled the header button to "LIVE" before,
-      // requiring a second tap to actually get there — asked for directly ("i click at go
-      // live but got stary at same page... muve me to live scen"). Jump straight to the live
-      // page the instant the transition succeeds.
-      if (nextStatus === "live") {
-        navigate(`/events/live/${eventId}`);
-      }
     } catch (err) {
-      // Going live is time-sensitive ("i'm about to ride") — a network hiccup shouldn't be
-      // able to strand the organizer on this page staring at a "you appear to be offline"
-      // banner, asked for directly ("so what? just move me if it started"). The live page's
-      // own polling will just show nothing new until connectivity returns, which is a much
-      // smaller problem than being stuck. Only applies to that one specific failure mode
-      // (ApiError.isOffline, api-client.ts) — a real server error (403/500/etc.) still shows.
-      if (nextStatus === "live" && err instanceof ApiError && err.isOffline) {
-        navigate(`/events/live/${eventId}`);
-        return;
-      }
       setError(
         err instanceof ApiError
           ? err.message
@@ -344,7 +302,6 @@ export function EventDetailPage() {
       );
     } finally {
       setBusy(false);
-      setConfirming(null);
     }
   }
 
@@ -444,50 +401,112 @@ export function EventDetailPage() {
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
   const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
   const riderCount = seedParticipantCount(event.id);
-  const bucket = figmaStatus(displayStatus);
-  const canEditNow =
-    event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
-  // Owner never registers for their own ride; a rider who already finished/cancelled events
-  // can't join either — same guard the old bottom card and sign-in link used.
-  const showRiderCta =
-    !event.isOwner &&
-    displayStatus !== "finished" &&
-    displayStatus !== "cancelled";
 
   return (
     <section className={styles.page}>
-      {/* --- hero: colored placeholder (no real cover-image field yet, same honest-fallback
-          rule as EventCard/EventTile) with the date/status pinned to its corners and the
-          name/organizer overlaid at the bottom. ------------------------------------------ */}
-      <div
-        className={styles.hero}
-        style={{ background: placeholderColorVar(event.id) }}
-      >
-        <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />
-        <div className={styles.heroScrim} />
+      <div className={styles.deck}>
+        <span
+          className={`${styles.corner} ${styles.cornerTl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerTr}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBl}`}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.corner} ${styles.cornerBr}`}
+          aria-hidden="true"
+        />
 
-        <div className={styles.heroTop}>
-          {event.startsAt ? (
-            <span className={styles.dateBadge}>
-              <span className={styles.dateBadgeMonth}>
-                {heroMonthFormat.format(new Date(event.startsAt))}
-              </span>
-              <span className={styles.dateBadgeDay}>
-                {heroDayFormat.format(new Date(event.startsAt))}
-              </span>
-            </span>
-          ) : (
-            <span />
-          )}
-          <div className={styles.heroTopRight}>
-            <span className={styles.statusPill} data-bucket={bucket}>
-              {displayStatus === "cancelled"
-                ? "Cancelled"
-                : FIGMA_TAG_LABEL[bucket]}
-            </span>
+        <div className={styles.header}>
+          {/* Row 1: icon beside the name — "up the event name and at side the activity
+              icon", asked for directly. */}
+          <div className={styles.headerTop}>
+            <div className={styles.headerIcon}>
+              <ActivityIcon aria-hidden="true" />
+            </div>
+            <div className={styles.headerText}>
+              <h1 className={styles.title}>{event.name}</h1>
+              <span className={styles.codeTag}>{event.code}</span>
+            </div>
+          </div>
+          {/* Row 2: the action buttons, all together — "second row all butons like start
+              edit share", asked for directly. Wraps if it doesn't fit one line. */}
+          <div className={styles.headerActions}>
+            {/* Edit was previously reachable only through the Command menu further down the
+                page — asked for directly to put it right in the header instead, next to Share.
+                Same guard as that menu item: gone once live/finished, since the server blocks
+                general-detail edits past that point anyway (EventCreatePage.tsx's edit-mode
+                guard). Links to the same EventCreatePage component Create uses, in edit mode. */}
+            {event.isOwner &&
+              displayStatus !== "live" &&
+              displayStatus !== "finished" && (
+                <Link
+                  className={styles.editBtn}
+                  to={`/events/${event.id}/edit`}
+                  aria-label="Edit this event"
+                  title="Edit event"
+                >
+                  <Pencil aria-hidden="true" />
+                </Link>
+              )}
+            {/* Was buried in a "Command" card at the bottom of the page — asked for directly
+                ("the orgenize action is at end and that not good must be up"), moved into the
+                header next to Edit/Share. Same slot, two lives: while live this is the "LIVE"
+                link straight to the dedicated live page (asked for: "if it allredy started
+                then the caption change to LIVE ... that bring us to new page"), plus a
+                separate Stop button next to it ("i need some stop event that make it past");
+                otherwise it fires the next status transition (Publish/Open registration/etc.),
+                with a confirm prompt on the two consequential ones (going live, finishing). */}
+            {event.isOwner &&
+              (displayStatus === "live" ? (
+                <>
+                  <Link
+                    className={styles.startBtn}
+                    to={`/events/${event.id}/live`}
+                  >
+                    LIVE
+                  </Link>
+                  <button
+                    type="button"
+                    className={styles.stopBtn}
+                    disabled={busy}
+                    onClick={() =>
+                      changeStatus(
+                        "finished",
+                        "Stop this event and mark it finished? This can't be undone.",
+                      )
+                    }
+                  >
+                    Stop
+                  </button>
+                </>
+              ) : (
+                next && (
+                  <button
+                    type="button"
+                    className={styles.startBtn}
+                    disabled={busy}
+                    onClick={() =>
+                      changeStatus(
+                        next.status,
+                        next.status === "live"
+                          ? "Go live now? Riders will see the ride as started."
+                          : undefined,
+                      )
+                    }
+                  >
+                    {next.label}
+                  </button>
+                )
+              ))}
             <button
               type="button"
-              className={styles.heroIconBtn}
+              className={styles.shareBtn}
               onClick={() => setShareOpen(true)}
               aria-label="Share this event"
               title="Share — code, QR, link"
@@ -497,7 +516,7 @@ export function EventDetailPage() {
             {event.isOwner && (
               <button
                 type="button"
-                className={styles.heroIconBtn}
+                className={styles.menuTriggerIcon}
                 onClick={() => setMenuOpen(true)}
                 aria-expanded={menuOpen}
                 aria-label="More organizer actions"
@@ -509,22 +528,6 @@ export function EventDetailPage() {
           </div>
         </div>
 
-        <div className={styles.heroBottom}>
-          <h1 className={styles.title}>{event.name}</h1>
-          <div className={styles.organizerRow}>
-            <span
-              className={styles.avatar}
-              style={{ background: placeholderColorVar(organizer) }}
-              aria-hidden="true"
-            >
-              {initialOf(organizer)}
-            </span>
-            Organized by {organizer}
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.body}>
         {error && (
           <p className="banner banner--error" role="alert">
             {error}
@@ -532,204 +535,166 @@ export function EventDetailPage() {
         )}
         {redirectMessage && <p className="banner">{redirectMessage}</p>}
 
-        {/* --- stats row ------------------------------------------------------------------ */}
-        <div className={styles.statsRow}>
-          <span className={styles.statItem}>
-            <Users width={15} height={15} aria-hidden="true" />
-            {riderCount} Riders
-          </span>
-          {results?.route.distanceKm != null && (
-            <span className={styles.statItem}>
-              <Ruler width={15} height={15} aria-hidden="true" />
-              {results.route.distanceKm} km
-            </span>
-          )}
-          {results?.route.elevationM != null && (
-            <span className={styles.statItem}>
-              <Mountain width={15} height={15} aria-hidden="true" />
-              {results.route.elevationM} m
-            </span>
-          )}
-        </div>
-
-        {/* --- tags row: status / visibility / difficulty stairs --------------------------- */}
-        <div className={styles.tagsRow}>
-          <span
-            className={styles.pill}
-            data-tone={
-              displayStatus === "cancelled"
-                ? "danger"
-                : bucket === "live"
-                  ? "live"
-                  : bucket === "finished"
-                    ? "neutral"
-                    : "ready"
-            }
-            title={
-              isPastDue
-                ? "Automatically marked finished — the date has passed"
-                : undefined
-            }
-          >
-            {displayStatus.replace("_", " ")}
-          </span>
-          <span className={styles.pill} data-tone="neutral">
-            {event.visibility}
-          </span>
-          {event.requiresApproval && event.isOwner && (
+        {/* --- quick facts: the status strip every viewer scans first ------------------- */}
+        <div className="card stack">
+          <div className="row">
             <span
-              className={styles.pill}
-              data-tone="neutral"
-              title="Riders who join must be approved before they're in"
+              className={
+                displayStatus === "live"
+                  ? "badge badge--live"
+                  : displayStatus === "finished"
+                    ? "badge badge--finished"
+                    : displayStatus === "cancelled"
+                      ? "badge badge--danger"
+                      : "badge badge--pending"
+              }
+              title={
+                isPastDue
+                  ? "Automatically marked finished — the date has passed"
+                  : undefined
+              }
             >
-              Approval required
+              {displayStatus.replace("_", " ")}
             </span>
-          )}
-          {event.isPaused && (
+            <span className="badge">{event.visibility}</span>
+            {/* Same steps visual (and color-per-level scheme) as the create page's difficulty
+                picker, asked for directly ("insted of intemidiate show the level step as the
+                create"). Read-only here — just the current level lit. */}
             <span
-              className={styles.pill}
-              data-tone="ready"
-              title="The organizer has paused live tracking"
+              className={styles.levelBars}
+              title={LEVEL_LABEL[level]}
+              aria-label={`Difficulty: ${LEVEL_LABEL[level]}`}
             >
-              Paused
+              {LEVELS.map((l, i) => (
+                <span
+                  key={l.value}
+                  className={styles.levelBar}
+                  data-level={l.value}
+                  data-filled={i === levelIndex}
+                  style={{ height: `${6 + i * 4}px` }}
+                />
+              ))}
             </span>
-          )}
-          {/* Same steps visual (and color-per-level scheme) as the create page's difficulty
-              picker — read-only here, just the current level lit. */}
-          <span
-            className={`${styles.levelBars} ${styles.tagsRowSpacer}`}
-            title={LEVEL_LABEL[level]}
-            aria-label={`Difficulty: ${LEVEL_LABEL[level]}`}
-          >
-            {LEVELS.map((l, i) => (
+            <span className="badge">
+              <Users width={12} height={12} aria-hidden="true" />
+              {riderCount} riders
+            </span>
+            {results?.route.distanceKm != null && (
+              <span className="badge">
+                <Ruler width={12} height={12} aria-hidden="true" />
+                {results.route.distanceKm} km
+              </span>
+            )}
+            {results?.route.elevationM != null && (
+              <span className="badge">
+                <Mountain width={12} height={12} aria-hidden="true" />
+                {results.route.elevationM} m
+              </span>
+            )}
+            {event.requiresApproval && event.isOwner && (
               <span
-                key={l.value}
-                className={styles.levelBar}
-                data-level={l.value}
-                data-filled={i === levelIndex}
-                style={{ height: `${6 + i * 4}px` }}
-              />
-            ))}
-          </span>
-        </div>
-
-        {/* --- owner actions: Edit + Start/LIVE/Stop — the rest (Participants/Groups/Cancel)
-            live in the "more" sheet opened from the hero's gear icon. ---------------------- */}
-        {event.isOwner && (
-          <div className={styles.ownerActions}>
-            {confirming ? (
-              <div className={styles.confirmBar}>
-                <span className={styles.confirmMessage}>
-                  {confirming === "live"
-                    ? "Go live now? Riders will see the ride as started."
-                    : "Stop this event and mark it finished? This can't be undone."}
-                </span>
-                <div className={styles.confirmActions}>
-                  <button
-                    type="button"
-                    className={styles.confirmCancelBtn}
-                    disabled={busy}
-                    onClick={() => setConfirming(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.confirmOkBtn}
-                    data-tone={confirming === "finish" ? "danger" : undefined}
-                    disabled={busy}
-                    onClick={() =>
-                      changeStatus(confirming === "live" ? "live" : "finished")
-                    }
-                  >
-                    {busy
-                      ? "…"
-                      : confirming === "live"
-                        ? "Go live"
-                        : "Stop event"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {canEditNow && (
-                  <Link
-                    className={styles.editBtn}
-                    to={`/events/${event.id}/edit`}
-                  >
-                    <Pencil width={16} height={16} aria-hidden="true" />
-                    Edit
-                  </Link>
-                )}
-                {displayStatus === "live" ? (
-                  <>
-                    <Link
-                      className={styles.startBtn}
-                      to={`/events/live/${event.id}`}
-                    >
-                      LIVE
-                    </Link>
-                    <button
-                      type="button"
-                      className={styles.stopBtn}
-                      disabled={busy}
-                      onClick={() => setConfirming("finish")}
-                    >
-                      Stop
-                    </button>
-                  </>
-                ) : (
-                  next && (
-                    <button
-                      type="button"
-                      className={styles.startBtn}
-                      disabled={busy}
-                      onClick={() =>
-                        next.status === "live"
-                          ? setConfirming("live")
-                          : changeStatus(next.status)
-                      }
-                    >
-                      {next.label}
-                    </button>
-                  )
-                )}
-              </>
+                className="badge"
+                title="Riders who join must be approved before they're in"
+              >
+                Approval required
+              </span>
+            )}
+            {event.isPaused && (
+              <span
+                className="badge badge--pending"
+                title="The organizer has paused live tracking"
+              >
+                Paused
+              </span>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Owner gets the LIVE entry point above — this compact summary is only for a
-            non-owner viewer, who has no such control. The full live map itself is never
-            embedded here; it's the fully separate /events/:eventId/live page. */}
+        {/* Owner gets the LIVE entry point in the header's Start/LIVE button — this compact
+            summary is only for a non-owner viewer, who has no such control. The full live map
+            itself is never embedded here; it's the fully separate /events/:eventId/live page. */}
         {displayStatus === "live" &&
           !event.isOwner &&
           event.showLiveLocations && (
             <LiveTracking eventId={event.id} isPaused={event.isPaused} />
           )}
 
-        {/* --- at a glance: where/when/who, one card, one source of truth per field --------- */}
+        {/* --- primary CTA: right under the status strip, not buried under everything else
+            ("pro ux" reorg) — a browsing rider's next step should be the second thing on the
+            page, not the fifth. --------------------------------------------------------- */}
+        {!event.isOwner &&
+          profile &&
+          displayStatus !== "finished" &&
+          displayStatus !== "cancelled" && (
+            <div className="card stack">
+              {event.myParticipant ? (
+                <span
+                  className="badge"
+                  data-status={event.myParticipant.registrationStatus}
+                >
+                  {event.myParticipant.registrationStatus === "waiting_approval"
+                    ? "Pending approval"
+                    : event.myParticipant.registrationStatus === "rejected"
+                      ? "Registration rejected"
+                      : event.myParticipant.registrationStatus === "approved"
+                        ? "Approved"
+                        : "Registered"}
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.primaryAction}
+                    disabled={registerBusy}
+                    onClick={handleRegister}
+                  >
+                    {event.requiresApproval
+                      ? "Request to Register"
+                      : "Register"}
+                  </button>
+                  {registerError && (
+                    <p className="banner banner--error" role="alert">
+                      {registerError}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+        {!event.isOwner &&
+          !profile &&
+          displayStatus !== "finished" &&
+          displayStatus !== "cancelled" && (
+            <Link
+              className={`button ${styles.primaryAction}`}
+              to="/login"
+              state={{ from: `/events/${event.id}` }}
+            >
+              Sign in to register
+            </Link>
+          )}
+
+        {/* --- at a glance: where/when/who, one card, one source of truth per field (was
+            split across two cards before — start time and organizer each shown twice) ----- */}
         <div className="card stack">
-          {event.startsAt && (
+          {/* Date and location share one row — "near dat add the location field", asked for
+              directly (was two separate lines before). */}
+          {(event.startsAt || event.location) && (
             <p
               className={`${styles.highlightRow} row`}
               style={{ margin: 0, gap: "14px", flexWrap: "wrap" }}
             >
-              <span className="row" style={{ gap: "6px" }}>
-                <CalendarDays width={16} height={16} aria-hidden="true" />
-                {formatLocalDateTime(event.startsAt)}
-              </span>
-            </p>
-          )}
-          {event.location && (
-            <div className={styles.infoBlock}>
-              <p className={styles.infoLabel}>Meeting point</p>
-              <p className="row" style={{ margin: 0, gap: "6px" }}>
-                <MapPin width={16} height={16} aria-hidden="true" />
-                {event.location}
-              </p>
-              {(wazeHref || googleMapsHref) && (
-                <div className="row" style={{ gap: "8px", marginTop: 6 }}>
+              {event.startsAt && (
+                <span className="row" style={{ gap: "6px" }}>
+                  <CalendarDays width={16} height={16} aria-hidden="true" />
+                  {formatLocalDateTime(event.startsAt)}
+                </span>
+              )}
+              {event.location && (
+                <span className="row" style={{ gap: "6px" }}>
+                  <MapPin width={16} height={16} aria-hidden="true" />
+                  {event.location}
                   {wazeHref && (
                     <a
                       href={wazeHref}
@@ -737,6 +702,7 @@ export function EventDetailPage() {
                       rel="noopener noreferrer"
                       className={styles.navLink}
                       aria-label="Navigate with Waze"
+                      title="Navigate with Waze"
                     >
                       <Navigation width={14} height={14} aria-hidden="true" />
                       Waze
@@ -749,14 +715,15 @@ export function EventDetailPage() {
                       rel="noopener noreferrer"
                       className={styles.navLink}
                       aria-label="Navigate with Google Maps"
+                      title="Navigate with Google Maps"
                     >
                       <MapPin width={14} height={14} aria-hidden="true" />
                       Maps
                     </a>
                   )}
-                </div>
+                </span>
               )}
-            </div>
+            </p>
           )}
           <div className="row" style={{ gap: "6px" }}>
             <p className="muted row" style={{ margin: 0, gap: "6px" }}>
@@ -779,7 +746,7 @@ export function EventDetailPage() {
           </div>
           {event.description && (
             <div className={styles.infoBlock}>
-              <p className={styles.infoLabel}>Mission brief</p>
+              <p className={styles.infoLabel}>{"// MISSION BRIEF"}</p>
               <p style={{ margin: 0 }}>{event.description}</p>
             </div>
           )}
@@ -799,10 +766,12 @@ export function EventDetailPage() {
         )}
 
         {results && (
-          <>
-            {/* --- conditions ------------------------------------------------------------- */}
+          <div className="stack">
+            {/* Organizer contact and start time now live once, in the "at a glance" card
+                above (they were duplicated here before — same two facts, two different
+                cards). This card is conditions only now. */}
             <div className="card stack">
-              <p className={styles.infoLabel}>Conditions</p>
+              <p className={styles.infoLabel}>{"// CONDITIONS"}</p>
               <div className="row" style={{ flexWrap: "wrap" }}>
                 <span
                   className={`${styles.conditionBadge} ${
@@ -826,7 +795,7 @@ export function EventDetailPage() {
                   title="Illustrative — no live traffic provider yet"
                 >
                   <AlertTriangle width={12} height={12} aria-hidden="true" />
-                  Roads: {traffic.label}
+                  {traffic.label}
                 </span>
               </div>
               {forecast && (
@@ -853,40 +822,19 @@ export function EventDetailPage() {
               )}
             </div>
 
-            {/* --- route preview ------------------------------------------------------------ */}
-            <div className="card stack">
-              <p className={styles.infoLabel}>Route preview</p>
-              <Suspense
-                fallback={<div className="row muted">Loading the map…</div>}
-              >
-                <RouteMap points={results.route.points} />
-              </Suspense>
-              <div
-                className={styles.statsRow}
-                style={{ marginTop: "var(--space-2)" }}
-              >
-                <span className={styles.statItem}>
-                  <Ruler width={15} height={15} aria-hidden="true" />
-                  {results.route.distanceKm} km
-                </span>
-                {results.route.elevationM != null && (
-                  <span className={styles.statItem}>
-                    <Mountain width={15} height={15} aria-hidden="true" />
-                    {results.route.elevationM} m
-                  </span>
-                )}
-              </div>
-            </div>
+            <Suspense
+              fallback={<div className="row muted">Loading the map…</div>}
+            >
+              <RouteMap points={results.route.points} />
+            </Suspense>
 
             {/* "if riders are published we will see them" — the organizer's own "Riders list
                 open to view" switch (EventCreatePage.tsx) gates this for everyone else; the
                 organizer still sees their own start list regardless, same as every other
                 owner-only visibility rule on this page. */}
             {(event.isOwner || event.showParticipants) && (
-              <div className="card stack">
-                <p className={styles.infoLabel}>
-                  Riders ({visibleRiders.length})
-                </p>
+              <>
+                <h2 style={{ margin: 0 }}>Riders ({visibleRiders.length})</h2>
                 <div
                   className="stack"
                   style={{
@@ -899,138 +847,82 @@ export function EventDetailPage() {
                     <RiderResultRow key={rider.id} rider={rider} />
                   ))}
                 </div>
-              </div>
+              </>
             )}
-          </>
+          </div>
         )}
 
-        {/* Bottom-bar CTA takes over the rider join flow below — this reserves its height so
-            the last card never sits underneath the fixed bar. */}
-        {showRiderCta && (
-          <div className={styles.bottomBarSpacer} aria-hidden="true" />
+        {shareOpen && (
+          <Suspense fallback={null}>
+            <ShareEventSheet
+              eventName={event.name}
+              eventCode={event.code}
+              onClose={() => setShareOpen(false)}
+            />
+          </Suspense>
         )}
-      </div>
 
-      {/* --- sticky bottom CTA — "I'M IN", asked for directly ---------------------------- */}
-      {showRiderCta && (
-        <div className={styles.bottomBar}>
-          {!profile ? (
-            <Link
-              className={styles.ctaBtn}
-              to="/login"
-              state={{ from: `/events/${event.id}` }}
-            >
-              Sign in to join
-            </Link>
-          ) : event.myParticipant ? (
-            <span
-              className={styles.ctaStatus}
-              data-status={event.myParticipant.registrationStatus}
-            >
-              {event.myParticipant.registrationStatus === "waiting_approval"
-                ? "Pending approval"
-                : event.myParticipant.registrationStatus === "rejected"
-                  ? "Registration rejected"
-                  : event.myParticipant.registrationStatus === "approved"
-                    ? "Approved — see you there"
-                    : "You're in"}
-            </span>
-          ) : (
-            <button
-              type="button"
-              className={styles.ctaBtn}
-              disabled={registerBusy}
-              onClick={handleRegister}
-            >
-              {registerBusy
-                ? "Joining…"
-                : event.requiresApproval
-                  ? "Request to join"
-                  : "I'M IN"}
-            </button>
-          )}
-          {registerError && (
-            <p
-              className="banner banner--error"
-              role="alert"
-              style={{ margin: 0 }}
-            >
-              {registerError}
-            </p>
-          )}
-        </div>
-      )}
-
-      {shareOpen && (
-        <Suspense fallback={null}>
-          <ShareEventSheet
-            eventName={event.name}
-            eventCode={event.code}
-            onClose={() => setShareOpen(false)}
-          />
-        </Suspense>
-      )}
-
-      {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
+        {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both
           more visible and consistent with every other action sheet in this app
           (CopyTrackSheet, ParticipantFormSheet, TracksPage's filter sheet). */}
-      {menuOpen && (
-        <>
-          <div
-            className={styles.menuOverlay}
-            onClick={() => setMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div className={styles.menu} role="menu">
-            <div className={styles.menuHeader}>
-              <span>Organizer actions</span>
-              <button
-                type="button"
-                className={styles.menuClose}
+        {menuOpen && (
+          <>
+            <div
+              className={styles.menuOverlay}
+              onClick={() => setMenuOpen(false)}
+              aria-hidden="true"
+            />
+            <div className={styles.menu} role="menu">
+              <div className={styles.menuHeader}>
+                <span>Organizer actions</span>
+                <button
+                  type="button"
+                  className={styles.menuClose}
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close"
+                >
+                  <X width={18} height={18} aria-hidden="true" />
+                </button>
+              </div>
+              {/* Edit and Share both moved to standalone header buttons next to this menu
+                  trigger — this sheet is just what's left over: Participants/Groups/Cancel.
+                  While live, "Participants" is relabeled "Manage": it's the same restricted
+                  page (add/remove/check-in riders, pause/stop), not a separate screen. */}
+              <Link
+                className={styles.menuItem}
+                to={`/events/${event.id}/participants`}
                 onClick={() => setMenuOpen(false)}
-                aria-label="Close"
               >
-                <X width={18} height={18} aria-hidden="true" />
-              </button>
+                <Users width={16} height={16} aria-hidden="true" />
+                {displayStatus === "live" ? "Manage" : "Participants"}
+              </Link>
+              <Link
+                className={styles.menuItem}
+                to={`/events/${event.id}/groups`}
+                onClick={() => setMenuOpen(false)}
+              >
+                <UsersRound width={16} height={16} aria-hidden="true" />
+                Groups
+              </Link>
+              {CANCELLABLE.includes(displayStatus) && (
+                <button
+                  type="button"
+                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    cancelEvent();
+                  }}
+                >
+                  <X width={16} height={16} aria-hidden="true" />
+                  Cancel event
+                </button>
+              )}
             </div>
-            {/* Edit and Start/LIVE/Stop both live in the owner action row above this sheet —
-                this is just what's left over: Participants/Groups/Cancel. While live,
-                "Participants" is relabeled "Manage": it's the same restricted page
-                (add/remove/check-in riders, pause/stop), not a separate screen. */}
-            <Link
-              className={styles.menuItem}
-              to={`/events/${event.id}/participants`}
-              onClick={() => setMenuOpen(false)}
-            >
-              <Users width={16} height={16} aria-hidden="true" />
-              {displayStatus === "live" ? "Manage" : "Participants"}
-            </Link>
-            <Link
-              className={styles.menuItem}
-              to={`/events/${event.id}/groups`}
-              onClick={() => setMenuOpen(false)}
-            >
-              <UsersRound width={16} height={16} aria-hidden="true" />
-              Groups
-            </Link>
-            {CANCELLABLE.includes(displayStatus) && (
-              <button
-                type="button"
-                className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                disabled={busy}
-                onClick={() => {
-                  setMenuOpen(false);
-                  cancelEvent();
-                }}
-              >
-                <X width={16} height={16} aria-hidden="true" />
-                Cancel event
-              </button>
-            )}
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

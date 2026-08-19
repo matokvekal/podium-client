@@ -64,6 +64,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
 
         <NavLink to="/" className="app-header__brand">
+          <img
+            className="app-header__logo"
+            src="/logo.png"
+            alt=""
+            aria-hidden="true"
+            width={22}
+            height={22}
+          />
           El Niño Move
         </NavLink>
 

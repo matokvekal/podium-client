@@ -159,11 +159,18 @@ textarea {
 }
 
 .app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--accent);
   text-decoration: none;
   font-weight: var(--weight-medium);
   font-size: var(--text-base);
   text-align: center;
+}
+
+.app-header__logo {
+  flex-shrink: 0;
 }
 
 .app-header__avatar {

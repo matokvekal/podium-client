@@ -171,7 +171,11 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  color: var(--text);
+  /* Fixed dark icon on a fixed light circle — not var(--text)/var(--surface), which flip in
+     dark mode. These float over the map (always light tiles regardless of app theme), and a
+     theme-linked icon color went near-white-on-near-white in dark mode: a visible circle with
+     no visible icon inside it ("just circle no logo, so we don't know what are they for"). */
+  color: #1c2733;
   background: rgba(255, 255, 255, 0.9);
   border: none;
   border-radius: 50%;

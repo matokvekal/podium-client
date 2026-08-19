@@ -1,9 +1,9 @@
 /**
  * Splash screen
  *
- * Shown once per cold start, for one second, layered over the real app while it mounts
- * underneath — it does not delay anything; routing and auth are already loading in
- * parallel behind it.
+ * Shown once per cold start, for three seconds (asked for directly), layered over the real
+ * app while it mounts underneath — it does not delay anything; routing and auth are already
+ * loading in parallel behind it.
  *
  * Purely presentational: a dark, glowing road route — straight streets meeting at angled
  * junctions, like a real map, not a smooth circle — with a scatter of small rider dots, one
@@ -11,12 +11,16 @@
  * a group riding together, watched over, with trouble visible the instant it happens. The
  * red-and-blinking language for "needs help" is the same one the real SOS marker on the live
  * map uses (see AGENT.md); reused here on purpose, not a coincidence.
+ *
+ * The mark itself (public/logo.png — a swirl, picked from logos.png's set: "start at top like
+ * a wheel and turn down like a tornado, blue shine fluorescent," asked for directly) spins
+ * for as long as the splash is on screen, echoing the tornado shape rather than sitting still.
  */
 
 import { useEffect, useState } from "react";
 import "./splash-screen.css";
 
-const VISIBLE_MS = 1000;
+const VISIBLE_MS = 3000;
 const FADE_MS = 300;
 
 // Riders bunch up on a real ride — a few small groups strung out along the route, not one
@@ -57,7 +61,10 @@ export function SplashScreen() {
   if (phase === "done") return null;
 
   return (
-    <div className={phase === "fading" ? "splash splash--fading" : "splash"} aria-hidden="true">
+    <div
+      className={phase === "fading" ? "splash splash--fading" : "splash"}
+      aria-hidden="true"
+    >
       <div className="splash__glow" />
       <div className="splash__grid" />
 
@@ -81,12 +88,26 @@ export function SplashScreen() {
         {RIDERS.map((rider, index) => (
           <span
             key={rider.id}
-            className={rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"}
-            style={{ left: `${rider.x}%`, top: `${rider.y}%`, animationDelay: `${index * 0.2}s` }}
+            className={
+              rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"
+            }
+            style={{
+              left: `${rider.x}%`,
+              top: `${rider.y}%`,
+              animationDelay: `${index * 0.2}s`,
+            }}
           />
         ))}
 
         <div className="splash__mark">
+          <img
+            className="splash__mark-logo"
+            src="/logo.png"
+            alt=""
+            aria-hidden="true"
+            width={64}
+            height={64}
+          />
           <span className="splash__mark-name">El Niño Move</span>
           <span className="splash__mark-tag">Every rider, watched over.</span>
         </div>

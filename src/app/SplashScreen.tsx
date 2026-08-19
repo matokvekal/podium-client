@@ -13,11 +13,14 @@
  * map uses (see AGENT.md); reused here on purpose, not a coincidence.
  *
  * The mark itself (public/logo.png — a swirl, picked from logos.png's set: "start at top like
- * a wheel and turn down like a tornado, blue shine fluorescent," asked for directly) spins
- * for as long as the splash is on screen, echoing the tornado shape rather than sitting still.
+ * a wheel and turn down like a tornado, blue shine fluorescent," asked for directly) spins for
+ * as long as the splash is on screen, echoing the tornado shape rather than sitting still. Also
+ * asked for directly: shifted higher in the stage rather than dead-center, sized 200% bigger
+ * (3x) than its original 64px, and re-tinted to a random hue on every mount rather than always
+ * the same blue — see splash-screen.css's .splash__mark/.splash__mark-logo for the how/why.
  */
 
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import "./splash-screen.css";
 
 const VISIBLE_MS = 3000;
@@ -48,6 +51,11 @@ const RIDERS: { id: string; x: number; y: number; sos?: boolean }[] = [
 
 export function SplashScreen() {
   const [phase, setPhase] = useState<"visible" | "fading" | "done">("visible");
+  // A fresh random tint each time the splash mounts ("each time at different color") — picked
+  // once per mount, not re-rolled on rerender, and applied via the --logo-hue custom property
+  // splash-screen.css's .splash__mark-logo reads (see that file for why it's a CSS var rather
+  // than an inline `filter`).
+  const [logoHue] = useState(() => Math.floor(Math.random() * 360));
 
   useEffect(() => {
     const toFade = setTimeout(() => setPhase("fading"), VISIBLE_MS);
@@ -105,8 +113,9 @@ export function SplashScreen() {
             src="/logo.png"
             alt=""
             aria-hidden="true"
-            width={64}
-            height={64}
+            width={192}
+            height={192}
+            style={{ "--logo-hue": `${logoHue}deg` } as CSSProperties}
           />
           <span className="splash__mark-name">El Niño Move</span>
           <span className="splash__mark-tag">Every rider, watched over.</span>

@@ -20,6 +20,14 @@ interface EventExtras {
   /** Same "shown, then forgotten" story as everywhere else — but EventCreatePage.tsx's edit
    * mode needs to read it back to prefill the form, so it's persisted here now too. */
   activityType: SurfaceType | null;
+  /** Distance/climb — same "no server column yet, but needs to show up again later" story as
+   * Level: shown on cards near the difficulty stairs, so a browsing/returning rider can see
+   * them without opening the event. Auto-filled from whatever route the organizer picked/
+   * uploaded on EventCreatePage.tsx, but a plain number either way, editable by hand — a route
+   * doesn't always carry real elevation data (mock routes can have a null climb), and manual
+   * entry is the honest fallback rather than leaving it blank. */
+  distanceKm: number | null;
+  climbM: number | null;
 }
 
 const EMPTY_EXTRAS: EventExtras = {
@@ -27,6 +35,8 @@ const EMPTY_EXTRAS: EventExtras = {
   organizerGroup: null,
   teamId: null,
   activityType: null,
+  distanceKm: null,
+  climbM: null,
 };
 
 interface EventExtrasState {
@@ -35,6 +45,11 @@ interface EventExtrasState {
   setOrganizerGroup(eventId: string, name: string): void;
   setTeam(eventId: string, teamId: string | null, teamName: string | null): void;
   setActivityType(eventId: string, activityType: SurfaceType): void;
+  setDistanceClimb(
+    eventId: string,
+    distanceKm: number | null,
+    climbM: number | null,
+  ): void;
 }
 
 export const useEventExtrasStore = create<EventExtrasState>()(
@@ -82,6 +97,19 @@ export const useEventExtrasStore = create<EventExtrasState>()(
           byEvent: {
             ...state.byEvent,
             [eventId]: { ...(state.byEvent[eventId] ?? EMPTY_EXTRAS), activityType },
+          },
+        }));
+      },
+
+      setDistanceClimb(eventId, distanceKm, climbM) {
+        set((state) => ({
+          byEvent: {
+            ...state.byEvent,
+            [eventId]: {
+              ...(state.byEvent[eventId] ?? EMPTY_EXTRAS),
+              distanceKm,
+              climbM,
+            },
           },
         }));
       },

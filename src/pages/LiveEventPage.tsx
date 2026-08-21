@@ -104,7 +104,10 @@ function liveInfoFromCachedSummary(
 
 interface RosterEntry {
   id: number;
-  name: string;
+  // Nullable in practice (e.g. a participant row with no display name set yet) — the "go
+  // live" crash was placeholderColorVar/initialOf assuming a string here. Guarded there too,
+  // but keep the type honest.
+  name: string | null;
   bib: string | null;
 }
 
@@ -637,7 +640,7 @@ export function LiveEventPage() {
                       {initialOf(r.name)}
                     </span>
                     <span className={styles.ridersModalName}>
-                      {isMe ? "You" : r.name}
+                      {isMe ? "You" : (r.name ?? "Unnamed rider")}
                       {r.bib && <span className="muted"> #{r.bib}</span>}
                     </span>
                   </label>
@@ -785,7 +788,7 @@ export function LiveEventPage() {
                     <span className={styles.riderInfo}>
                       <span className={styles.riderNameRow}>
                         <span className={styles.riderName}>
-                          {isMe ? "You" : r.name}
+                          {isMe ? "You" : (r.name ?? "Unnamed rider")}
                           {r.bib && <span className="muted"> #{r.bib}</span>}
                         </span>
                         {isLeader && (

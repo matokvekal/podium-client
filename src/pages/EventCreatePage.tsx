@@ -106,11 +106,14 @@ import {
   Lock,
   Map as MapIcon,
   MapPin,
+  Mountain,
   Radio,
   Route,
+  Ruler,
   ShieldCheck,
   Target,
-  Users,
+  Trash2,
+  Users
 } from "lucide-react";
 import {
   type FormEvent,
@@ -118,7 +121,7 @@ import {
   lazy,
   Suspense,
   useEffect,
-  useState,
+  useState
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
@@ -127,16 +130,21 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
 import { type EventRoute, getEventResults } from "../lib/mock-results";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/mock-tracks";
-import { parseQuickAdd, toDatetimeLocalValue } from "../lib/quick-add-parser";
+import {
+  nextUpcomingSaturdayStart,
+  parseQuickAdd,
+  toDatetimeLocalValue
+} from "../lib/quick-add-parser";
 import {
   LEVEL_ICON,
   LEVEL_LABEL,
   LEVELS,
-  type RiderLevel,
+  type RiderLevel
 } from "../lib/rider-level";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
+import { useParticipantsStore } from "../store/participantsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCreatePage.module.css";
 
@@ -153,6 +161,8 @@ interface ExistingEvent {
   visibility: "public" | "private";
   startsAt: string | null;
   location: string | null;
+  /** Optional — not yet in the frozen API contract; older/unmigrated events won't have it. */
+  area?: string | null;
   description: string | null;
   requiresApproval: boolean;
   showParticipants: boolean;
@@ -163,7 +173,7 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "mtb", label: "MTB" },
   { value: "gravel", label: "Gravel" },
   { value: "running", label: "Running" },
-  { value: "hiking", label: "Hiking" },
+  { value: "hiking", label: "Hiking" }
 ];
 
 const NEW_TEAM_OPTION = "__new__";
@@ -178,15 +188,17 @@ export function EventCreatePage() {
   const setOrganizerGroup = useEventExtrasStore((s) => s.setOrganizerGroup);
   const setEventTeam = useEventExtrasStore((s) => s.setTeam);
   const setEventActivityType = useEventExtrasStore((s) => s.setActivityType);
+  const setEventDistanceClimb = useEventExtrasStore((s) => s.setDistanceClimb);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const setEventRoute = useEventRouteStore((s) => s.setRoute);
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
   const setLastDefaults = useLastEventDefaultsStore((s) => s.setDefaults);
+  const addParticipant = useParticipantsStore((s) => s.addParticipant);
 
   const myTeams = Object.values(teams).filter(
-    (t) => profile != null && t.createdBy === profile.id,
+    (t) => profile != null && t.createdBy === profile.id
   );
 
   // Pre-fill from the last event this organizer created — "all data from my previous will
@@ -205,30 +217,60 @@ export function EventCreatePage() {
 
   const [name, setName] = useState("");
   const [activityType, setActivityType] = useState<SurfaceType>(
-    lastDefaults?.activityType ?? "mtb",
+    lastDefaults?.activityType ?? "mtb"
   );
   const [level, setLevel] = useState<RiderLevel | null>(
-    lastDefaults?.level ?? "intermediate",
+    lastDefaults?.level ?? "intermediate"
   );
+  // Distance/climb — near the difficulty picker below, same "no server column, persisted via
+  // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
+  // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
+  // picked/uploaded below (see pickEventToCopy/handleUploadRoute), but editable by hand at any
+  // point — a route doesn't always carry real elevation, and this is the fallback for that.
+  // `*Edited` mirrors `startsAtEdited`: once the organizer types a value in by hand, picking a
+  // different route stops overwriting it.
+  const [distanceKm, setDistanceKmInput] = useState("");
+  const [climbM, setClimbMInput] = useState("");
+  const [distanceEdited, setDistanceEdited] = useState(false);
+  const [climbEdited, setClimbEdited] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
   const [organizerGroup, setOrganizerGroupInput] = useState(
-    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : "",
+    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : ""
   );
   const [requiresApproval, setRequiresApproval] = useState(
-    lastDefaults?.requiresApproval ?? false,
+    lastDefaults?.requiresApproval ?? false
   );
   const [ridersListVisible, setRidersListVisible] = useState(
-    lastDefaults?.ridersListVisible ?? true,
+    lastDefaults?.ridersListVisible ?? true
   );
   const [visibility, setVisibility] = useState<"public" | "private">(
-    lastDefaults?.visibility ?? "private",
+    lastDefaults?.visibility ?? "private"
   );
-  const [startsAt, setStartsAt] = useState("");
+  const [startsAt, setStartsAt] = useState(() =>
+    isEditing ? "" : toDatetimeLocalValue(nextUpcomingSaturdayStart())
+  );
   const [startsAtEdited, setStartsAtEdited] = useState(false);
   const [dateHint, setDateHint] = useState<string | null>(null);
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
+  const [area, setArea] = useState(lastDefaults?.area ?? "");
   const [description, setDescription] = useState("");
+  // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
+  // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
+  // on every edit save risked adding a duplicate roster row each time. Checking it adds the
+  // organizer to the real participant list (same addParticipant EventParticipantsPage.tsx
+  // uses) right after the event is created, under whatever nickname they type — defaults to
+  // their account nickname (Profile.nickname) but can be overridden, since the name they ride
+  // under isn't necessarily their account name.
+  const [imRiding, setImRiding] = useState(false);
+  const [riderNickname, setRiderNickname] = useState(profile?.nickname ?? "");
+
+  // Edit-mode only, for the Danger Zone below — "ride that i create and didnt start i can
+  // delete," asked for directly. Not read anywhere else; the live/finished check right after
+  // the fetch below already redirects away before this would ever see those two statuses.
+  const [eventStatus, setEventStatus] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -263,6 +305,7 @@ export function EventCreatePage() {
       if (cached && !cancelled) {
         setName(cached.name);
         setLocation(cached.location ?? "");
+        setArea(cached.area ?? "");
         setVisibility(cached.visibility);
         if (cached.startsAt)
           setStartsAt(toDatetimeLocalValue(new Date(cached.startsAt)));
@@ -280,13 +323,15 @@ export function EventCreatePage() {
               message:
                 found.status === "live"
                   ? "This event is live — use Manage to add/remove riders or stop it."
-                  : "This event has finished and can no longer be edited.",
-            },
+                  : "This event has finished and can no longer be edited."
+            }
           });
           return;
         }
+        setEventStatus(found.status);
         setName(found.name);
         setLocation(found.location ?? "");
+        setArea(found.area ?? "");
         setDescription(found.description ?? "");
         setVisibility(found.visibility);
         if (found.startsAt)
@@ -309,6 +354,14 @@ export function EventCreatePage() {
         if (existingExtras.teamId) setTeamId(existingExtras.teamId);
         else if (existingExtras.organizerGroup)
           setOrganizerGroupInput(existingExtras.organizerGroup);
+        if (existingExtras.distanceKm != null) {
+          setDistanceKmInput(String(existingExtras.distanceKm));
+          setDistanceEdited(true);
+        }
+        if (existingExtras.climbM != null) {
+          setClimbMInput(String(existingExtras.climbM));
+          setClimbEdited(true);
+        }
       }
     })();
     return () => {
@@ -336,15 +389,25 @@ export function EventCreatePage() {
     activityType,
     name.trim(),
     location.trim(),
+    area.trim(),
     startsAt,
     description.trim(),
-    copiedFrom || uploadedFileName ? "route" : "",
+    copiedFrom || uploadedFileName ? "route" : ""
   ];
   const readinessCount = readinessFields.filter(Boolean).length;
   const readinessPct = Math.round(
-    (readinessCount / readinessFields.length) * 100,
+    (readinessCount / readinessFields.length) * 100
   );
   const armed = readinessPct === 100;
+
+  // Auto-fills Distance/Climb from a picked/uploaded route's own numbers — only while the
+  // organizer hasn't typed something in by hand (`*Edited`), same "never clobber a hand-typed
+  // value" rule startsAtEdited already follows for the quick-add date guess.
+  function applyRouteDistanceClimb(route: EventRoute) {
+    if (!distanceEdited) setDistanceKmInput(String(route.distanceKm));
+    if (!climbEdited)
+      setClimbMInput(route.elevationM != null ? String(route.elevationM) : "");
+  }
 
   async function pickEventToCopy(event: EventSummary) {
     setCopiedFrom(event);
@@ -359,6 +422,7 @@ export function EventCreatePage() {
     // next). Only fills in fields still at their default, so it never clobbers something typed
     // in by hand before picking a track.
     if (!location.trim()) setLocation(event.location ?? "");
+    if (!area.trim()) setArea(event.area ?? "");
     const sourceExtras = extrasByEvent[event.id];
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
@@ -374,6 +438,7 @@ export function EventCreatePage() {
     try {
       const results = await getEventResults(event.id);
       setCopiedRoute(results.route);
+      applyRouteDistanceClimb(results.route);
     } finally {
       setCopyLoading(false);
     }
@@ -384,6 +449,10 @@ export function EventCreatePage() {
     setCopiedRoute(null);
     setUploadedFileName(null);
     setUploadedRestStops([]);
+    // Only clears values that came from the route being removed — a hand-typed distance/climb
+    // stays put, same "never clobber a hand-typed value" rule as everywhere else here.
+    if (!distanceEdited) setDistanceKmInput("");
+    if (!climbEdited) setClimbMInput("");
   }
 
   function handleUploadRoute(uploaded: UploadedTrack) {
@@ -394,6 +463,7 @@ export function EventCreatePage() {
     setUploadedFileName(uploaded.fileName);
     setUploadedRestStops(uploaded.restStops);
     setInvalidRoute(false);
+    applyRouteDistanceClimb(uploaded.route);
   }
 
   function handleDescriptionChange(value: string) {
@@ -408,7 +478,7 @@ export function EventCreatePage() {
     setDateHint(
       `Detected "${found.label}" → ${found.date.toLocaleDateString()} at ${found.date
         .toTimeString()
-        .slice(0, 5)}. Edit Start time above to change it.`,
+        .slice(0, 5)}. Edit Start time above to change it.`
     );
   }
 
@@ -426,6 +496,15 @@ export function EventCreatePage() {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
     if (copiedRoute) setEventRoute(id, copiedRoute);
+    const parsedDistance = distanceKm.trim() ? Number(distanceKm) : null;
+    const parsedClimb = climbM.trim() ? Number(climbM) : null;
+    setEventDistanceClimb(
+      id,
+      parsedDistance != null && !Number.isNaN(parsedDistance)
+        ? parsedDistance
+        : null,
+      parsedClimb != null && !Number.isNaN(parsedClimb) ? parsedClimb : null,
+    );
 
     if (teamId === NEW_TEAM_OPTION && newTeamName.trim() && profile) {
       const team = createTeam(newTeamName, profile.id);
@@ -481,12 +560,13 @@ export function EventCreatePage() {
           body: {
             name,
             location: location || undefined,
+            area: area || undefined,
             description: description || undefined,
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
             requiresApproval,
-            showParticipants: ridersListVisible,
-          },
+            showParticipants: ridersListVisible
+          }
         });
         saveExtras(eventId);
         navigate(`/events/${eventId}`);
@@ -506,37 +586,99 @@ export function EventCreatePage() {
           visibility,
           startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
           location: location || undefined,
+          area: area || undefined,
           description: description || undefined,
           requiresApproval,
-          showParticipants: ridersListVisible,
-        },
+          showParticipants: ridersListVisible
+        }
       });
+      // Auto-publish right after create — a fresh event starts in "draft" server-side, which
+      // is NOT active (an event code only resolves once status is out of draft/cancelled/
+      // finished, per 02-database-schema.md's is_active rule), so a still-draft event can't
+      // even be found by its code yet. Organizer already filled in everything on this form, so
+      // there's nothing left to decide before Publish — asked for directly ("i dont need
+      // publish"), skip the separate manual tap on EventDetailPage. Best-effort: if this call
+      // fails, the event still exists (just sitting in draft) and Publish is still there on
+      // EventDetailPage as a manual fallback.
+      try {
+        await apiRequest(`/events/${created.id}/status`, {
+          method: "PATCH",
+          body: { status: "published" }
+        });
+      } catch {
+        // Non-fatal — see comment above.
+      }
+      // "Am I also riding?" — add the organizer to the real start list under the nickname
+      // they typed, same addParticipant call EventParticipantsPage.tsx uses. Best-effort/
+      // non-fatal, same pattern as auto-publish above: the event still exists either way, and
+      // the organizer can always add themselves by hand afterward from Participants.
+      if (imRiding && riderNickname.trim()) {
+        try {
+          await addParticipant(created.id, { name: riderNickname.trim() });
+        } catch {
+          // Non-fatal — see comment above.
+        }
+      }
       saveExtras(created.id);
       setLastDefaults({
         location,
+        area,
         activityType,
         level,
         teamId: teamId === NEW_TEAM_OPTION ? "" : teamId,
         organizerGroup,
         visibility,
         requiresApproval,
-        ridersListVisible,
+        ridersListVisible
       });
       // Land back on the home screen instead of the new event's own page — asked for
       // directly. The event id/name ride along in router state so the home screen can point
       // straight at it (a banner linking to it) instead of making the organizer hunt for it
       // in the list.
       navigate("/", {
-        state: { createdEventId: created.id, createdEventName: name },
+        state: { createdEventId: created.id, createdEventName: name }
       });
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Could not save. Try again.",
+        err instanceof ApiError ? err.message : "Could not save. Try again."
       );
     } finally {
       setBusy(false);
     }
   }
+
+  // Danger Zone — "ride that i create and didnt start i can delete... are you sure and delete
+  // it will remove from db so other riser at next pull will delete," asked for directly. Real
+  // DELETE /events/:eventId (same endpoint EventDetailPage.tsx's "Cancel event" already uses)
+  // — the server marks it cancelled, which is is_active = false per
+  // 02-database-schema.md, so it stops surfacing in anyone's list on their next fetch, same
+  // practical effect as being gone. Inline confirm (`confirmDelete`), not window.confirm — same
+  // "not just simple alert" rule this page and EventDetailPage's go-live/finish already follow.
+  async function deleteEvent() {
+    if (!eventId) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await apiRequest(`/events/${eventId}`, { method: "DELETE" });
+      navigate("/");
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Could not delete this event.",
+      );
+      setConfirmDelete(false);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  // Redirect above already sends live/finished events away before this component keeps
+  // rendering, so in practice this just excludes cancelled (nothing left to delete twice).
+  const canDelete =
+    isEditing &&
+    eventStatus != null &&
+    eventStatus !== "live" &&
+    eventStatus !== "finished" &&
+    eventStatus !== "cancelled";
 
   return (
     <section className={styles.page}>
@@ -761,11 +903,52 @@ export function EventCreatePage() {
                 </div>
               </div>
 
+              {/* "Am I also riding?" — asked for directly. Create-only: re-asking on every edit
+                  save would risk adding a duplicate roster row each time. Checking it adds the
+                  organizer to the real start list right after the event is created, under
+                  whatever nickname they type here (defaults to their account nickname, since
+                  the name they ride under isn't necessarily their account name). */}
+              {!isEditing && (
+                <div className={styles.field}>
+                  <label className={styles.switchRow}>
+                    <input
+                      type="checkbox"
+                      className={styles.switchInput}
+                      checked={imRiding}
+                      onChange={(e) => setImRiding(e.target.checked)}
+                    />
+                    <span className={styles.switchTrack}>
+                      <span className={styles.switchThumb} />
+                    </span>
+                    <span
+                      className={`${styles.switchState} ${imRiding ? styles.switchStateOn : ""}`}
+                    >
+                      {imRiding ? "Yes" : "No"}
+                    </span>
+                    <span className={styles.switchLabel}>
+                      <Bike aria-hidden="true" />
+                      I'm riding too
+                    </span>
+                  </label>
+                  {imRiding && (
+                    <input
+                      id="riderNickname"
+                      className={styles.input}
+                      style={{ marginTop: "var(--space-2)" }}
+                      value={riderNickname}
+                      onChange={(e) => setRiderNickname(e.target.value)}
+                      placeholder="Your nickname on the roster"
+                      required
+                    />
+                  )}
+                </div>
+              )}
+
               <div className={styles.fieldRow}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel} htmlFor="location">
                     <MapPin aria-hidden="true" />
-                    Location
+                    Meeting At
                   </label>
                   <input
                     id="location"
@@ -793,6 +976,19 @@ export function EventCreatePage() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="area">
+                  <MapPin aria-hidden="true" />
+                  Area
+                </label>
+                <input
+                  id="area"
+                  className={styles.input}
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                />
               </div>
 
               <div className={styles.field}>
@@ -871,6 +1067,50 @@ export function EventCreatePage() {
                       "Not specified"
                     )}
                   </span>
+                </div>
+              </div>
+
+              {/* Distance/climb, near the difficulty picker above — auto-filled from whatever
+                  route gets picked/uploaded (see applyRouteDistanceClimb), editable by hand at
+                  any time — a route doesn't always carry real elevation, and this is the
+                  fallback for that ("track length + climb shown on cards near difficulty,
+                  editable at create if missing," asked for directly). */}
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="distanceKm">
+                    <Ruler aria-hidden="true" />
+                    Distance (km)
+                  </label>
+                  <input
+                    id="distanceKm"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    className={styles.input}
+                    value={distanceKm}
+                    onChange={(e) => {
+                      setDistanceKmInput(e.target.value);
+                      setDistanceEdited(true);
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="climbM">
+                    <Mountain aria-hidden="true" />
+                    Climb (m)
+                  </label>
+                  <input
+                    id="climbM"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className={styles.input}
+                    value={climbM}
+                    onChange={(e) => {
+                      setClimbMInput(e.target.value);
+                      setClimbEdited(true);
+                    }}
+                  />
                 </div>
               </div>
 
@@ -956,6 +1196,50 @@ export function EventCreatePage() {
             {busy ? "Saving…" : "Save event"}
           </button>
         </form>
+
+        {canDelete && (
+          <div className={styles.dangerZone}>
+            <div className={styles.dangerZoneHeader}>
+              <AlertTriangle aria-hidden="true" />
+              Danger zone
+            </div>
+            {!confirmDelete ? (
+              <button
+                type="button"
+                className={styles.dangerZoneBtn}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 aria-hidden="true" size={15} />
+                Delete this event
+              </button>
+            ) : (
+              <div className={styles.dangerZoneConfirm}>
+                <p>
+                  Are you sure? This removes it for every rider — it stops
+                  showing up anywhere the next time anyone's app checks.
+                </p>
+                <div className={styles.dangerZoneConfirmRow}>
+                  <button
+                    type="button"
+                    className={styles.dangerZoneBtn}
+                    disabled={deleteBusy}
+                    onClick={deleteEvent}
+                  >
+                    {deleteBusy ? "Deleting…" : "Yes, delete it"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--quiet"
+                    disabled={deleteBusy}
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {copySheetOpen && (
           <CopyTrackSheet

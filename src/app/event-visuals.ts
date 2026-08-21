@@ -4,10 +4,11 @@
 import type { EventStatus } from "../lib/local-db";
 import { LEVELS, type RiderLevel } from "../lib/rider-level";
 
-function hashSeed(seed: string): number {
+function hashSeed(seed: string | null | undefined): number {
+  const s = seed ?? "";
   let hash = 0;
-  for (let i = 0; i < seed.length; i++)
-    hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
+  for (let i = 0; i < s.length; i++)
+    hash = (Math.imul(hash, 31) + s.charCodeAt(i)) | 0;
   return Math.abs(hash);
 }
 
@@ -75,13 +76,13 @@ const PLACEHOLDER_TOKENS = [
   "--status-stale",
 ];
 
-export function placeholderColorVar(seed: string): string {
+export function placeholderColorVar(seed: string | null | undefined): string {
   const token = PLACEHOLDER_TOKENS[hashSeed(seed) % PLACEHOLDER_TOKENS.length];
   return `var(${token})`;
 }
 
-export function initialOf(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || "?";
+export function initialOf(name: string | null | undefined): string {
+  return (name ?? "").trim().charAt(0).toUpperCase() || "?";
 }
 
 // "the event we came from need glow shadow under for 10 seconds to know where we came from" —

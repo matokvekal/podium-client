@@ -19,12 +19,14 @@
   width: 100%;
   min-height: 104px;
   padding: 5px;
-  background: var(--surface);
-  border: 1px solid rgba(62, 221, 164, 0.4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0))
+      var(--surface);
+  border: 1px solid rgba(62, 221, 164, 0.52);
   box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.15),
-    0 0 14px rgba(62, 221, 164, 0.18),
-    0 0 22px rgba(99, 166, 252, 0.12);
+    0 0 0 1px rgba(99, 166, 252, 0.2),
+    0 0 16px rgba(62, 221, 164, 0.24),
+    0 0 26px rgba(99, 166, 252, 0.16);
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
@@ -36,11 +38,11 @@
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: rgba(62, 221, 164, 0.75);
+  border-color: rgba(62, 221, 164, 0.86);
   box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.3),
-    0 0 20px rgba(62, 221, 164, 0.32),
-    0 0 32px rgba(99, 166, 252, 0.22),
+    0 0 0 1px rgba(99, 166, 252, 0.36),
+    0 0 24px rgba(62, 221, 164, 0.38),
+    0 0 36px rgba(99, 166, 252, 0.26),
     0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
@@ -241,21 +243,38 @@
   flex-shrink: 0;
 }
 
+.creatorMeta {
+  font-size: 13px;
+}
+
 /* Difficulty "stairs" — same read-only signal-bars idea and storm-intensity color-per-level
    scheme as EventCreatePage.module.css's difficulty picker / EventDetailPage.module.css's
    own copy of it. Only the current level's bar is lit. */
+.levelScale {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.levelEdge {
+  font-family: "Abel", var(--font-sans);
+  font-size: 10px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--text-muted) 82%, var(--text));
+}
+
 .levelBars {
   display: inline-flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 3px;
   height: 15px;
 }
 
 .levelBar {
   width: 5px;
   border-radius: 1px;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--border));
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {

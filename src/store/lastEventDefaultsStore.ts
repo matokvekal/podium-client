@@ -12,6 +12,7 @@ import type { RiderLevel } from "../lib/rider-level";
 
 export interface LastEventDefaults {
   location: string;
+  area: string;
   activityType: SurfaceType;
   level: RiderLevel | null;
   teamId: string;

@@ -223,27 +223,38 @@ export function EventsListPage() {
         (event.location ?? "").toLowerCase().includes(q)
       );
     });
-    const sorter = (a: EventSummary, b: EventSummary) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "area") {
-        return (
-          (a.location ?? "").localeCompare(b.location ?? "") ||
-          timestamp(b.startsAt) - timestamp(a.startsAt)
-        );
+    // Date sort direction depends on the bucket — "rides are list top to bottom, the top is the
+    // closest date," asked for directly. For Upcoming that's soonest-first (ascending); for
+    // Past it's most-recent-first (descending), which IS the closest-to-today date for
+    // something already behind you. Same direction the home row's own bucket sort
+    // (myRidesByBucket above) already uses for Upcoming/Past — this just brings the See-All
+    // list's "Date" sort into agreement with it, instead of always sorting newest-first
+    // regardless of bucket.
+    function comparator(bucket: "live" | "upcoming" | "past") {
+      if (sortBy === "name") {
+        return (a: EventSummary, b: EventSummary) => a.name.localeCompare(b.name);
       }
-      // Default: date, newest first.
-      return timestamp(b.startsAt) - timestamp(a.startsAt);
-    };
+      if (sortBy === "area") {
+        return (a: EventSummary, b: EventSummary) =>
+          (a.location ?? "").localeCompare(b.location ?? "") ||
+          timestamp(b.startsAt) - timestamp(a.startsAt);
+      }
+      return bucket === "upcoming"
+        ? (a: EventSummary, b: EventSummary) =>
+            timestamp(a.startsAt) - timestamp(b.startsAt)
+        : (a: EventSummary, b: EventSummary) =>
+            timestamp(b.startsAt) - timestamp(a.startsAt);
+    }
     return {
       live: matches
         .filter((e) => figmaStatus(e.status) === "live")
-        .sort(sorter),
+        .sort(comparator("live")),
       upcoming: matches
         .filter((e) => figmaStatus(e.status) === "upcoming")
-        .sort(sorter),
+        .sort(comparator("upcoming")),
       past: matches
         .filter((e) => figmaStatus(e.status) === "finished")
-        .sort(sorter),
+        .sort(comparator("past")),
       total: matches.length,
     };
   }, [myRides, q, favoritesOnly, sortBy]);

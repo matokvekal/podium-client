@@ -61,6 +61,15 @@ export const config = {
   /** How often the live map asks for new positions. 10–15 s: riders move, batteries don't. */
   livePollIntervalMs: 12_000,
 
+  /**
+   * How often non-live pages re-pull data that has no push channel behind it (e.g.
+   * EventDetailPage's rider count / pending join-request badge) — asked for directly ("we will
+   * not use soket so puling can be every 2-3 minutes"). 2.5 min: frequent enough that a new
+   * join request shows up without a manual refresh, infrequent enough not to hammer the API
+   * for something that isn't time-critical the way live position tracking is.
+   */
+  backgroundPollIntervalMs: 150_000,
+
   /** A rider with nothing newer than this is drawn as stale rather than current. */
   staleAfterMs: 90_000,
 } as const;

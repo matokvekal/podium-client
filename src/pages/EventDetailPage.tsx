@@ -80,6 +80,7 @@ import { RiderResultRow } from "../app/RiderResultRow";
 import { useAuth } from "../auth/AuthContext";
 import { getEventAirQuality } from "../lib/air-quality";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { config } from "../lib/config";
 import { countryFlagEmoji } from "../lib/country-flag";
 import {
   type EventStatus,
@@ -118,6 +119,15 @@ interface MyParticipant {
   registrationStatus:
     "registered" | "waiting_approval" | "approved" | "rejected";
   attendanceStatus: "unknown" | "present" | "dns" | "started";
+}
+
+/** GET /events/:eventId/participants row — just enough to render the real start list below
+ * (name/bib) and compute the real rider count + pending-approval badge. */
+interface RealParticipant {
+  id: number;
+  name: string | null;
+  bib: string | null;
+  registrationStatus: string;
 }
 
 interface EventDetail {
@@ -245,12 +255,78 @@ export function EventDetailPage() {
     if (eventId) loadResults(eventId);
   }, [eventId, loadResults]);
 
+  // Real rider list/count — same best-effort GET /events/:eventId/participants call
+  // LiveEventPage.tsx's roster already makes (gated server-side by show_participants; a viewer
+  // without permission just gets a 403, handled by falling back to the mock riders below).
+  //
+  // Was showing a full mock rider list (results.riders, from lib/mock-results.ts, unconditional
+  // on every event) below and a fake seedParticipantCount number in the stats row — "i create
+  // ride, i didnt add riders but how i do see riders, its bug," flagged as the most important
+  // one, direct. `realRoster` is `null` until this resolves (or forever, if this viewer truly
+  // can't see it — mock stands in only then) and a real (possibly empty) array the instant it
+  // does; the render below shows realRoster whenever it's non-null, including an honest "no
+  // riders yet" for an empty one, rather than ever faking names for people who never joined.
+  const [realRiderCount, setRealRiderCount] = useState<number | null>(null);
+  const [realRoster, setRealRoster] = useState<RealParticipant[] | null>(null);
+  // Pending-approval count, same fetch — surfaced as a badge below so the organizer notices a
+  // join request without having to remember to check the Participants page. "Approve/reject"
+  // itself already existed there (EventParticipantsPage.tsx); this just makes it visible from
+  // the hub too — "if i request to join the creator need to see me request," asked for
+  // directly.
+  const [pendingCount, setPendingCount] = useState(0);
+  // Polled, not one-shot — "we will not use soket so puling can be every 2-3 minutes," asked
+  // for directly: there's no push channel for "a rider just requested to join," so this page
+  // re-pulls on config.backgroundPollIntervalMs while it's open rather than only checking once
+  // on load. Same setInterval/cleanup shape as LiveEventPage.tsx's position poll, just a much
+  // longer interval since this isn't time-critical the way live tracking is.
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+    setRealRiderCount(null);
+    setRealRoster(null);
+    setPendingCount(0);
+
+    async function poll() {
+      if (!eventId) return;
+      try {
+        const list = await apiRequest<RealParticipant[]>(
+          `/events/${eventId}/participants`,
+        );
+        if (cancelled) return;
+        setRealRiderCount(list.length);
+        setRealRoster(list);
+        setPendingCount(
+          list.filter((p) => p.registrationStatus === "waiting_approval")
+            .length,
+        );
+      } catch {
+        // Not visible to this viewer, or not built for this event — mock stands in.
+      }
+    }
+
+    void poll();
+    const id = window.setInterval(poll, config.backgroundPollIntervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [eventId]);
+
   // Just riders on a ride, name-sorted — no bib/category sort options and no category filter;
   // both are race-result concepts, hidden per the same decision as EventCreatePage.tsx.
   const visibleRiders = useMemo(() => {
     if (!results) return [];
     return [...results.riders].sort((a, b) => a.name.localeCompare(b.name));
   }, [results]);
+
+  // Real start list, name-sorted same as visibleRiders above — see the fetch effect's doc
+  // comment for why this wins over visibleRiders whenever it's available.
+  const visibleRealRoster = useMemo(() => {
+    if (!realRoster) return null;
+    return [...realRoster].sort((a, b) =>
+      (a.name ?? "").localeCompare(b.name ?? ""),
+    );
+  }, [realRoster]);
 
   const load = useCallback(async () => {
     if (!eventId) return;
@@ -443,7 +519,7 @@ export function EventDetailPage() {
   const level = extras.level ?? mockLevel(event.id);
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
   const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
-  const riderCount = seedParticipantCount(event.id);
+  const riderCount = realRiderCount ?? seedParticipantCount(event.id);
   const bucket = figmaStatus(displayStatus);
   const canEditNow =
     event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
@@ -538,16 +614,19 @@ export function EventDetailPage() {
             <Users width={15} height={15} aria-hidden="true" />
             {riderCount} Riders
           </span>
-          {results?.route.distanceKm != null && (
+          {/* Organizer's own distance/climb (typed or auto-filled from a picked route on
+              EventCreatePage.tsx) wins over the mock route's numbers — that's the real value
+              for this event once it's set; the mock route only stands in before that exists. */}
+          {(extras.distanceKm ?? results?.route.distanceKm) != null && (
             <span className={styles.statItem}>
               <Ruler width={15} height={15} aria-hidden="true" />
-              {results.route.distanceKm} km
+              {extras.distanceKm ?? results?.route.distanceKm} km
             </span>
           )}
-          {results?.route.elevationM != null && (
+          {(extras.climbM ?? results?.route.elevationM) != null && (
             <span className={styles.statItem}>
               <Mountain width={15} height={15} aria-hidden="true" />
-              {results.route.elevationM} m
+              {extras.climbM ?? results?.route.elevationM} m
             </span>
           )}
         </div>
@@ -885,7 +964,9 @@ export function EventDetailPage() {
             {(event.isOwner || event.showParticipants) && (
               <div className="card stack">
                 <p className={styles.infoLabel}>
-                  Riders ({visibleRiders.length})
+                  Riders (
+                  {visibleRealRoster ? visibleRealRoster.length : visibleRiders.length}
+                  )
                 </p>
                 <div
                   className="stack"
@@ -895,9 +976,40 @@ export function EventDetailPage() {
                     paddingRight: "2px",
                   }}
                 >
-                  {visibleRiders.map((rider) => (
-                    <RiderResultRow key={rider.id} rider={rider} />
-                  ))}
+                  {visibleRealRoster ? (
+                    visibleRealRoster.length === 0 ? (
+                      <p className="muted">No riders yet.</p>
+                    ) : (
+                      visibleRealRoster.map((rider) => (
+                        <div key={rider.id} className={styles.realRiderRow}>
+                          <span
+                            className={styles.realRiderAvatar}
+                            style={{
+                              background: placeholderColorVar(
+                                rider.name ?? String(rider.id),
+                              ),
+                            }}
+                            aria-hidden="true"
+                          >
+                            {initialOf(rider.name)}
+                          </span>
+                          <span className={styles.realRiderName}>
+                            {rider.name ?? "Unnamed rider"}
+                            {rider.bib && (
+                              <span className="muted"> #{rider.bib}</span>
+                            )}
+                          </span>
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    // Real list not visible/available to this viewer yet (still loading, or a
+                    // permission this viewer doesn't have) — mock stands in rather than showing
+                    // nothing while it's genuinely just pending.
+                    visibleRiders.map((rider) => (
+                      <RiderResultRow key={rider.id} rider={rider} />
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -1005,6 +1117,15 @@ export function EventDetailPage() {
             >
               <Users width={16} height={16} aria-hidden="true" />
               {displayStatus === "live" ? "Manage" : "Participants"}
+              {pendingCount > 0 && (
+                <span
+                  className="badge badge--live"
+                  style={{ marginLeft: "auto" }}
+                  title="Riders waiting on your approval"
+                >
+                  {pendingCount} pending
+                </span>
+              )}
             </Link>
             <Link
               className={styles.menuItem}

@@ -35,6 +35,18 @@ function nextWeekday(from: Date, targetDay: number, includeToday: boolean): Date
   return result;
 }
 
+/**
+ * The next upcoming Saturday at the app's default ride start time (06:00 local).
+ * If today is Saturday before 06:00, returns today at 06:00; otherwise returns next Saturday.
+ */
+export function nextUpcomingSaturdayStart(now: Date = new Date()): Date {
+  const saturday = 6;
+  const candidate = atHour(nextWeekday(now, saturday, true), DEFAULT_HOUR, 0);
+  if (candidate.getTime() > now.getTime()) return candidate;
+  candidate.setDate(candidate.getDate() + 7);
+  return candidate;
+}
+
 function findExplicitTime(text: string): { hour: number; minute: number } | null {
   // "at 6", "at 6:30am", "07:00", "6am" — the common ways someone types a time in passing.
   const match = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);

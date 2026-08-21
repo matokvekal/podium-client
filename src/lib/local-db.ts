@@ -31,6 +31,8 @@ export interface EventSummary {
   startsAt: string | null;
   endsAt: string | null;
   location: string | null;
+  /** Optional — not yet in the frozen API contract; older/unmigrated events won't have it. */
+  area?: string | null;
   ownerId: number | null;
   /**
    * Client-only, not part of any server response — there is no server field for it yet.

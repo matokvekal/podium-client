@@ -84,6 +84,9 @@ export function EventTile({
   const TypeIcon = SURFACE_TYPE_ICON[activityType];
   const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
   const riderCount = seedParticipantCount(event.id);
+  // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
+  const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
+  const climbM = extras.climbM ?? event.climbM ?? null;
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();
@@ -183,16 +186,16 @@ export function EventTile({
             <Users className={styles.metaIcon} aria-hidden="true" />
             {riderCount} Riders
           </span>
-          {event.distanceKm != null && (
+          {distanceKm != null && (
             <span className={styles.metaItem}>
               <Ruler className={styles.metaIcon} aria-hidden="true" />
-              {event.distanceKm} km
+              {distanceKm} km
             </span>
           )}
-          {event.climbM != null && (
+          {climbM != null && (
             <span className={styles.metaItem}>
               <Mountain className={styles.metaIcon} aria-hidden="true" />
-              {event.climbM} m
+              {climbM} m
             </span>
           )}
           {!compact && (

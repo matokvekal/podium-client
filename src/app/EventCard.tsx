@@ -43,6 +43,7 @@ import { wazeUrl } from "../lib/nav-links";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
+import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCard.module.css";
 import {
   FIGMA_TAG_LABEL,
@@ -76,11 +77,20 @@ export function EventCard({
 }) {
   const status = figmaStatus(event.status);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
+  const teams = useTeamsStore((s) => s.teams);
   const extras = getEventExtras(extrasByEvent, event.id);
   const level = extras.level ?? mockLevel(event.id);
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
   const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
+  const teamName = extras.teamId ? teams[extras.teamId]?.name ?? null : null;
+  const organizerLine =
+    teamName && teamName !== organizer ? `${organizer} · ${teamName}` : organizer;
   const riderCount = seedParticipantCount(event.id);
+  // Real distance/climb (set on EventCreatePage.tsx, from the picked route or typed by hand)
+  // wins over event.distanceKm/climbM, which is only ever populated on the hardcoded mock list
+  // (lib/mock-my-rides.ts) — a real event never has those set server-side.
+  const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
+  const climbM = extras.climbM ?? event.climbM ?? null;
   // Same fallback EventDetailPage.tsx uses when this device never set one (no server column
   // yet — see EventCreatePage.tsx's doc comment on Activity type).
   const activityType = extras.activityType ?? "road";
@@ -180,16 +190,23 @@ export function EventCard({
           </span>
           {/* Same read-only "stairs" as EventDetailPage.tsx's difficulty display — asked for
               directly ("dificalty icons stairs it important"). */}
-          <span className={styles.levelBars} title={LEVEL_LABEL[level]}>
-            {LEVELS.map((l, i) => (
-              <span
-                key={l.value}
-                className={styles.levelBar}
-                data-level={l.value}
-                data-filled={i === levelIndex}
-                style={{ height: `${5 + i * 3}px` }}
-              />
-            ))}
+          <span className={styles.levelScale} title={`Difficulty: ${LEVEL_LABEL[level]}`}>
+            <span className={styles.levelEdge}>Easy</span>
+            <span
+              className={styles.levelBars}
+              aria-label={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
+            >
+              {LEVELS.map((l, i) => (
+                <span
+                  key={l.value}
+                  className={styles.levelBar}
+                  data-level={l.value}
+                  data-filled={i === levelIndex}
+                  style={{ height: `${5 + i * 3}px` }}
+                />
+              ))}
+            </span>
+            <span className={styles.levelEdge}>Hard</span>
           </span>
           <span
             className={styles.metaItem}
@@ -200,19 +217,21 @@ export function EventCard({
         </div>
 
         <div className={styles.metaRow}>
-          {event.distanceKm != null && (
+          {distanceKm != null && (
             <span className={styles.metaItem}>
               <Ruler className={styles.metaIcon} aria-hidden="true" />
-              {event.distanceKm} km
+              {distanceKm} km
             </span>
           )}
-          {event.climbM != null && (
+          {climbM != null && (
             <span className={styles.metaItem}>
               <Mountain className={styles.metaIcon} aria-hidden="true" />
-              {event.climbM} m
+              {climbM} m
             </span>
           )}
-          <span className={styles.metaItem}>{organizer}</span>
+          <span className={`${styles.metaItem} ${styles.creatorMeta}`}>
+            {organizerLine}
+          </span>
         </div>
       </div>
     </Link>

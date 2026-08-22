@@ -21,6 +21,8 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  background-size: cover;
+  background-position: center;
   color: #fff;
 }
 
@@ -540,6 +542,7 @@
   bottom: 0;
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -547,6 +550,54 @@
   background: var(--surface);
   border-top: 1px solid var(--border);
   box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.approvalFx {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  animation: approval-fx-in 180ms ease-out;
+}
+
+.approvalFx[data-phase="celebrate"] {
+  color: var(--status-live-strong);
+  border-color: color-mix(in srgb, var(--status-live-strong) 45%, transparent);
+  background: color-mix(in srgb, var(--status-live) 18%, var(--surface) 82%);
+}
+
+.approvalFxTitle {
+  font-size: 0.82rem;
+  font-weight: var(--weight-bold);
+}
+
+.approvalFxTrack {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 65%, transparent);
+  overflow: hidden;
+}
+
+.approvalFxFill {
+  height: 100%;
+  background: var(--accent-strong);
+  transition: width 2s linear;
+}
+
+@keyframes approval-fx-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ctaBtn {
@@ -590,6 +641,27 @@
 
 .ctaStatus[data-status="rejected"] {
   color: var(--status-danger);
+}
+
+/* Sits beside .ctaStatus once this rider has joined — taps into the same inline-confirm bar
+   (.confirmBar etc.) as the owner's go-live/finish actions above, not a window.confirm(). */
+.leaveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-medium);
+  color: var(--status-danger);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.leaveBtn:hover {
+  border-color: var(--status-danger);
 }
 
 /* --- organizer "more actions" sheet -------------------------------------------------------- */

@@ -7,8 +7,7 @@ import { LEVELS, type RiderLevel } from "../lib/rider-level";
 function hashSeed(seed: string | null | undefined): number {
   const s = seed ?? "";
   let hash = 0;
-  for (let i = 0; i < s.length; i++)
-    hash = (Math.imul(hash, 31) + s.charCodeAt(i)) | 0;
+  for (let i = 0; i < s.length; i++) hash = (Math.imul(hash, 31) + s.charCodeAt(i)) | 0;
   return Math.abs(hash);
 }
 
@@ -50,11 +49,7 @@ export function figmaStatus(status: EventStatus): FigmaStatus {
 
 export function statusBadgeClass(status: EventStatus): string {
   if (status === "live") return "badge badge--live";
-  if (
-    status === "published" ||
-    status === "registration_open" ||
-    status === "ready"
-  ) {
+  if (status === "published" || status === "registration_open" || status === "ready") {
     return "badge badge--pending";
   }
   if (status === "finished") return "badge badge--finished";
@@ -79,6 +74,36 @@ const PLACEHOLDER_TOKENS = [
 export function placeholderColorVar(seed: string | null | undefined): string {
   const token = PLACEHOLDER_TOKENS[hashSeed(seed) % PLACEHOLDER_TOKENS.length];
   return `var(${token})`;
+}
+
+type CoverMood = "pastel" | "neon";
+
+function coverMood(seed: string | null | undefined): CoverMood {
+  return hashSeed(seed) % 2 === 0 ? "pastel" : "neon";
+}
+
+/**
+ * Shared cover style for event placeholders (no uploaded cover image yet).
+ * Deterministic per-event, but alternates between pastel and neon moods.
+ */
+export function placeholderCoverGradient(seed: string | null | undefined): string {
+  const baseA = PLACEHOLDER_TOKENS[hashSeed(seed) % PLACEHOLDER_TOKENS.length];
+  const baseB = PLACEHOLDER_TOKENS[(hashSeed(seed) + 3) % PLACEHOLDER_TOKENS.length];
+
+  if (coverMood(seed) === "pastel") {
+    return `linear-gradient(135deg, color-mix(in srgb, var(${baseA}) 34%, white 66%) 0%, color-mix(in srgb, var(${baseB}) 42%, white 58%) 100%)`;
+  }
+
+  return `linear-gradient(135deg, color-mix(in srgb, var(${baseA}) 80%, #05070c 20%) 0%, color-mix(in srgb, var(${baseB}) 72%, #05070c 28%) 100%)`;
+}
+
+export function eventCoverBackground(
+  seed: string | null | undefined,
+  coverImageDataUrl: string | null | undefined,
+): string {
+  if (!coverImageDataUrl) return placeholderCoverGradient(seed);
+  const safeUrl = coverImageDataUrl.replaceAll('"', "%22");
+  return `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), url("${safeUrl}")`;
 }
 
 export function initialOf(name: string | null | undefined): string {

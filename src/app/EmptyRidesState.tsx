@@ -9,15 +9,23 @@ import { Bike, Plus, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 import styles from "./EmptyRidesState.module.css";
 
-export function EmptyRidesState() {
+type EmptyRidesStateProps = {
+  title?: string;
+  subtitle?: string;
+};
+
+export function EmptyRidesState({
+  title = "No rides yet",
+  subtitle = "Create a ride or race, or join one with a code.",
+}: EmptyRidesStateProps) {
   return (
     <div className={styles.wrapper}>
       <div className={styles.iconCircle}>
         <Bike className={styles.icon} aria-hidden="true" />
       </div>
 
-      <div className={styles.title}>No rides yet</div>
-      <div className={styles.subtitle}>Create a ride or race, or join one with a code.</div>
+      <div className={styles.title}>{title}</div>
+      <div className={styles.subtitle}>{subtitle}</div>
 
       <div className={styles.actions}>
         <Link className={styles.btnPrimary} to="/events/new">

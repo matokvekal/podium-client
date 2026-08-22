@@ -10,7 +10,7 @@
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-// Most rides here start early — see mock-my-rides.ts's seed data, almost all early-morning.
+// Most rides tend to start early — early-morning is the common case.
 // Used only when a date phrase was found but no time was mentioned alongside it.
 const DEFAULT_HOUR = 6;
 

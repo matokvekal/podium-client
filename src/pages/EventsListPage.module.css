@@ -169,11 +169,7 @@
   gap: 8px;
   min-height: 40px;
   padding: 8px 16px;
-  background: linear-gradient(
-    150deg,
-    var(--status-live),
-    var(--status-live-strong)
-  );
+  background: linear-gradient(150deg, var(--status-live), var(--status-live-strong));
   border: 1px solid rgba(24, 143, 102, 0.22);
   border-radius: 12px;
   font-size: 13px;

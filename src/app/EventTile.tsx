@@ -17,31 +17,23 @@
  * blinking so i can get in fast").
  */
 
-import {
-  CalendarDays,
-  Heart,
-  Mountain,
-  Pencil,
-  Ruler,
-  Users,
-} from "lucide-react";
+import { CalendarDays, Heart, Mountain, Pencil, Ruler } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
-import { seedParticipantCount } from "../lib/mock-participants";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/mock-tracks";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { formatLocalDateTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
+import { Avatar } from "./Avatar";
 import styles from "./EventTile.module.css";
 import {
-  figmaStatus,
+  eventCoverBackground,
   FIGMA_TAG_LABEL,
+  figmaStatus,
   mockLevel,
-  mockOrganizerName,
-  placeholderColorVar,
-  recordOpenedEvent,
+  recordOpenedEvent
 } from "./event-visuals";
 
 interface EventTileProps {
@@ -59,7 +51,7 @@ export function EventTile({
   onToggleFavorite,
   isNew,
   justOpened,
-  compact,
+  compact
 }: EventTileProps) {
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
@@ -82,11 +74,18 @@ export function EventTile({
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
   const activityType = extras.activityType ?? "road";
   const TypeIcon = SURFACE_TYPE_ICON[activityType];
-  const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
-  const riderCount = seedParticipantCount(event.id);
+  const organizer =
+    extras.organizerGroup ?? event.ownerName ?? "Independent ride";
+  const organizerAvatarUrl = extras.organizerGroup
+    ? null
+    : event.ownerAvatarUrl;
   // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
+  const coverBackground = eventCoverBackground(
+    event.id,
+    extras.coverImageDataUrl
+  );
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();
@@ -105,7 +104,7 @@ export function EventTile({
         <div
           className={styles.bg}
           style={{
-            background: `linear-gradient(135deg, ${placeholderColorVar(event.id)} 0%, color-mix(in srgb, ${placeholderColorVar(event.id)} 55%, #05070c 45%) 100%)`,
+            background: coverBackground
           }}
         >
           {/* No real cover-image field exists yet (event-visuals.ts) — the event's own name,
@@ -176,16 +175,20 @@ export function EventTile({
         </div>
 
         <div className={styles.photoBottom}>
-          <div className={styles.organizerRow}>Organized by {organizer}</div>
+          <div className={styles.organizerRow}>
+            <Avatar
+              name={organizer}
+              avatarUrl={organizerAvatarUrl}
+              seed={event.ownerId != null ? String(event.ownerId) : event.id}
+              className={styles.organizerAvatar}
+            />
+            Organized by {organizer}
+          </div>
         </div>
       </div>
 
       <div className={styles.cardBody}>
         <div className={styles.metaRow}>
-          <span className={styles.metaItem}>
-            <Users className={styles.metaIcon} aria-hidden="true" />
-            {riderCount} Riders
-          </span>
           {distanceKm != null && (
             <span className={styles.metaItem}>
               <Ruler className={styles.metaIcon} aria-hidden="true" />

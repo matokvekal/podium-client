@@ -69,10 +69,7 @@ export function SplashScreen() {
   if (phase === "done") return null;
 
   return (
-    <div
-      className={phase === "fading" ? "splash splash--fading" : "splash"}
-      aria-hidden="true"
-    >
+    <div className={phase === "fading" ? "splash splash--fading" : "splash"} aria-hidden="true">
       <div className="splash__glow" />
       <div className="splash__grid" />
 
@@ -96,9 +93,7 @@ export function SplashScreen() {
         {RIDERS.map((rider, index) => (
           <span
             key={rider.id}
-            className={
-              rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"
-            }
+            className={rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"}
             style={{
               left: `${rider.x}%`,
               top: `${rider.y}%`,

@@ -44,8 +44,7 @@
   width: 20px;
   height: 20px;
   color: var(--accent-strong);
-  filter: drop-shadow(0 0 4px var(--accent-strong))
-    drop-shadow(0 0 9px var(--accent));
+  filter: drop-shadow(0 0 4px var(--accent-strong)) drop-shadow(0 0 9px var(--accent));
 }
 
 .sheetBody {

@@ -25,7 +25,7 @@ import type {
   Participant,
   RegistrationStatus,
   ResultStatus,
-} from "../lib/mock-participants";
+} from "../lib/participant-types";
 
 interface NewParticipantInput {
   name: string;
@@ -41,6 +41,7 @@ interface ServerParticipant {
   eventId: string;
   userId: number | null;
   name: string;
+  avatarUrl: string | null;
   bib: string | null;
   email: string | null;
   phone: string | null;
@@ -89,6 +90,7 @@ function toParticipant(server: ServerParticipant, overlay: LocalOverlay | undefi
     eventId: server.eventId,
     userId: server.userId,
     name: server.name,
+    avatarUrl: server.avatarUrl,
     bib: server.bib,
     email: server.email,
     phone: server.phone,

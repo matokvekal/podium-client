@@ -22,11 +22,7 @@
 .splash__glow {
   position: absolute;
   inset: -20%;
-  background: radial-gradient(
-    circle at 50% 45%,
-    rgb(56 189 248 / 0.35),
-    rgb(15 23 42 / 0) 60%
-  );
+  background: radial-gradient(circle at 50% 45%, rgb(56 189 248 / 0.35), rgb(15 23 42 / 0) 60%);
   filter: blur(40px);
   animation: splash-breathe 5s ease-in-out infinite alternate;
 }
@@ -35,16 +31,8 @@
   position: absolute;
   inset: 0;
   background-image:
-    repeating-linear-gradient(
-      0deg,
-      rgb(56 189 248 / 0.06) 0 1px,
-      transparent 1px 40px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgb(56 189 248 / 0.06) 0 1px,
-      transparent 1px 40px
-    );
+    repeating-linear-gradient(0deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px);
   mask-image: radial-gradient(circle at 50% 45%, black 0%, transparent 70%);
 }
 
@@ -176,14 +164,7 @@
 }
 
 .splash__mark-name {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 1.35rem;
   font-weight: 700;
   color: #eaf6ff;

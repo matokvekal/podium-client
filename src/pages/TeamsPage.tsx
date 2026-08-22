@@ -67,20 +67,14 @@ export function TeamsPage() {
     <section className="stack">
       <h1>Teams</h1>
       <p className="muted" style={{ marginTop: 0 }}>
-        Create a team, then add riders — a ride's team picker links it to
-        whichever team you pick.
+        Create a team, then add riders — a ride's team picker links it to whichever team you pick.
       </p>
 
       {atLimit ? (
         <p className={`card ${styles.limitNote}`}>
-          <Lock
-            width={15}
-            height={15}
-            aria-hidden="true"
-            style={{ marginRight: 6 }}
-          />
-          Free plan: up to {FREE_TEAM_LIMIT} teams. More teams will be available
-          on a paid plan (coming later).
+          <Lock width={15} height={15} aria-hidden="true" style={{ marginRight: 6 }} />
+          Free plan: up to {FREE_TEAM_LIMIT} teams. More teams will be available on a paid plan
+          (coming later).
         </p>
       ) : (
         <form className="card row" onSubmit={submit}>
@@ -90,17 +84,8 @@ export function TeamsPage() {
             placeholder="New team name — e.g. Galilee Cycling Club"
             style={{ flex: 1 }}
           />
-          <button
-            className="button"
-            type="submit"
-            disabled={!newTeamName.trim()}
-          >
-            <Plus
-              width={15}
-              height={15}
-              aria-hidden="true"
-              style={{ marginRight: 4 }}
-            />
+          <button className="button" type="submit" disabled={!newTeamName.trim()}>
+            <Plus width={15} height={15} aria-hidden="true" style={{ marginRight: 4 }} />
             Create
           </button>
         </form>
@@ -114,12 +99,7 @@ export function TeamsPage() {
             <Link key={team.id} to={`/teams/${team.id}`} className={styles.row}>
               <span className={styles.rowName}>{team.name}</span>
               <span className={styles.rowMeta}>
-                <Users
-                  width={12}
-                  height={12}
-                  aria-hidden="true"
-                  style={{ marginRight: 4 }}
-                />
+                <Users width={12} height={12} aria-hidden="true" style={{ marginRight: 4 }} />
                 {(members[team.id] ?? []).length} members
               </span>
             </Link>

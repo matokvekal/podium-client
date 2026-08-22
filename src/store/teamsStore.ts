@@ -51,11 +51,7 @@ interface TeamsState {
   // than each needing its own validation error.
   addMembers(teamId: string, inputs: NewMemberInput[]): void;
   removeMember(teamId: string, memberId: string): void;
-  setMemberStatus(
-    teamId: string,
-    memberId: string,
-    status: TeamMemberStatus,
-  ): void;
+  setMemberStatus(teamId: string, memberId: string, status: TeamMemberStatus): void;
 
   addEventToTeam(teamId: string, eventId: string): void;
 }
@@ -132,9 +128,7 @@ export const useTeamsStore = create<TeamsState>()(
         set((state) => ({
           members: {
             ...state.members,
-            [teamId]: (state.members[teamId] ?? []).filter(
-              (m) => m.id !== memberId,
-            ),
+            [teamId]: (state.members[teamId] ?? []).filter((m) => m.id !== memberId),
           },
         }));
       },

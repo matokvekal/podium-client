@@ -3,16 +3,15 @@
  *
  * Route:    /events/:eventId
  * Loads:    GET /events/:eventId — respects the event's visibility settings. The route map
- *           and rider results shown directly on this page come from lib/mock-results.ts
- *           until the server actually has GET /events/:eventId/results — see
- *           plan/server-tasks.md.
+ *           comes from the real GET /events/:eventId/route (via store/resultsStore.ts) and
+ *           the rider list from the real GET /events/:eventId/participants — no mock data.
  * Actions:  owner: edit details, move through the status workflow, cancel
  * State:    the loaded event, an inline edit form toggle
  * Calls:    GET /events/:eventId, PATCH /events/:eventId, PATCH /events/:eventId/status,
  *           DELETE /events/:eventId (soft delete — sets status to cancelled)
  *
  * The rider list is name-sorted only — no sort/category picker, no per-rider time/place/DNF
- * status, no split times. See RiderResultRow.tsx's doc comment: this app is rides-only for
+ * status, no split times. This app is rides-only for
  * now, not a timed competition.
  *
  * `displayStatus` (computed below, after the null-guard) shows an event as "finished" once its
@@ -49,14 +48,13 @@ import {
   Mountain,
   Navigation,
   Pencil,
-  Phone,
   Ruler,
   Settings,
   Share2,
   Users,
   UsersRound,
   Wind,
-  X,
+  X
 } from "lucide-react";
 import {
   lazy,
@@ -64,31 +62,32 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useState,
+  useRef,
+  useState
 } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Avatar } from "../app/Avatar";
 import {
+  eventCoverBackground,
   FIGMA_TAG_LABEL,
   figmaStatus,
-  initialOf,
   mockLevel,
-  mockOrganizerName,
-  placeholderColorVar,
+  mockOrganizerName
 } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
-import { RiderResultRow } from "../app/RiderResultRow";
+
 import { useAuth } from "../auth/AuthContext";
 import { getEventAirQuality } from "../lib/air-quality";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
-import { countryFlagEmoji } from "../lib/country-flag";
+
 import {
   type EventStatus,
   type EventSummary,
   getCachedEvent,
-  putCachedEvent,
+  putCachedEvent
 } from "../lib/local-db";
-import { seedParticipantCount } from "../lib/mock-participants";
+
 import { SURFACE_TYPE_ICON } from "../lib/mock-tracks";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
@@ -96,6 +95,8 @@ import { formatLocalDateTime } from "../lib/time";
 import { getEventTraffic } from "../lib/traffic";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
+import { useEventsStore } from "../store/eventsStore";
+import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./EventDetailPage.module.css";
 
@@ -110,14 +111,17 @@ const RouteMap = lazy(() => import("../app/RouteMap"));
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
   import("../app/ShareEventSheet").then((m) => ({
-    default: m.ShareEventSheet,
-  })),
+    default: m.ShareEventSheet
+  }))
 );
 
 interface MyParticipant {
   id: number;
   registrationStatus:
-    "registered" | "waiting_approval" | "approved" | "rejected";
+    | "registered"
+    | "waiting_approval"
+    | "approved"
+    | "rejected";
   attendanceStatus: "unknown" | "present" | "dns" | "started";
 }
 
@@ -126,6 +130,7 @@ interface MyParticipant {
 interface RealParticipant {
   id: number;
   name: string | null;
+  avatarUrl: string | null;
   bib: string | null;
   registrationStatus: string;
 }
@@ -142,6 +147,8 @@ interface EventDetail {
   endsAt: string | null;
   location: string | null;
   ownerId: number | null;
+  ownerName: string | null;
+  ownerAvatarUrl: string | null;
   requiresBib: boolean;
   description: string | null;
   finishedAt: string | null;
@@ -164,7 +171,7 @@ const NEXT_STATUS: Partial<
   published: { status: "live", label: "Start — go live" },
   registration_open: { status: "live", label: "Start — go live" },
   ready: { status: "live", label: "Start — go live" },
-  live: { status: "finished", label: "Finish" },
+  live: { status: "finished", label: "Finish" }
 };
 
 const CANCELLABLE: EventStatus[] = [
@@ -172,21 +179,18 @@ const CANCELLABLE: EventStatus[] = [
   "published",
   "registration_open",
   "ready",
-  "live",
+  "live"
 ];
 
 // The cache only ever holds the summary shape (whatever a list screen last saw) — the
 // fields a list never has (description, requiresBib, finishedAt, isOwner) get an honest
 // "unknown yet" default until the real fetch resolves and replaces this.
-// The real fetch is what normally decides isOwner; while it's still in flight (or for the
-// client-only local dev sign-in, which has no server behind it at all — see
-// AuthContext.signInAsLocalDevUser / lib/mock-my-rides.ts's ownerId: -1 sentinel — where it
-// never resolves), fall back to the same profile.id === ownerId check EventTile.tsx already
-// uses on the tile itself. Without this, every mock "my ride" looked read-only forever: no
-// Manage/Participants/Share/Start-Finish, nothing to preview any event status in.
+// The real fetch is what normally decides isOwner; while it's still in flight, fall back to
+// the same profile.id === ownerId check EventTile.tsx already uses on the tile itself, so a
+// cached "my ride" doesn't look read-only for the instant before the real fetch resolves.
 function detailFromCachedSummary(
   summary: EventSummary,
-  viewerId: number | null,
+  viewerId: number | null
 ): EventDetail {
   return {
     ...summary,
@@ -199,7 +203,7 @@ function detailFromCachedSummary(
     effectiveStatus: summary.status,
     showParticipants: true,
     showLiveLocations: true,
-    myParticipant: null,
+    myParticipant: null
   };
 }
 
@@ -216,15 +220,23 @@ export function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Which consequential action (go live / finish) is awaiting an in-place confirm tap —
-  // replaces the two window.confirm() popups asked to be swapped for real UI ("not just
-  // simple alert"). null means the normal action button(s) show; otherwise the owner-actions
-  // row swaps to a small message + Cancel/Confirm pair for that one action.
-  const [confirming, setConfirming] = useState<"live" | "finish" | null>(null);
+  // Which consequential action (go live / finish / leave) is awaiting an in-place confirm tap —
+  // replaces the window.confirm() popups asked to be swapped for real UI ("not just simple
+  // alert"). null means the normal action button(s) show; otherwise the owner-actions row (or,
+  // for "leave", the rider's own sticky bottom bar) swaps to a small message + Cancel/Confirm
+  // pair for that one action.
+  const [confirming, setConfirming] = useState<
+    "live" | "finish" | "leave" | null
+  >(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [approvalFxPhase, setApprovalFxPhase] = useState<
+    "idle" | "arming" | "celebrate"
+  >("idle");
+  const [approvalFxProgress, setApprovalFxProgress] = useState(0);
+  const previousRegistrationStatusRef = useRef<string | null>(null);
 
   const results = useResultsStore((state) => state.results);
   const resultsLoading = useResultsStore((state) => state.loading);
@@ -237,7 +249,7 @@ export function EventDetailPage() {
   // never geocoded (see lib/weather.ts's doc comment). Silently shows nothing outside
   // Open-Meteo's ~16-day range or if the request fails; never a fabricated forecast.
   useEffect(() => {
-    const start = results?.route.points[0];
+    const start = results?.route?.points[0];
     if (!start || !event?.startsAt) {
       setForecast(null);
       return;
@@ -257,15 +269,16 @@ export function EventDetailPage() {
 
   // Real rider list/count — same best-effort GET /events/:eventId/participants call
   // LiveEventPage.tsx's roster already makes (gated server-side by show_participants; a viewer
-  // without permission just gets a 403, handled by falling back to the mock riders below).
+  // without permission just gets a 403, handled by an honest "unavailable" placeholder below).
   //
-  // Was showing a full mock rider list (results.riders, from lib/mock-results.ts, unconditional
-  // on every event) below and a fake seedParticipantCount number in the stats row — "i create
-  // ride, i didnt add riders but how i do see riders, its bug," flagged as the most important
-  // one, direct. `realRoster` is `null` until this resolves (or forever, if this viewer truly
-  // can't see it — mock stands in only then) and a real (possibly empty) array the instant it
-  // does; the render below shows realRoster whenever it's non-null, including an honest "no
-  // riders yet" for an empty one, rather than ever faking names for people who never joined.
+  // This used to show a full mock rider list (results.riders, from lib/mock-results.ts,
+  // unconditional on every event) and a fake seedParticipantCount number in the stats row —
+  // "i create ride, i didnt add riders but how i do see riders, its bug," flagged as the most
+  // important one, direct. That mock is gone (BUGS.md "Remove fake/mock riders"): `realRoster`
+  // is `null` until this resolves (or forever, if this viewer truly can't see it — an honest
+  // placeholder shows then) and a real (possibly empty) array the instant it does; the render
+  // below only ever shows realRoster, including an honest "no riders yet" for an empty one,
+  // rather than ever faking names for people who never joined.
   const [realRiderCount, setRealRiderCount] = useState<number | null>(null);
   const [realRoster, setRealRoster] = useState<RealParticipant[] | null>(null);
   // Pending-approval count, same fetch — surfaced as a badge below so the organizer notices a
@@ -290,14 +303,13 @@ export function EventDetailPage() {
       if (!eventId) return;
       try {
         const list = await apiRequest<RealParticipant[]>(
-          `/events/${eventId}/participants`,
+          `/events/${eventId}/participants`
         );
         if (cancelled) return;
         setRealRiderCount(list.length);
         setRealRoster(list);
         setPendingCount(
-          list.filter((p) => p.registrationStatus === "waiting_approval")
-            .length,
+          list.filter((p) => p.registrationStatus === "waiting_approval").length
         );
       } catch {
         // Not visible to this viewer, or not built for this event — mock stands in.
@@ -312,19 +324,12 @@ export function EventDetailPage() {
     };
   }, [eventId]);
 
-  // Just riders on a ride, name-sorted — no bib/category sort options and no category filter;
-  // both are race-result concepts, hidden per the same decision as EventCreatePage.tsx.
-  const visibleRiders = useMemo(() => {
-    if (!results) return [];
-    return [...results.riders].sort((a, b) => a.name.localeCompare(b.name));
-  }, [results]);
-
-  // Real start list, name-sorted same as visibleRiders above — see the fetch effect's doc
-  // comment for why this wins over visibleRiders whenever it's available.
+  // Real start list, name-sorted — see the fetch effect's doc comment above for why this is
+  // the only rider list this page ever renders.
   const visibleRealRoster = useMemo(() => {
     if (!realRoster) return null;
     return [...realRoster].sort((a, b) =>
-      (a.name ?? "").localeCompare(b.name ?? ""),
+      (a.name ?? "").localeCompare(b.name ?? "")
     );
   }, [realRoster]);
 
@@ -353,7 +358,7 @@ export function EventDetailPage() {
           ? "This event is private."
           : err instanceof ApiError && err.status === 404
             ? "Event not found."
-            : "Could not load this event.",
+            : "Could not load this event."
       );
     } finally {
       setLoading(false);
@@ -363,6 +368,79 @@ export function EventDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Approval has no push channel yet. While this rider is waiting_approval, re-pull this
+  // event detail in the background so the CTA/status flips to approved without a manual reload.
+  useEffect(() => {
+    if (!eventId) return;
+    if (event?.myParticipant?.registrationStatus !== "waiting_approval") return;
+
+    let cancelled = false;
+    async function pollPendingApproval() {
+      try {
+        const found = await apiRequest<EventDetail>(`/events/${eventId}`);
+        if (cancelled) return;
+        setEvent(found);
+        putCachedEvent(found);
+      } catch {
+        // Keep current UI state; a later poll will retry.
+      }
+    }
+
+    void pollPendingApproval();
+    const id = window.setInterval(pollPendingApproval, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [eventId, event?.myParticipant?.registrationStatus]);
+
+  // Approval dopamine: if this rider's approval lands and they haven't seen it yet on this
+  // device, show a short 2s arming bar and then a subtle celebration chip.
+  useEffect(() => {
+    const eventKey = event?.id ?? null;
+    const current = event?.myParticipant?.registrationStatus ?? null;
+    const previous = previousRegistrationStatusRef.current;
+    previousRegistrationStatusRef.current = current;
+
+    if (!eventKey || current !== "approved") return;
+    if (approvalFxPhase !== "idle") return;
+
+    const seenKey = `elnino.approval-seen.${eventKey}`;
+    const alreadySeen = window.sessionStorage.getItem(seenKey) === "1";
+    // Show this when approval is newly observed from a pending state, or first seen while
+    // approved and not yet acknowledged in this browser session.
+    if (alreadySeen || (previous !== "waiting_approval" && previous !== null))
+      return;
+
+    let alive = true;
+    setApprovalFxPhase("arming");
+    setApprovalFxProgress(0);
+
+    const t1 = window.setTimeout(() => {
+      if (!alive) return;
+      setApprovalFxProgress(100);
+    }, 40);
+
+    const t2 = window.setTimeout(() => {
+      if (!alive) return;
+      setApprovalFxPhase("celebrate");
+      window.sessionStorage.setItem(seenKey, "1");
+    }, 2000);
+
+    const t3 = window.setTimeout(() => {
+      if (!alive) return;
+      setApprovalFxPhase("idle");
+      setApprovalFxProgress(0);
+    }, 6000);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [approvalFxPhase, event?.id, event?.myParticipant?.registrationStatus]);
 
   // Applies the event's display mode to the whole document while this page is open, and
   // restores whatever was there before on the way out — display mode is presentation only,
@@ -391,8 +469,8 @@ export function EventDetailPage() {
         `/events/${eventId}/status`,
         {
           method: "PATCH",
-          body: { status: nextStatus },
-        },
+          body: { status: nextStatus }
+        }
       );
       setEvent(updated);
       // Clicking "Start — go live" only re-labeled the header button to "LIVE" before,
@@ -416,7 +494,7 @@ export function EventDetailPage() {
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not change the event status.",
+          : "Could not change the event status."
       );
     } finally {
       setBusy(false);
@@ -433,17 +511,49 @@ export function EventDetailPage() {
     try {
       await apiRequest(`/events/join`, {
         method: "POST",
-        body: { eventCode: event.code },
+        body: { eventCode: event.code }
       });
       await load();
     } catch (err) {
       setRegisterError(
-        err instanceof ApiError
-          ? err.message
-          : "Could not register. Try again.",
+        err instanceof ApiError ? err.message : "Could not register. Try again."
       );
     } finally {
       setRegisterBusy(false);
+    }
+  }
+
+  // Self-leave for a rider who already joined (not the organizer — that's cancelEvent below).
+  // Reuses the frozen POST /events/:eventId/leave endpoint; on success just re-fetches the
+  // event the same way handleRegister's join does, rather than hand-patching myParticipant, so
+  // this stays in sync with whatever else a fresh load would also pick up (e.g. rider count).
+  //
+  // On a genuinely successful leave (not on cancel/error) this event should also move off the
+  // home screen's My Rides list and back onto the Invited banner, so the rider can still find
+  // it and rejoin later — asked for directly. My Rides is refetched for real (the server drops
+  // this event from filter=joined once left_at is set) rather than hand-filtered locally, and
+  // the event is re-added to invitedEventsStore using the code/name/type already loaded here.
+  async function leaveEvent() {
+    if (!eventId || !event) return;
+    setRegisterBusy(true);
+    setRegisterError(null);
+    try {
+      await apiRequest(`/events/${eventId}/leave`, { method: "POST" });
+      useInvitedEventsStore.getState().addInvite({
+        eventId: event.id,
+        code: event.code,
+        name: event.name,
+        type: event.type,
+        invitedAt: Date.now()
+      });
+      await Promise.all([load(), useEventsStore.getState().loadMyRides(true)]);
+    } catch (err) {
+      setRegisterError(
+        err instanceof ApiError ? err.message : "Could not leave. Try again."
+      );
+    } finally {
+      setRegisterBusy(false);
+      setConfirming(null);
     }
   }
 
@@ -451,7 +561,7 @@ export function EventDetailPage() {
     if (!eventId) return;
     if (
       !window.confirm(
-        "Cancel this event? Riders will no longer be able to join.",
+        "Cancel this event? Riders will no longer be able to join."
       )
     )
       return;
@@ -459,12 +569,12 @@ export function EventDetailPage() {
     setError(null);
     try {
       const updated = await apiRequest<EventDetail>(`/events/${eventId}`, {
-        method: "DELETE",
+        method: "DELETE"
       });
       setEvent(updated);
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Could not cancel this event.",
+        err instanceof ApiError ? err.message : "Could not cancel this event."
       );
     } finally {
       setBusy(false);
@@ -506,20 +616,32 @@ export function EventDetailPage() {
     event.effectiveStatus ?? (isPastDue ? "finished" : event.status);
 
   const next = NEXT_STATUS[displayStatus];
-  const routePoint = results?.route.points[0] ?? null;
+  const routePoint = results?.route?.points[0] ?? null;
   const wazeHref = wazeUrl(event.location, routePoint);
   const googleMapsHref = googleMapsUrl(event.location, routePoint);
   const airQuality = getEventAirQuality(event.id, event.startsAt);
   const traffic = getEventTraffic(event.id, event.startsAt);
   const extras = getEventExtras(extrasByEvent, event.id);
   const ActivityIcon = SURFACE_TYPE_ICON[extras.activityType ?? "road"];
-  // Same fallbacks EventCard.tsx uses on the list card — level/organizer aren't real data
-  // yet (no server column), so a deterministic mock fills in rather than showing blank; the
-  // point is that whatever the card promised before the click is what's still here after it.
+  // Same fallback chain EventCard.tsx/EventTile.tsx use on the list cards — a team or manual
+  // club name the organizer explicitly picked on EventCreatePage.tsx (extras.organizerGroup)
+  // wins over everything; failing that, the real signed-in owner's name (event.ownerName —
+  // nickname, else first+last, resolved server-side) is honest real data and preferred over a
+  // fabricated one; only an event with neither (no server column set, legacy/manual owner)
+  // falls all the way back to a deterministic mock club name so the card never shows blank.
+  // Only the "real owner" branch has a photo to show — a club/team name and the mock name are
+  // not real accounts, so there is no server avatar for either.
   const level = extras.level ?? mockLevel(event.id);
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
-  const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
-  const riderCount = realRiderCount ?? seedParticipantCount(event.id);
+  const organizerIsRealOwner = !extras.organizerGroup && !!event.ownerName;
+  const organizer =
+    extras.organizerGroup ?? event.ownerName ?? mockOrganizerName(event.id);
+  const organizerAvatarUrl = organizerIsRealOwner ? event.ownerAvatarUrl : null;
+  const coverBackground = eventCoverBackground(
+    event.id,
+    extras.coverImageDataUrl
+  );
+  const riderCount = realRiderCount;
   const bucket = figmaStatus(displayStatus);
   const canEditNow =
     event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
@@ -535,10 +657,7 @@ export function EventDetailPage() {
       {/* --- hero: colored placeholder (no real cover-image field yet, same honest-fallback
           rule as EventCard/EventTile) with the date/status pinned to its corners and the
           name/organizer overlaid at the bottom. ------------------------------------------ */}
-      <div
-        className={styles.hero}
-        style={{ background: placeholderColorVar(event.id) }}
-      >
+      <div className={styles.hero} style={{ background: coverBackground }}>
         <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />
         <div className={styles.heroScrim} />
 
@@ -588,13 +707,12 @@ export function EventDetailPage() {
         <div className={styles.heroBottom}>
           <h1 className={styles.title}>{event.name}</h1>
           <div className={styles.organizerRow}>
-            <span
+            <Avatar
               className={styles.avatar}
-              style={{ background: placeholderColorVar(organizer) }}
-              aria-hidden="true"
-            >
-              {initialOf(organizer)}
-            </span>
+              name={organizer}
+              avatarUrl={organizerAvatarUrl}
+              seed={organizer}
+            />
             Organized by {organizer}
           </div>
         </div>
@@ -610,23 +728,25 @@ export function EventDetailPage() {
 
         {/* --- stats row ------------------------------------------------------------------ */}
         <div className={styles.statsRow}>
-          <span className={styles.statItem}>
-            <Users width={15} height={15} aria-hidden="true" />
-            {riderCount} Riders
-          </span>
-          {/* Organizer's own distance/climb (typed or auto-filled from a picked route on
-              EventCreatePage.tsx) wins over the mock route's numbers — that's the real value
-              for this event once it's set; the mock route only stands in before that exists. */}
-          {(extras.distanceKm ?? results?.route.distanceKm) != null && (
+          {riderCount != null && (
             <span className={styles.statItem}>
-              <Ruler width={15} height={15} aria-hidden="true" />
-              {extras.distanceKm ?? results?.route.distanceKm} km
+              <Users width={15} height={15} aria-hidden="true" />
+              {riderCount} Riders
             </span>
           )}
-          {(extras.climbM ?? results?.route.elevationM) != null && (
+          {/* Organizer's own distance/climb (typed or auto-filled from a picked route on
+              EventCreatePage.tsx) wins over the saved route's numbers — that's the real value
+              for this event once it's set. */}
+          {(extras.distanceKm ?? results?.route?.distanceKm) != null && (
+            <span className={styles.statItem}>
+              <Ruler width={15} height={15} aria-hidden="true" />
+              {extras.distanceKm ?? results?.route?.distanceKm} km
+            </span>
+          )}
+          {(extras.climbM ?? results?.route?.elevationM) != null && (
             <span className={styles.statItem}>
               <Mountain width={15} height={15} aria-hidden="true" />
-              {extras.climbM ?? results?.route.elevationM} m
+              {extras.climbM ?? results?.route?.elevationM} m
             </span>
           )}
         </div>
@@ -678,7 +798,6 @@ export function EventDetailPage() {
           <span
             className={`${styles.levelBars} ${styles.tagsRowSpacer}`}
             title={LEVEL_LABEL[level]}
-            aria-label={`Difficulty: ${LEVEL_LABEL[level]}`}
           >
             {LEVELS.map((l, i) => (
               <span
@@ -840,21 +959,14 @@ export function EventDetailPage() {
           <div className="row" style={{ gap: "6px" }}>
             <p className="muted row" style={{ margin: 0, gap: "6px" }}>
               <Users width={14} height={14} aria-hidden="true" />
+              <Avatar
+                className={styles.avatar}
+                name={organizer}
+                avatarUrl={organizerAvatarUrl}
+                seed={organizer}
+              />
               Organized by {organizer}
             </p>
-            {/* Flag/phone come from the (async, mock-until-server) results endpoint, so they
-                fade in once that resolves rather than blocking this always-available line. */}
-            {results && countryFlagEmoji(results.organizer.countryCode) && (
-              <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
-                {countryFlagEmoji(results.organizer.countryCode)}
-              </span>
-            )}
-            {results?.organizer.phone && (
-              <span className="muted row" style={{ margin: 0, gap: "4px" }}>
-                <Phone width={14} height={14} aria-hidden="true" />
-                {results.organizer.phone}
-              </span>
-            )}
           </div>
           {event.description && (
             <div className={styles.infoBlock}>
@@ -935,26 +1047,35 @@ export function EventDetailPage() {
             {/* --- route preview ------------------------------------------------------------ */}
             <div className="card stack">
               <p className={styles.infoLabel}>Route preview</p>
-              <Suspense
-                fallback={<div className="row muted">Loading the map…</div>}
-              >
-                <RouteMap points={results.route.points} />
-              </Suspense>
-              <div
-                className={styles.statsRow}
-                style={{ marginTop: "var(--space-2)" }}
-              >
-                <span className={styles.statItem}>
-                  <Ruler width={15} height={15} aria-hidden="true" />
-                  {results.route.distanceKm} km
-                </span>
-                {results.route.elevationM != null && (
-                  <span className={styles.statItem}>
-                    <Mountain width={15} height={15} aria-hidden="true" />
-                    {results.route.elevationM} m
-                  </span>
-                )}
-              </div>
+              {results.route ? (
+                <>
+                  <Suspense
+                    fallback={<div className="row muted">Loading the map…</div>}
+                  >
+                    <RouteMap points={results.route.points} />
+                  </Suspense>
+                  <div
+                    className={styles.statsRow}
+                    style={{ marginTop: "var(--space-2)" }}
+                  >
+                    <span className={styles.statItem}>
+                      <Ruler width={15} height={15} aria-hidden="true" />
+                      {results.route.distanceKm} km
+                    </span>
+                    {results.route.elevationM != null && (
+                      <span className={styles.statItem}>
+                        <Mountain width={15} height={15} aria-hidden="true" />
+                        {results.route.elevationM} m
+                      </span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // Neither the organizer's saved route (server, or this device's own local
+                // cache) exists yet — an honest empty state, never a fabricated route
+                // standing in as if it were real (see resultsStore.ts's doc comment).
+                <p className="muted">No route added yet.</p>
+              )}
             </div>
 
             {/* "if riders are published we will see them" — the organizer's own "Riders list
@@ -964,16 +1085,14 @@ export function EventDetailPage() {
             {(event.isOwner || event.showParticipants) && (
               <div className="card stack">
                 <p className={styles.infoLabel}>
-                  Riders (
-                  {visibleRealRoster ? visibleRealRoster.length : visibleRiders.length}
-                  )
+                  Riders ({visibleRealRoster ? visibleRealRoster.length : "…"})
                 </p>
                 <div
                   className="stack"
                   style={{
                     maxHeight: "60vh",
                     overflowY: "auto",
-                    paddingRight: "2px",
+                    paddingRight: "2px"
                   }}
                 >
                   {visibleRealRoster ? (
@@ -982,19 +1101,14 @@ export function EventDetailPage() {
                     ) : (
                       visibleRealRoster.map((rider) => (
                         <div key={rider.id} className={styles.realRiderRow}>
-                          <span
+                          <Avatar
                             className={styles.realRiderAvatar}
-                            style={{
-                              background: placeholderColorVar(
-                                rider.name ?? String(rider.id),
-                              ),
-                            }}
-                            aria-hidden="true"
-                          >
-                            {initialOf(rider.name)}
-                          </span>
+                            name={rider.name}
+                            avatarUrl={rider.avatarUrl}
+                            seed={String(rider.id)}
+                          />
                           <span className={styles.realRiderName}>
-                            {rider.name ?? "Unnamed rider"}
+                            {rider.name?.trim() || "Unnamed rider"}
                             {rider.bib && (
                               <span className="muted"> #{rider.bib}</span>
                             )}
@@ -1004,11 +1118,9 @@ export function EventDetailPage() {
                     )
                   ) : (
                     // Real list not visible/available to this viewer yet (still loading, or a
-                    // permission this viewer doesn't have) — mock stands in rather than showing
-                    // nothing while it's genuinely just pending.
-                    visibleRiders.map((rider) => (
-                      <RiderResultRow key={rider.id} rider={rider} />
-                    ))
+                    // permission this viewer doesn't have) — an honest placeholder, never a
+                    // fabricated rider list (BUGS.md "Remove fake/mock riders").
+                    <p className="muted">Rider list unavailable.</p>
                   )}
                 </div>
               </div>
@@ -1026,7 +1138,57 @@ export function EventDetailPage() {
       {/* --- sticky bottom CTA — "I'M IN", asked for directly ---------------------------- */}
       {showRiderCta && (
         <div className={styles.bottomBar}>
-          {!profile ? (
+          {approvalFxPhase !== "idle" && (
+            <div
+              className={styles.approvalFx}
+              data-phase={approvalFxPhase}
+              role="status"
+            >
+              {approvalFxPhase === "arming" ? (
+                <>
+                  <span className={styles.approvalFxTitle}>
+                    Approval update incoming…
+                  </span>
+                  <div className={styles.approvalFxTrack} aria-hidden="true">
+                    <div
+                      className={styles.approvalFxFill}
+                      style={{ width: `${approvalFxProgress}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <span className={styles.approvalFxTitle}>
+                  Approved. See you at the ride.
+                </span>
+              )}
+            </div>
+          )}
+          {confirming === "leave" ? (
+            <div className={styles.confirmBar}>
+              <span className={styles.confirmMessage}>
+                Leave this event? You can join again later if it still has room.
+              </span>
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.confirmCancelBtn}
+                  disabled={registerBusy}
+                  onClick={() => setConfirming(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.confirmOkBtn}
+                  data-tone="danger"
+                  disabled={registerBusy}
+                  onClick={leaveEvent}
+                >
+                  {registerBusy ? "…" : "Leave event"}
+                </button>
+              </div>
+            </div>
+          ) : !profile ? (
             <Link
               className={styles.ctaBtn}
               to="/login"
@@ -1035,18 +1197,27 @@ export function EventDetailPage() {
               Sign in to join
             </Link>
           ) : event.myParticipant ? (
-            <span
-              className={styles.ctaStatus}
-              data-status={event.myParticipant.registrationStatus}
-            >
-              {event.myParticipant.registrationStatus === "waiting_approval"
-                ? "Pending approval"
-                : event.myParticipant.registrationStatus === "rejected"
-                  ? "Registration rejected"
-                  : event.myParticipant.registrationStatus === "approved"
-                    ? "Approved — see you there"
-                    : "You're in"}
-            </span>
+            <>
+              <span
+                className={styles.ctaStatus}
+                data-status={event.myParticipant.registrationStatus}
+              >
+                {event.myParticipant.registrationStatus === "waiting_approval"
+                  ? "Pending approval"
+                  : event.myParticipant.registrationStatus === "rejected"
+                    ? "Registration rejected"
+                    : event.myParticipant.registrationStatus === "approved"
+                      ? "Approved — see you there"
+                      : "You're in"}
+              </span>
+              <button
+                type="button"
+                className={styles.leaveBtn}
+                onClick={() => setConfirming("leave")}
+              >
+                Leave
+              </button>
+            </>
           ) : (
             <button
               type="button"

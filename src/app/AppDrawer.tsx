@@ -11,21 +11,28 @@
  * a sign-in, and only when actually attempted.
  */
 
-import { Bike, LogOut, Map as MapIcon, QrCode, User, Users, X } from "lucide-react";
+import { Bike, LogOut, Map as MapIcon, Moon, QrCode, Sun, User, Users, X } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import type { ColorTheme } from "../lib/color-theme";
 
 interface AppDrawerProps {
   open: boolean;
   onClose: () => void;
+  colorTheme: ColorTheme;
+  onToggleColorTheme: () => void;
 }
 
-export function AppDrawer({ open, onClose }: AppDrawerProps) {
+export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: AppDrawerProps) {
   const { status, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
   const displayName =
-    status === "signed-in" ? (profile?.nickname ?? profile?.firstName ?? "Rider") : "Guest";
+    status === "signed-in" ? profile?.nickname?.trim() || fullName || "Rider" : "Guest";
 
   function go(path: string) {
     onClose();
@@ -79,6 +86,20 @@ export function AppDrawer({ open, onClose }: AppDrawerProps) {
             Join with a code
           </NavLink>
         </nav>
+
+        <fieldset className="drawer__theme">
+          <legend className="drawer__theme-title">View</legend>
+          <button
+            type="button"
+            className="drawer__theme-toggle"
+            onClick={onToggleColorTheme}
+            aria-label={colorTheme === "day" ? "Switch to dark mode" : "Switch to day mode"}
+            title={colorTheme === "day" ? "Switch to dark mode" : "Switch to day mode"}
+          >
+            {colorTheme === "day" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
+            <span>{colorTheme === "day" ? "Switch to dark" : "Switch to day"}</span>
+          </button>
+        </fieldset>
 
         <div className="drawer__footer">
           {status === "signed-in" ? (

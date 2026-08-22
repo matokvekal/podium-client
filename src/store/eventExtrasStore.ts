@@ -28,6 +28,8 @@ interface EventExtras {
    * entry is the honest fallback rather than leaving it blank. */
   distanceKm: number | null;
   climbM: number | null;
+  /** Client-only cover image (resized data URL) until a server-side cover pipeline exists. */
+  coverImageDataUrl: string | null;
 }
 
 const EMPTY_EXTRAS: EventExtras = {
@@ -37,6 +39,7 @@ const EMPTY_EXTRAS: EventExtras = {
   activityType: null,
   distanceKm: null,
   climbM: null,
+  coverImageDataUrl: null,
 };
 
 interface EventExtrasState {
@@ -45,11 +48,8 @@ interface EventExtrasState {
   setOrganizerGroup(eventId: string, name: string): void;
   setTeam(eventId: string, teamId: string | null, teamName: string | null): void;
   setActivityType(eventId: string, activityType: SurfaceType): void;
-  setDistanceClimb(
-    eventId: string,
-    distanceKm: number | null,
-    climbM: number | null,
-  ): void;
+  setDistanceClimb(eventId: string, distanceKm: number | null, climbM: number | null): void;
+  setCoverImage(eventId: string, coverImageDataUrl: string | null): void;
 }
 
 export const useEventExtrasStore = create<EventExtrasState>()(
@@ -109,6 +109,18 @@ export const useEventExtrasStore = create<EventExtrasState>()(
               ...(state.byEvent[eventId] ?? EMPTY_EXTRAS),
               distanceKm,
               climbM,
+            },
+          },
+        }));
+      },
+
+      setCoverImage(eventId, coverImageDataUrl) {
+        set((state) => ({
+          byEvent: {
+            ...state.byEvent,
+            [eventId]: {
+              ...(state.byEvent[eventId] ?? EMPTY_EXTRAS),
+              coverImageDataUrl,
             },
           },
         }));

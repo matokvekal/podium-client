@@ -3,7 +3,7 @@
  * public events, hands the picked EventSummary back via onPick. Originally built inline on
  * EventCreatePage.tsx (for the event's own track); extracted so EventGroupsCard.tsx can reuse
  * the exact same picker for a group's track instead of duplicating ~80 lines of search/list
- * code. Fetching the picked event's actual route (lib/mock-results.ts's getEventResults) is
+ * code. Fetching the picked event's actual route (GET /events/:eventId/route) is
  * the caller's job, same as it always was — this component only ever hands back which event
  * was picked.
  *
@@ -23,19 +23,12 @@
  */
 
 import { Map as MapIcon, Upload, X } from "lucide-react";
-import {
-  type ChangeEvent,
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ChangeEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../auth/AuthContext";
+import { apiRequest } from "../lib/api-client";
+import type { EventRoute } from "../lib/event-route";
 import type { EventSummary } from "../lib/local-db";
-import { type EventRoute, getEventResults } from "../lib/mock-results";
 import { LEVEL_LABEL } from "../lib/rider-level";
 import { formatLocalMonthYear } from "../lib/time";
 import { parseTrackCsv } from "../lib/track-csv";
@@ -66,10 +59,7 @@ interface CopyTrackSheetProps {
 }
 
 function eventPickerMeta(event: EventSummary): string {
-  return [
-    event.location,
-    event.startsAt ? formatLocalMonthYear(event.startsAt) : null,
-  ]
+  return [event.location, event.startsAt ? formatLocalMonthYear(event.startsAt) : null]
     .filter(Boolean)
     .join(" · ");
 }
@@ -115,19 +105,16 @@ export function CopyTrackSheet({
     loadOtherRides();
   }, [authed, loadMyRides, loadOtherRides]);
 
-  // Switching source or search resets which page we're on — otherwise flipping "My rides" →
-  // "Others" could leave the list scrolled to a reveal point that doesn't exist in the new set.
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [source, search]);
-
   async function openPreview(event: EventSummary) {
     setPreviewEvent(event);
     setPreviewRoute(null);
     setPreviewLoading(true);
     try {
-      const results = await getEventResults(event.id);
-      setPreviewRoute(results.route);
+      const route = await apiRequest<EventRoute | null>(`/events/${event.id}/route`);
+      setPreviewRoute(route);
+    } catch {
+      // No saved route for this event (or a permission issue) — previewRoute stays null and
+      // the preview area shows its empty state, never a fabricated route.
     } finally {
       setPreviewLoading(false);
     }
@@ -155,7 +142,6 @@ export function CopyTrackSheet({
           points: parsed.points,
           distanceKm: parsed.distanceKm,
           elevationM: null,
-          splits: [],
         },
         restStops: parsed.restStopIndices.map((i) => parsed.points[i]),
         fileName: file.name,
@@ -170,9 +156,7 @@ export function CopyTrackSheet({
     () =>
       myRides.filter(
         (e) =>
-          !q ||
-          e.name.toLowerCase().includes(q) ||
-          (e.location ?? "").toLowerCase().includes(q),
+          !q || e.name.toLowerCase().includes(q) || (e.location ?? "").toLowerCase().includes(q),
       ),
     [myRides, q],
   );
@@ -180,39 +164,41 @@ export function CopyTrackSheet({
     () =>
       otherRides.filter(
         (e) =>
-          !q ||
-          e.name.toLowerCase().includes(q) ||
-          (e.location ?? "").toLowerCase().includes(q),
+          !q || e.name.toLowerCase().includes(q) || (e.location ?? "").toLowerCase().includes(q),
       ),
     [otherRides, q],
   );
 
   const sourceRides = source === "mine" ? myRides : otherRides;
-  const matchingRides =
-    source === "mine" ? matchingMyRides : matchingOtherRides;
+  const matchingRides = source === "mine" ? matchingMyRides : matchingOtherRides;
   const visibleRides = matchingRides.slice(0, visibleCount);
   const hasMoreRides = visibleCount < matchingRides.length;
 
   // Fetch distance/climb for whatever's currently visible, one page at a time — each id is
   // only ever requested once (fetchedRouteMetaIds), so scrolling back up never re-fetches.
   useEffect(() => {
-    const toFetch = visibleRides.filter(
-      (e) => !fetchedRouteMetaIds.current.has(e.id),
-    );
+    const toFetch = visibleRides.filter((e) => !fetchedRouteMetaIds.current.has(e.id));
     if (toFetch.length === 0) return;
     for (const e of toFetch) fetchedRouteMetaIds.current.add(e.id);
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
         toFetch.map(async (e) => {
-          const results = await getEventResults(e.id);
-          return [e.id, results.route] as const;
+          try {
+            const route = await apiRequest<EventRoute | null>(`/events/${e.id}/route`);
+            return route ? ([e.id, route] as const) : null;
+          } catch {
+            // No saved route for this event — skip it rather than fabricate one.
+            return null;
+          }
         }),
       );
       if (cancelled) return;
       setRouteMetaByEventId((prev) => {
         const next = { ...prev };
-        for (const [id, route] of entries) {
+        for (const entry of entries) {
+          if (!entry) continue;
+          const [id, route] = entry;
           next[id] = {
             distanceKm: route.distanceKm,
             elevationM: route.elevationM,
@@ -224,10 +210,7 @@ export function CopyTrackSheet({
     return () => {
       cancelled = true;
     };
-    // visibleRides is a fresh array each render (slice()); it's compared by its ids showing up
-    // in fetchedRouteMetaIds instead, so this intentionally doesn't depend on its identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, q, visibleCount]);
+  }, [visibleRides]);
 
   // Reveal the next page once the sentinel row scrolls into view within the scrollable list.
   useEffect(() => {
@@ -249,20 +232,14 @@ export function CopyTrackSheet({
     const level = getEventExtras(extrasByEvent, event.id).level;
     return (
       <div key={event.id} className={styles.row}>
-        <button
-          type="button"
-          className={styles.rowMain}
-          onClick={() => onPick(event)}
-        >
+        <button type="button" className={styles.rowMain} onClick={() => onPick(event)}>
           <span className={styles.rowName}>{event.name}</span>
           <span className={styles.rowMeta}>{eventPickerMeta(event)}</span>
           <span className={styles.rowStats}>
             {routeMeta
               ? [
                   `${routeMeta.distanceKm} km`,
-                  routeMeta.elevationM != null
-                    ? `${routeMeta.elevationM} m climb`
-                    : null,
+                  routeMeta.elevationM != null ? `${routeMeta.elevationM} m climb` : null,
                   level ? LEVEL_LABEL[level] : null,
                 ]
                   .filter(Boolean)
@@ -285,16 +262,8 @@ export function CopyTrackSheet({
 
   return createPortal(
     <>
-      <div
-        className={styles.sheetOverlay}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        className={`${styles.sheet} ${styles.sheetOpen}`}
-        role="dialog"
-        aria-label={title}
-      >
+      <div className={styles.sheetOverlay} onClick={onClose} aria-hidden="true" />
+      <div className={`${styles.sheet} ${styles.sheetOpen}`} role="dialog" aria-label={title}>
         <div className={styles.sheetHeader}>
           <MapIcon aria-hidden="true" className={styles.sheetHeaderIcon} />
           <button
@@ -311,16 +280,20 @@ export function CopyTrackSheet({
             <button
               type="button"
               className={source === "mine" ? "button" : "button button--quiet"}
-              onClick={() => setSource("mine")}
+              onClick={() => {
+                setSource("mine");
+                setVisibleCount(PAGE_SIZE);
+              }}
             >
               My rides
             </button>
             <button
               type="button"
-              className={
-                source === "others" ? "button" : "button button--quiet"
-              }
-              onClick={() => setSource("others")}
+              className={source === "others" ? "button" : "button button--quiet"}
+              onClick={() => {
+                setSource("others");
+                setVisibleCount(PAGE_SIZE);
+              }}
             >
               Others
             </button>
@@ -333,12 +306,7 @@ export function CopyTrackSheet({
                 className="button button--quiet"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload
-                  width={14}
-                  height={14}
-                  aria-hidden="true"
-                  style={{ marginRight: 6 }}
-                />
+                <Upload width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
                 Upload track (CSV or GPX)
               </button>
               <input
@@ -349,11 +317,7 @@ export function CopyTrackSheet({
                 style={{ display: "none" }}
               />
               {uploadError && (
-                <p
-                  className="banner banner--error"
-                  role="alert"
-                  style={{ fontSize: "0.85rem" }}
-                >
+                <p className="banner banner--error" role="alert" style={{ fontSize: "0.85rem" }}>
                   {uploadError}
                 </p>
               )}
@@ -364,7 +328,10 @@ export function CopyTrackSheet({
             className={styles.search}
             placeholder="Search by name or location…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setVisibleCount(PAGE_SIZE);
+            }}
           />
 
           <div className={styles.list} ref={listRef}>
@@ -376,11 +343,7 @@ export function CopyTrackSheet({
               <>
                 {visibleRides.map(renderRow)}
                 {hasMoreRides && (
-                  <div
-                    ref={sentinelRef}
-                    className={styles.scrollSentinel}
-                    aria-hidden="true"
-                  />
+                  <div ref={sentinelRef} className={styles.scrollSentinel} aria-hidden="true" />
                 )}
               </>
             )}
@@ -414,16 +377,13 @@ export function CopyTrackSheet({
               </div>
             ) : (
               <>
-                <Suspense
-                  fallback={<div className="row muted">Loading the map…</div>}
-                >
+                <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={previewRoute.points} heightPx={200} />
                 </Suspense>
                 <div className={styles.previewFooter}>
                   <span className="muted" style={{ fontSize: "0.85rem" }}>
                     {previewRoute.distanceKm} km
-                    {previewRoute.elevationM != null &&
-                      ` · ${previewRoute.elevationM} m climb`}
+                    {previewRoute.elevationM != null && ` · ${previewRoute.elevationM} m climb`}
                   </span>
                   <button
                     type="button"

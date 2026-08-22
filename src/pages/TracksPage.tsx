@@ -59,7 +59,11 @@ import styles from "./TracksPage.module.css";
 
 const TrackMap = lazy(() => import("../app/TrackMap"));
 
-const SURFACE_FILTERS: { value: SurfaceType; label: string; icon: typeof Bike }[] = [
+const SURFACE_FILTERS: {
+  value: SurfaceType;
+  label: string;
+  icon: typeof Bike;
+}[] = [
   { value: "road", label: "Road", icon: Bike },
   { value: "gravel", label: "Gravel", icon: Route },
   { value: "mtb", label: "MTB", icon: Mountain },
@@ -77,7 +81,11 @@ const COUNTRY_FILTERS: { code: string; label: string }[] = [
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const CLIMB_PRESETS: { label: string; icon: typeof Minus; range: [number, number] }[] = [
+const CLIMB_PRESETS: {
+  label: string;
+  icon: typeof Minus;
+  range: [number, number];
+}[] = [
   { label: "Flat", icon: Minus, range: [0, 300] },
   { label: "Rolling hills", icon: Waves, range: [300, 1000] },
   { label: "Mountains", icon: Mountain, range: [1000, 2000] },
@@ -86,8 +94,12 @@ const CLIMB_PRESETS: { label: string; icon: typeof Minus; range: [number, number
 
 export function TracksPage() {
   const { status, profile } = useAuth();
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
   const commentAuthor =
-    status === "signed-in" ? (profile?.nickname ?? profile?.firstName ?? "Rider") : "Guest";
+    status === "signed-in" ? profile?.nickname?.trim() || fullName || "Rider" : "Guest";
 
   const tracks = useTracksStore((state) => state.tracks);
   const loading = useTracksStore((state) => state.loading);

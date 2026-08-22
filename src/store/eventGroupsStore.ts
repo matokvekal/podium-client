@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { EventRoute } from "../lib/mock-results";
+import type { EventRoute } from "../lib/event-route";
 
 export interface EventGroup {
   id: string;
@@ -15,7 +15,7 @@ export interface EventGroup {
   /** Independent of the event's own startsAt — a club can run "Elite" at 06:00 and "Masters"
    * at 07:00 off the same event. ISO, UTC — see lib/time.ts for display conversion. */
   startsAt: string | null;
-  /** Set only if this group copied a track from another event — see mock-results.ts. */
+  /** Set only if this group copied a track from another event (its real saved route). */
   route: EventRoute | null;
   copiedFromName: string | null;
 }

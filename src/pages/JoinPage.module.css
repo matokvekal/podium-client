@@ -1,0 +1,67 @@
+/* Same bottom-sheet pattern as ShareEventSheet.module.css / TracksPage.module.css's
+   .sheet/.sheetOverlay — reused here for the in-app QR scanner so it opens and closes the
+   same way "Share event" does. */
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.sheetBody {
+  padding: var(--space-4);
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.videoWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 320px;
+  overflow: hidden;
+  background: #000;
+  border-radius: var(--radius-md);
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

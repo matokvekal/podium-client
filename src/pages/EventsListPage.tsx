@@ -13,12 +13,16 @@
  * State:    the active tab, My Rides search/sort/favourites-filter/See-All, the Find filter
  * Calls:    GET /events, GET /events/public
  *
- * Three tabs, not two sections stacked — a guest only ever sees "Find Rides"/"Track" (there
- * is nothing to show under "My Rides" without an account, and this app's rule is that a
+ * Four tabs, not sections stacked — a guest only ever sees "Invited"/"Find Rides"/"Track"
+ * (there is nothing to show under "My Rides" without an account, and this app's rule is that a
  * sign-in prompt only ever lives in the drawer, never on this page):
  *   - "My Rides" — a toolbar (search, sort cycle, favourites filter, Add) over what this
  *     rider owns or joined. Home view shows a compact tile row; See All swaps to the full
  *     filtered/sorted list. Signed-in only.
+ *   - "Invited" — events this rider was sent a join link/code for but hasn't joined yet (see
+ *     store/invitedEventsStore.ts, populated by JoinPage.tsx). Renders InvitedEventsTab.tsx.
+ *     Always present and public, same as Find Rides/Track, so a guest who opened a share link
+ *     before registering still sees what they were invited to.
  *   - "Find Rides" — the public discover list (RIDE-type events only — see below), with its
  *     own Live/Upcoming/Finished filter pills and search. Browsed by anyone. Genuinely *other*
  *     people's events, never this rider's own — that's why it always reads from the public
@@ -47,6 +51,7 @@ import {
   CheckCircle2,
   Compass,
   Heart,
+  Mail,
   Map as MapIcon,
   Plus,
   Search,
@@ -63,13 +68,14 @@ import {
   type FigmaStatus,
   figmaStatus,
 } from "../app/event-visuals";
+import { InvitedEventsTab } from "../app/InvitedEventsTab";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
 import { useEventsStore } from "../store/eventsStore";
 import styles from "./EventsListPage.module.css";
 import { TracksPage } from "./TracksPage";
 
-type EventTab = "myRides" | "findRides" | "track";
+type EventTab = "myRides" | "invited" | "findRides" | "track";
 
 type FindFilter = "all" | FigmaStatus;
 
@@ -125,17 +131,15 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [createdEvent?.createdEventId]);
   const newEventId =
-    createdEvent?.createdEventId && !newHighlightExpired
-      ? createdEvent.createdEventId
-      : null;
+    createdEvent?.createdEventId && !newHighlightExpired ? createdEvent.createdEventId : null;
 
   // "the event we came from need glow shadow under for 10 seconds to know where we came from"
   // — whichever card was clicked into (EventCard.tsx/EventTile.tsx record it) lights up again
   // for 10s once this page remounts from a back navigation. Read once via a lazy initializer,
   // not an effect, so it's already known on the very first render — an effect would paint one
   // frame without the glow first.
-  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(
-    () => consumeOpenedEventId(),
+  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(() =>
+    consumeOpenedEventId(),
   );
   useEffect(() => {
     if (!returnHighlightId) return;
@@ -143,9 +147,7 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [returnHighlightId]);
 
-  const [activeTab, setActiveTab] = useState<EventTab>(
-    authed ? "myRides" : "findRides",
-  );
+  const [activeTab, setActiveTab] = useState<EventTab>(authed ? "myRides" : "findRides");
   // A guest (or a session that just expired) can't be sitting on My Rides — everything else
   // (Find Rides, Find Races, Track) is public.
   useEffect(() => {
@@ -161,9 +163,7 @@ export function EventsListPage() {
   const otherError = useEventsStore((state) => state.otherError);
   const loadMyRides = useEventsStore((state) => state.loadMyRides);
   const loadOtherRides = useEventsStore((state) => state.loadOtherRides);
-  const toggleFavoriteRide = useEventsStore(
-    (state) => state.toggleFavoriteRide,
-  );
+  const toggleFavoriteRide = useEventsStore((state) => state.toggleFavoriteRide);
 
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -199,10 +199,7 @@ export function EventsListPage() {
   // Upcoming, then Past, filling in up to HOME_ROW_LIMIT total tiles.
   const homeRow = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const upcomingSlice = upcoming.slice(
-      0,
-      Math.max(0, HOME_ROW_LIMIT - live.length),
-    );
+    const upcomingSlice = upcoming.slice(0, Math.max(0, HOME_ROW_LIMIT - live.length));
     const pastSlice = past.slice(
       0,
       Math.max(0, HOME_ROW_LIMIT - live.length - upcomingSlice.length),
@@ -219,8 +216,7 @@ export function EventsListPage() {
       if (favoritesOnly && !event.favorite) return false;
       if (!q) return true;
       return (
-        event.name.toLowerCase().includes(q) ||
-        (event.location ?? "").toLowerCase().includes(q)
+        event.name.toLowerCase().includes(q) || (event.location ?? "").toLowerCase().includes(q)
       );
     });
     // Date sort direction depends on the bucket — "rides are list top to bottom, the top is the
@@ -240,21 +236,15 @@ export function EventsListPage() {
           timestamp(b.startsAt) - timestamp(a.startsAt);
       }
       return bucket === "upcoming"
-        ? (a: EventSummary, b: EventSummary) =>
-            timestamp(a.startsAt) - timestamp(b.startsAt)
-        : (a: EventSummary, b: EventSummary) =>
-            timestamp(b.startsAt) - timestamp(a.startsAt);
+        ? (a: EventSummary, b: EventSummary) => timestamp(a.startsAt) - timestamp(b.startsAt)
+        : (a: EventSummary, b: EventSummary) => timestamp(b.startsAt) - timestamp(a.startsAt);
     }
     return {
-      live: matches
-        .filter((e) => figmaStatus(e.status) === "live")
-        .sort(comparator("live")),
+      live: matches.filter((e) => figmaStatus(e.status) === "live").sort(comparator("live")),
       upcoming: matches
         .filter((e) => figmaStatus(e.status) === "upcoming")
         .sort(comparator("upcoming")),
-      past: matches
-        .filter((e) => figmaStatus(e.status) === "finished")
-        .sort(comparator("past")),
+      past: matches.filter((e) => figmaStatus(e.status) === "finished").sort(comparator("past")),
       total: matches.length,
     };
   }, [myRides, q, favoritesOnly, sortBy]);
@@ -299,10 +289,7 @@ export function EventsListPage() {
             >
               Add riders
             </Link>
-            <Link
-              className="button"
-              to={`/events/${createdEvent.createdEventId}`}
-            >
+            <Link className="button" to={`/events/${createdEvent.createdEventId}`}>
               View event
             </Link>
             <button
@@ -316,6 +303,7 @@ export function EventsListPage() {
           </span>
         </div>
       )}
+
       <div className={styles.tabBar}>
         {authed && (
           <button
@@ -327,6 +315,14 @@ export function EventsListPage() {
             My Rides
           </button>
         )}
+        <button
+          type="button"
+          className={activeTab === "invited" ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab("invited")}
+        >
+          <Mail className={styles.tabIcon} aria-hidden="true" />
+          Invited
+        </button>
         <button
           type="button"
           className={activeTab === "findRides" ? styles.tabActive : styles.tab}
@@ -349,11 +345,7 @@ export function EventsListPage() {
         <section className="stack">
           {showAll ? (
             <div className={styles.toolbarTop}>
-              <button
-                type="button"
-                className={styles.backBtn}
-                onClick={() => setShowAll(false)}
-              >
+              <button type="button" className={styles.backBtn} onClick={() => setShowAll(false)}>
                 ← My Rides
               </button>
             </div>
@@ -361,17 +353,11 @@ export function EventsListPage() {
             <div className="section-header">
               <div className="section-title-row">
                 <h2>My Rides</h2>
-                {myRides.length > 0 && (
-                  <span className="section-count">{myRides.length}</span>
-                )}
+                {myRides.length > 0 && <span className="section-count">{myRides.length}</span>}
               </div>
               <div className={styles.toolbarLeft}>
                 {myRides.length > 0 && (
-                  <button
-                    type="button"
-                    className={styles.backBtn}
-                    onClick={() => setShowAll(true)}
-                  >
+                  <button type="button" className={styles.backBtn} onClick={() => setShowAll(true)}>
                     See All
                   </button>
                 )}
@@ -408,26 +394,17 @@ export function EventsListPage() {
                     type="button"
                     className={styles.iconBtn}
                     onClick={() =>
-                      setSortBy(
-                        SORT_CYCLE[
-                          (SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length
-                        ],
-                      )
+                      setSortBy(SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length])
                     }
                     title="Sort by date / name / status"
                   >
-                    <ArrowUpDown
-                      className={styles.iconGlyph}
-                      aria-hidden="true"
-                    />
+                    <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
                     <span>{SORT_LABEL[sortBy]}</span>
                   </button>
                   <button
                     type="button"
                     className={
-                      favoritesOnly
-                        ? `${styles.iconBtn} ${styles.heartActive}`
-                        : styles.iconBtn
+                      favoritesOnly ? `${styles.iconBtn} ${styles.heartActive}` : styles.iconBtn
                     }
                     onClick={() => setFavoritesOnly((v) => !v)}
                     aria-label="Show favorites only"
@@ -576,6 +553,8 @@ export function EventsListPage() {
         </section>
       )}
 
+      {activeTab === "invited" && <InvitedEventsTab />}
+
       {activeTab === "findRides" && (
         <section className="stack">
           <div className="section-header">
@@ -614,9 +593,7 @@ export function EventsListPage() {
               <button
                 key={item.value}
                 type="button"
-                className={
-                  item.value === findFilter ? styles.pillActive : styles.pill
-                }
+                className={item.value === findFilter ? styles.pillActive : styles.pill}
                 onClick={() => setFindFilter(item.value)}
               >
                 {item.label}
@@ -636,7 +613,10 @@ export function EventsListPage() {
               <span className="muted">Loading…</span>
             </div>
           ) : visibleFindRides.length === 0 ? (
-            <p className="muted">No rides here yet.</p>
+            <EmptyRidesState
+              title="No rides here yet"
+              subtitle="Be the first to add one, or join a ride with a code."
+            />
           ) : (
             <div className="stack event-card-list">
               {visibleFindRides.map((event) => (

@@ -9,7 +9,7 @@
  *           groups from store/eventGroupsStore.ts (client-only, no server concept of this
  *           exists at all — see plan/server-tasks.md Part D); the main event route (for the
  *           map view's fallback when a group has no track of its own) from
- *           lib/mock-results.ts, same as EventDetailPage.
+ *           GET /events/:eventId/route, same as EventDetailPage.
  * Actions:  swipe/page between groups (prev/next), add/rename/remove a group, set a group's
  *           start time, copy or remove a group's track, switch List/Map view, add riders to
  *           the current group (pick from existing participants — multi-select, or add a brand
@@ -42,8 +42,8 @@ import { CopyTrackSheet } from "../app/CopyTrackSheet";
 import { ParticipantFormSheet, type ParticipantFormValues } from "../app/ParticipantFormSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import type { EventRoute } from "../lib/event-route";
 import { getCachedEvent } from "../lib/local-db";
-import { type EventRoute, getEventResults } from "../lib/mock-results";
 import { toDatetimeLocalValue } from "../lib/quick-add-parser";
 import { MAX_GROUPS, useEventGroupsStore } from "../store/eventGroupsStore";
 import { useParticipantsStore } from "../store/participantsStore";
@@ -139,9 +139,15 @@ export function EventGroupsPage() {
         if (!cancelled) setLoading(false);
       });
 
-    getEventResults(eventId).then((results) => {
-      if (!cancelled) setMainRoute(results.route);
-    });
+    // The event's real saved route (server) — never a fabricated stand-in; null when the
+    // event has no route yet.
+    apiRequest<EventRoute | null>(`/events/${eventId}/route`)
+      .then((route) => {
+        if (!cancelled) setMainRoute(route);
+      })
+      .catch(() => {
+        // No route saved for this event, or this viewer can't see it — mainRoute stays null.
+      });
 
     return () => {
       cancelled = true;
@@ -189,8 +195,12 @@ export function EventGroupsPage() {
     setCopyTrackOpen(false);
     setCopyLoading(true);
     try {
-      const results = await getEventResults(sourceEvent.id);
-      setGroupTrack(eventId, currentGroup.id, results.route, sourceEvent.name);
+      const route = await apiRequest<EventRoute | null>(`/events/${sourceEvent.id}/route`);
+      if (!route) {
+        setError("That event has no saved route to copy.");
+        return;
+      }
+      setGroupTrack(eventId, currentGroup.id, route, sourceEvent.name);
     } finally {
       setCopyLoading(false);
     }

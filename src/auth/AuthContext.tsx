@@ -22,6 +22,7 @@ import {
   saveProfile,
   saveTokens,
 } from "../lib/auth-storage";
+import { useEventsStore } from "../store/eventsStore";
 import { forgetGoogleSession } from "./google-signin";
 
 export interface Profile {
@@ -50,12 +51,6 @@ interface AuthContextValue {
   requiresProfile: boolean;
   signInWithGoogle(idToken: string): Promise<void>;
   verifySmsCode(challengeId: number, code: string): Promise<void>;
-  /** ⚠ TEMPORARY developer shortcut — delete before production. See README.md. */
-  signInAsDevUser(role: Profile["role"]): Promise<void>;
-  /** ⚠ TEMPORARY, CLIENT-ONLY developer shortcut — delete before production. See README.md.
-   * Unlike signInAsDevUser, never touches the network — for testing sign-in-gated screens
-   * with the server down. */
-  signInAsLocalDevUser(): void;
   updateProfile(input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>): Promise<void>;
   signOut(): Promise<void>;
 }
@@ -144,43 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completeSignIn],
   );
 
-  // ⚠⚠ TEMPORARY DEVELOPMENT AID — DELETE BEFORE PRODUCTION (see README.md).
-  // Nothing special happens here: the server hands back the same real token pair as any
-  // other sign-in, so the session that follows is indistinguishable from a genuine one.
-  const signInAsDevUser = useCallback(
-    async (role: Profile["role"]) => {
-      const auth = await apiRequest<AuthResponse>("/auth/dev-login", {
-        method: "POST",
-        body: { role, key: "default" },
-        anonymous: true,
-      });
-      await completeSignIn(auth);
-    },
-    [completeSignIn],
-  );
-
-  // ⚠⚠ TEMPORARY, CLIENT-ONLY DEVELOPMENT AID — DELETE BEFORE PRODUCTION, alongside
-  // signInAsDevUser (see README.md). Fakes a signed-in session entirely on this device: no
-  // request goes out, so this works with the server down, unlike every other sign-in path
-  // here. The fake token pair still satisfies hasSession() on the next cold start, so the
-  // cold-start effect above will try /users/me — and safely no-op on its failure (a network
-  // error, not a 401), leaving this profile on screen exactly like any other offline reload.
-  const signInAsLocalDevUser = useCallback(() => {
-    const fakeProfile: Profile = {
-      id: -1,
-      role: "RIDER",
-      firstName: "Dev",
-      lastName: "Rider",
-      nickname: "You",
-      emergencyPhone: null,
-      requiresProfile: false,
-    };
-    saveTokens({ accessToken: "local-dev-fake", refreshToken: "local-dev-fake" });
-    saveProfile(fakeProfile);
-    setProfile(fakeProfile);
-    setStatus("signed-in");
-  }, []);
-
   const updateProfile = useCallback(
     async (input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>) => {
       const updated = await apiRequest<Profile>("/users/me", { method: "PATCH", body: input });
@@ -197,6 +155,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearTokens();
     clearProfile();
     forgetGoogleSession();
+    // Drop this rider's My Rides (in-memory and the IndexedDB "mine" cache bucket) so a
+    // shared device never briefly shows them to whoever signs in next.
+    useEventsStore.getState().clearMyRides();
     setProfile(null);
     setStatus("signed-out");
   }, []);
@@ -208,21 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requiresProfile: profile?.requiresProfile ?? false,
       signInWithGoogle,
       verifySmsCode,
-      signInAsDevUser,
-      signInAsLocalDevUser,
       updateProfile,
       signOut,
     }),
-    [
-      status,
-      profile,
-      signInWithGoogle,
-      verifySmsCode,
-      signInAsDevUser,
-      signInAsLocalDevUser,
-      updateProfile,
-      signOut,
-    ],
+    [status, profile, signInWithGoogle, verifySmsCode, updateProfile, signOut],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

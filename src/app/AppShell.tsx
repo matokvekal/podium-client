@@ -14,9 +14,10 @@
 
 import { ArrowLeft, Menu, User } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { applyColorTheme, type ColorTheme, getInitialColorTheme } from "../lib/color-theme";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
 
@@ -34,11 +35,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => getInitialColorTheme());
 
   const showBackArrow =
-    (EVENT_DETAIL_PATH.test(location.pathname) &&
-      location.pathname !== "/events/new") ||
+    (EVENT_DETAIL_PATH.test(location.pathname) && location.pathname !== "/events/new") ||
     TEAMS_PATH.test(location.pathname);
+
+  useEffect(() => {
+    applyColorTheme(colorTheme);
+  }, [colorTheme]);
+
+  function toggleColorTheme() {
+    setColorTheme((current) => (current === "day" ? "dark" : "day"));
+  }
 
   return (
     <div className="app-shell">
@@ -79,29 +88,29 @@ export function AppShell({ children }: { children: ReactNode }) {
           type="button"
           className="app-header__avatar"
           aria-label={status === "signed-in" ? "Account" : "Sign in"}
-          onClick={() =>
-            status === "signed-in" ? navigate("/account") : setDrawerOpen(true)
-          }
+          onClick={() => (status === "signed-in" ? navigate("/account") : setDrawerOpen(true))}
         >
           <User aria-hidden="true" />
         </button>
       </header>
 
-      <AppDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <AppDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        colorTheme={colorTheme}
+        onToggleColorTheme={toggleColorTheme}
+      />
 
       {!online && (
         <div className="banner banner--offline" role="status">
-          Offline — showing what was last loaded. Anything you change is sent
-          when you reconnect.
+          Offline — showing what was last loaded. Anything you change is sent when you reconnect.
         </div>
       )}
 
       <main className="app-main">{children}</main>
 
       <footer className="app-footer">
-        <span>
-          © {new Date().getFullYear()} El Niño Move. All rights reserved.
-        </span>
+        <span>© {new Date().getFullYear()} El Niño Move. All rights reserved.</span>
       </footer>
     </div>
   );

@@ -12,6 +12,9 @@
 export interface LiveRider {
   participantId: number;
   name: string;
+  /** Real account's users.avatar_url (a Google profile photo), or null for a manual/
+   * account-less rider or an account that never signed in with Google. */
+  avatarUrl: string | null;
   bib: string | null;
   lat: number | null;
   lng: number | null;

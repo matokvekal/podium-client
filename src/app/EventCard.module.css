@@ -19,9 +19,12 @@
   width: 100%;
   min-height: 104px;
   padding: 5px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0))
-      var(--surface);
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0)
+    )
+    var(--surface);
   border: 1px solid rgba(62, 221, 164, 0.52);
   box-shadow:
     0 0 0 1px rgba(99, 166, 252, 0.2),
@@ -82,6 +85,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background-size: cover;
+  background-position: center;
   font-family: "Abel", var(--font-sans);
   font-size: 28px;
   color: #fff;
@@ -245,6 +250,19 @@
 
 .creatorMeta {
   font-size: 13px;
+}
+
+.creatorAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: var(--weight-medium);
+  color: #fff;
+  flex-shrink: 0;
 }
 
 /* Difficulty "stairs" — same read-only signal-bars idea and storm-intensity color-per-level

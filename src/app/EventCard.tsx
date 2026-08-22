@@ -13,12 +13,11 @@
  * after a look at real data: this rider's own events all say "Organizing," so with nothing to
  * contrast against it just read as noise. See EventTile.tsx's doc comment for the same call.
  *
- * Three rows of "should I join this" data, asked for directly ("i need extra data at card ...
- * number of riders register the dificalty and the orgenizer/club/team"): date + how many
- * riders are on the start list (Users, count via lib/mock-participants.ts's
- * seedParticipantCount — no real registration-count endpoint exists yet, so this mirrors
- * whatever EventParticipantsPage would seed for the same id); time + location; level + who's
- * organizing. Level and organizer are real data when this rider (or their device) set them via
+ * Rows of "should I join this" data, asked for directly ("i need extra data at card ...
+ * number of riders register the dificalty and the orgenizer/club/team"): date; time +
+ * location; level + who's organizing. (The rider count used to be shown here from a mock
+ * seed — removed, see BUGS.md "Remove fake/mock riders"; no real count endpoint exists yet.)
+ * Level and organizer are real data when this rider (or their device) set them via
  * EventCreatePage — otherwise event-visuals.ts's mockLevel/mockOrganizerName fill in something
  * deterministic rather than leaving a blank, since neither has a server column yet to sync a
  * real value from someone else's device.
@@ -30,34 +29,32 @@ import {
   MapPin,
   Mountain,
   Pencil,
-  Ruler,
-  Users,
+  Ruler
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
-import { seedParticipantCount } from "../lib/mock-participants";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/mock-tracks";
 import { wazeUrl } from "../lib/nav-links";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useTeamsStore } from "../store/teamsStore";
+import { Avatar } from "./Avatar";
 import styles from "./EventCard.module.css";
 import {
+  eventCoverBackground,
   FIGMA_TAG_LABEL,
   figmaStatus,
   initialOf,
   mockLevel,
-  mockOrganizerName,
-  placeholderColorVar,
-  recordOpenedEvent,
+  recordOpenedEvent
 } from "./event-visuals";
 
 const shortDateFormat = new Intl.DateTimeFormat(undefined, {
   day: "2-digit",
-  month: "short",
+  month: "short"
 });
 
 function shortDate(iso: string | null): string {
@@ -69,7 +66,7 @@ function shortDate(iso: string | null): string {
 export function EventCard({
   event,
   isNew,
-  justOpened,
+  justOpened
 }: {
   event: EventSummary;
   isNew?: boolean;
@@ -81,16 +78,25 @@ export function EventCard({
   const extras = getEventExtras(extrasByEvent, event.id);
   const level = extras.level ?? mockLevel(event.id);
   const levelIndex = LEVELS.findIndex((l) => l.value === level);
-  const organizer = extras.organizerGroup ?? mockOrganizerName(event.id);
-  const teamName = extras.teamId ? teams[extras.teamId]?.name ?? null : null;
+  const organizer =
+    extras.organizerGroup ?? event.ownerName ?? "Independent ride";
+  const organizerAvatarUrl = extras.organizerGroup
+    ? null
+    : event.ownerAvatarUrl;
+  const teamName = extras.teamId ? (teams[extras.teamId]?.name ?? null) : null;
   const organizerLine =
-    teamName && teamName !== organizer ? `${organizer} · ${teamName}` : organizer;
-  const riderCount = seedParticipantCount(event.id);
+    teamName && teamName !== organizer
+      ? `${organizer} · ${teamName}`
+      : organizer;
   // Real distance/climb (set on EventCreatePage.tsx, from the picked route or typed by hand)
-  // wins over event.distanceKm/climbM, which is only ever populated on the hardcoded mock list
-  // (lib/mock-my-rides.ts) — a real event never has those set server-side.
+  // wins over event.distanceKm/climbM, which is only ever populated on hardcoded mock lists —
+  // a real event never has those set server-side.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
+  const coverBackground = eventCoverBackground(
+    event.id,
+    extras.coverImageDataUrl
+  );
   // Same fallback EventDetailPage.tsx uses when this device never set one (no server column
   // yet — see EventCreatePage.tsx's doc comment on Activity type).
   const activityType = extras.activityType ?? "road";
@@ -123,10 +129,7 @@ export function EventCard({
       data-new={isNew || justOpened || undefined}
       onClick={() => recordOpenedEvent(event.id)}
     >
-      <div
-        className={styles.image}
-        style={{ background: placeholderColorVar(event.id) }}
-      >
+      <div className={styles.image} style={{ background: coverBackground }}>
         {initialOf(event.name)}
       </div>
 
@@ -184,17 +187,17 @@ export function EventCard({
               {formatLocalTime(event.startsAt)}
             </span>
           )}
-          <span className={styles.metaItem}>
-            <Users className={styles.metaIcon} aria-hidden="true" />
-            {riderCount} riders
-          </span>
+
           {/* Same read-only "stairs" as EventDetailPage.tsx's difficulty display — asked for
               directly ("dificalty icons stairs it important"). */}
-          <span className={styles.levelScale} title={`Difficulty: ${LEVEL_LABEL[level]}`}>
+          <span
+            className={styles.levelScale}
+            title={`Difficulty: ${LEVEL_LABEL[level]}`}
+          >
             <span className={styles.levelEdge}>Easy</span>
             <span
               className={styles.levelBars}
-              aria-label={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
+              title={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
             >
               {LEVELS.map((l, i) => (
                 <span
@@ -230,6 +233,12 @@ export function EventCard({
             </span>
           )}
           <span className={`${styles.metaItem} ${styles.creatorMeta}`}>
+            <Avatar
+              name={organizer}
+              avatarUrl={organizerAvatarUrl}
+              seed={event.ownerId != null ? String(event.ownerId) : event.id}
+              className={styles.creatorAvatar}
+            />
             {organizerLine}
           </span>
         </div>

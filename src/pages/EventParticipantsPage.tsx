@@ -27,6 +27,7 @@ import {
   Check,
   CheckCircle2,
   Pencil,
+  Phone,
   Radio,
   Square,
   Trash2,
@@ -38,14 +39,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  ParticipantFormSheet,
-  type ParticipantFormValues,
-} from "../app/ParticipantFormSheet";
+import { Avatar } from "../app/Avatar";
+import { ParticipantFormSheet, type ParticipantFormValues } from "../app/ParticipantFormSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { type EventStatus, getCachedEvent } from "../lib/local-db";
-import type { Participant } from "../lib/mock-participants";
+import type { Participant } from "../lib/participant-types";
 import { useEventGroupsStore } from "../store/eventGroupsStore";
 import { useParticipantsStore } from "../store/participantsStore";
 import styles from "./EventParticipantsPage.module.css";
@@ -97,15 +96,12 @@ export function EventParticipantsPage() {
   const addParticipant = useParticipantsStore((s) => s.addParticipant);
   const updateParticipant = useParticipantsStore((s) => s.updateParticipant);
   const deleteParticipant = useParticipantsStore((s) => s.deleteParticipant);
-  const setRegistrationStatus = useParticipantsStore(
-    (s) => s.setRegistrationStatus,
-  );
+  const setRegistrationStatus = useParticipantsStore((s) => s.setRegistrationStatus);
   const setAttendance = useParticipantsStore((s) => s.setAttendance);
 
   const groupsByEvent = useEventGroupsStore((s) => s.byEvent);
   const groups = (eventId && groupsByEvent[eventId]) || [];
-  const groupName = (groupId: string | null) =>
-    groups.find((g) => g.id === groupId)?.name ?? null;
+  const groupName = (groupId: string | null) => groups.find((g) => g.id === groupId)?.name ?? null;
 
   useEffect(() => {
     if (!eventId) return;
@@ -160,9 +156,7 @@ export function EventParticipantsPage() {
 
   useEffect(() => {
     if (eventId && event)
-      ensureLoaded(eventId).catch(() =>
-        setActionError("Could not load participants."),
-      );
+      ensureLoaded(eventId).catch(() => setActionError("Could not load participants."));
   }, [eventId, event, ensureLoaded]);
 
   async function togglePause(next: boolean) {
@@ -170,18 +164,13 @@ export function EventParticipantsPage() {
     setPauseBusy(true);
     setActionError(null);
     try {
-      const updated = await apiRequest<{ isPaused: boolean }>(
-        `/events/${eventId}/pause`,
-        {
-          method: "PATCH",
-          body: { paused: next },
-        },
-      );
+      const updated = await apiRequest<{ isPaused: boolean }>(`/events/${eventId}/pause`, {
+        method: "PATCH",
+        body: { paused: next },
+      });
       setEvent((e) => (e ? { ...e, isPaused: updated.isPaused } : e));
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : "Could not change pause state.",
-      );
+      setActionError(err instanceof ApiError ? err.message : "Could not change pause state.");
     } finally {
       setPauseBusy(false);
     }
@@ -189,27 +178,17 @@ export function EventParticipantsPage() {
 
   async function stopEvent() {
     if (!eventId) return;
-    if (
-      !window.confirm(
-        "Stop this event? It finishes permanently and can't be reopened.",
-      )
-    )
-      return;
+    if (!window.confirm("Stop this event? It finishes permanently and can't be reopened.")) return;
     setPauseBusy(true);
     setActionError(null);
     try {
-      const updated = await apiRequest<{ status: EventStatus }>(
-        `/events/${eventId}/status`,
-        {
-          method: "PATCH",
-          body: { status: "finished" },
-        },
-      );
+      const updated = await apiRequest<{ status: EventStatus }>(`/events/${eventId}/status`, {
+        method: "PATCH",
+        body: { status: "finished" },
+      });
       setEvent((e) => (e ? { ...e, status: updated.status } : e));
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : "Could not stop this event.",
-      );
+      setActionError(err instanceof ApiError ? err.message : "Could not stop this event.");
     } finally {
       setPauseBusy(false);
     }
@@ -222,16 +201,12 @@ export function EventParticipantsPage() {
     const list = !q
       ? participants
       : participants.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            (p.bib ?? "").toLowerCase().includes(q),
+          (p) => p.name.toLowerCase().includes(q) || (p.bib ?? "").toLowerCase().includes(q),
         );
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [participants, search]);
 
-  const presentCount = participants.filter(
-    (p) => p.attendanceStatus === "present",
-  ).length;
+  const presentCount = participants.filter((p) => p.attendanceStatus === "present").length;
 
   if (loading) {
     return (
@@ -268,16 +243,8 @@ export function EventParticipantsPage() {
           </p>
         </div>
         <div className="row">
-          <Link
-            className="button button--quiet"
-            to={`/events/${event.id}/groups`}
-          >
-            <Users
-              width={14}
-              height={14}
-              aria-hidden="true"
-              style={{ marginRight: 6 }}
-            />
+          <Link className="button button--quiet" to={`/events/${event.id}/groups`}>
+            <Users width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
             Groups
           </Link>
           <Link className="button button--quiet" to={`/events/${event.id}`}>
@@ -293,19 +260,13 @@ export function EventParticipantsPage() {
       )}
 
       {event.status === "live" && (
-        <div
-          className="card row"
-          style={{ justifyContent: "space-between", flexWrap: "wrap" }}
-        >
+        <div className="card row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           <span className="row" style={{ gap: 8 }}>
             <Radio width={16} height={16} aria-hidden="true" />
             {event.isPaused ? "Tracking is paused" : "Live now"}
           </span>
           <div className="row">
-            <Link
-              className="button button--quiet"
-              to={`/events/live/${event.id}`}
-            >
+            <Link className="button button--quiet" to={`/events/live/${event.id}`}>
               LIVE map
             </Link>
             <button
@@ -323,12 +284,7 @@ export function EventParticipantsPage() {
               onClick={stopEvent}
               title="Finish this event permanently"
             >
-              <Square
-                width={14}
-                height={14}
-                aria-hidden="true"
-                style={{ marginRight: 6 }}
-              />
+              <Square width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
               Stop
             </button>
           </div>
@@ -341,17 +297,8 @@ export function EventParticipantsPage() {
       </div>
 
       <div className="row" style={{ flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="button"
-          onClick={() => setAddOpen(true)}
-        >
-          <UserPlus
-            width={15}
-            height={15}
-            aria-hidden="true"
-            style={{ marginRight: 6 }}
-          />
+        <button type="button" className="button" onClick={() => setAddOpen(true)}>
+          <UserPlus width={15} height={15} aria-hidden="true" style={{ marginRight: 6 }} />
           Add participant
         </button>
         {isRace && (
@@ -361,12 +308,7 @@ export function EventParticipantsPage() {
             disabled
             title="Excel/CSV import — coming soon"
           >
-            <Upload
-              width={15}
-              height={15}
-              aria-hidden="true"
-              style={{ marginRight: 6 }}
-            />
+            <Upload width={15} height={15} aria-hidden="true" style={{ marginRight: 6 }} />
             Import from file (soon)
           </button>
         )}
@@ -393,19 +335,16 @@ export function EventParticipantsPage() {
                     : styles.checkBtn
                 }
                 onClick={() =>
-                  eventId &&
-                  setAttendance(eventId, p.id, p.attendanceStatus !== "present")
+                  eventId && setAttendance(eventId, p.id, p.attendanceStatus !== "present")
                 }
                 aria-pressed={p.attendanceStatus === "present"}
-                aria-label={
-                  p.attendanceStatus === "present"
-                    ? "Mark not arrived"
-                    : "Mark arrived"
-                }
+                aria-label={p.attendanceStatus === "present" ? "Mark not arrived" : "Mark arrived"}
                 title="Check in"
               >
                 <Check width={16} height={16} aria-hidden="true" />
               </button>
+
+              <Avatar className={styles.avatar} name={p.name} avatarUrl={p.avatarUrl} seed={p.id} />
 
               <div className={styles.info}>
                 <div className={styles.name}>
@@ -413,11 +352,20 @@ export function EventParticipantsPage() {
                   {p.bib && <span className={styles.bib}>#{p.bib}</span>}
                 </div>
                 <div className={styles.meta}>
-                  {[groupName(p.groupId), p.category, p.phone, p.email]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
+                  {[groupName(p.groupId), p.category, p.email].filter(Boolean).join(" · ") || "—"}
                 </div>
               </div>
+
+              {p.phone && (
+                <a
+                  className={styles.iconBtn}
+                  href={`tel:${p.phone}`}
+                  aria-label={`Call ${p.name}`}
+                  title={`Call ${p.name}`}
+                >
+                  <Phone width={15} height={15} aria-hidden="true" />
+                </a>
+              )}
 
               {p.registrationStatus === "waiting_approval" ? (
                 <div className={styles.approveRow}>
@@ -426,13 +374,10 @@ export function EventParticipantsPage() {
                     className={styles.iconBtn}
                     onClick={() =>
                       eventId &&
-                      setRegistrationStatus(eventId, p.id, "approved").catch(
-                        (err) =>
-                          setActionError(
-                            err instanceof ApiError
-                              ? err.message
-                              : "Could not approve.",
-                          ),
+                      setRegistrationStatus(eventId, p.id, "approved").catch((err) =>
+                        setActionError(
+                          err instanceof ApiError ? err.message : "Could not approve.",
+                        ),
                       )
                     }
                     aria-label="Approve"
@@ -445,13 +390,8 @@ export function EventParticipantsPage() {
                     className={styles.iconBtn}
                     onClick={() =>
                       eventId &&
-                      setRegistrationStatus(eventId, p.id, "rejected").catch(
-                        (err) =>
-                          setActionError(
-                            err instanceof ApiError
-                              ? err.message
-                              : "Could not reject.",
-                          ),
+                      setRegistrationStatus(eventId, p.id, "rejected").catch((err) =>
+                        setActionError(err instanceof ApiError ? err.message : "Could not reject."),
                       )
                     }
                     aria-label="Reject"
@@ -463,10 +403,7 @@ export function EventParticipantsPage() {
               ) : (
                 // "approved" here has no way back to pending server-side (only approve/reject
                 // exist, not an unapprove) — a plain badge, not a button, unlike before.
-                <span
-                  className={styles.statusBadge}
-                  data-status={p.registrationStatus}
-                >
+                <span className={styles.statusBadge} data-status={p.registrationStatus}>
                   {p.registrationStatus.replace("_", " ")}
                 </span>
               )}
@@ -484,16 +421,9 @@ export function EventParticipantsPage() {
                 type="button"
                 className={styles.iconBtn}
                 onClick={() => {
-                  if (
-                    eventId &&
-                    window.confirm(`Remove ${p.name} from this event?`)
-                  ) {
+                  if (eventId && window.confirm(`Remove ${p.name} from this event?`)) {
                     deleteParticipant(eventId, p.id).catch((err) =>
-                      setActionError(
-                        err instanceof ApiError
-                          ? err.message
-                          : "Could not remove.",
-                      ),
+                      setActionError(err instanceof ApiError ? err.message : "Could not remove."),
                     );
                   }
                 }}
@@ -518,9 +448,7 @@ export function EventParticipantsPage() {
             if (eventId) {
               addParticipant(eventId, values).catch((err) =>
                 setActionError(
-                  err instanceof ApiError
-                    ? err.message
-                    : "Could not add participant.",
+                  err instanceof ApiError ? err.message : "Could not add participant.",
                 ),
               );
             }
@@ -539,11 +467,7 @@ export function EventParticipantsPage() {
           onSubmit={(values) => {
             if (eventId) {
               updateParticipant(eventId, editing.id, values).catch((err) =>
-                setActionError(
-                  err instanceof ApiError
-                    ? err.message
-                    : "Could not save changes.",
-                ),
+                setActionError(err instanceof ApiError ? err.message : "Could not save changes."),
               );
             }
             setEditing(null);
@@ -553,27 +477,15 @@ export function EventParticipantsPage() {
               type="button"
               className="button button--quiet"
               onClick={() => {
-                if (
-                  eventId &&
-                  window.confirm(`Remove ${editing.name} from this event?`)
-                ) {
+                if (eventId && window.confirm(`Remove ${editing.name} from this event?`)) {
                   deleteParticipant(eventId, editing.id).catch((err) =>
-                    setActionError(
-                      err instanceof ApiError
-                        ? err.message
-                        : "Could not remove.",
-                    ),
+                    setActionError(err instanceof ApiError ? err.message : "Could not remove."),
                   );
                   setEditing(null);
                 }
               }}
             >
-              <X
-                width={15}
-                height={15}
-                aria-hidden="true"
-                style={{ marginRight: 6 }}
-              />
+              <X width={15} height={15} aria-hidden="true" style={{ marginRight: 6 }} />
               Remove from event
             </button>
           }

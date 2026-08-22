@@ -2,12 +2,12 @@
 // client-only, same "no server column yet" story as store/eventExtrasStore.ts. There is no
 // event_routes attach endpoint (see EventCreatePage.tsx's Track section doc comment), so the
 // picked route never reaches the server; without this store, every event's map fell back to
-// lib/mock-results.ts's deterministic-by-id mock instead of what the organizer actually chose.
+// a fabricated deterministic-by-id mock route instead of what the organizer actually chose.
 // Persisted to localStorage keyed by event id, same pattern as eventExtrasStore/eventGroupsStore.
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { EventRoute } from "../lib/mock-results";
+import type { EventRoute } from "../lib/event-route";
 
 interface EventRouteState {
   byEvent: Record<string, EventRoute>;

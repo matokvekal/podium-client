@@ -60,9 +60,7 @@ export function TeamDetailPage() {
   const [email, setEmail] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contactsSupported =
-    typeof navigator !== "undefined" &&
-    "contacts" in navigator &&
-    "ContactsManager" in window;
+    typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
 
   const team = teamId ? teams[teamId] : undefined;
   const teamMembers = (teamId && members[teamId]) || [];
@@ -97,9 +95,7 @@ export function TeamDetailPage() {
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => {
-          const [rowName, rowPhone, rowEmail] = line
-            .split(",")
-            .map((cell) => cell.trim());
+          const [rowName, rowPhone, rowEmail] = line.split(",").map((cell) => cell.trim());
           return { name: rowName ?? "", phone: rowPhone, email: rowEmail };
         });
       addMembers(teamId, inputs);
@@ -108,8 +104,7 @@ export function TeamDetailPage() {
 
   async function pickFromContacts() {
     if (!teamId) return;
-    const contacts = (navigator as Navigator & { contacts?: ContactsManager })
-      .contacts;
+    const contacts = (navigator as Navigator & { contacts?: ContactsManager }).contacts;
     if (!contacts) return;
     try {
       const picked = await contacts.select(["name", "tel"], { multiple: true });
@@ -169,11 +164,7 @@ export function TeamDetailPage() {
               style={{ display: "none" }}
             />
             {contactsSupported && (
-              <button
-                type="button"
-                className={styles.addToolbarBtn}
-                onClick={pickFromContacts}
-              >
+              <button type="button" className={styles.addToolbarBtn} onClick={pickFromContacts}>
                 <Contact width={18} height={18} aria-hidden="true" />
                 Contacts
               </button>
@@ -199,11 +190,7 @@ export function TeamDetailPage() {
                 required
               />
               <label htmlFor="member-phone">Phone</label>
-              <input
-                id="member-phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
+              <input id="member-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <label htmlFor="member-email">Email</label>
               <input
                 id="member-email"
@@ -226,9 +213,7 @@ export function TeamDetailPage() {
                   <div className={styles.info}>
                     <div className={styles.name}>{member.name}</div>
                     <div className={styles.meta}>
-                      {[member.phone, member.email]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
+                      {[member.phone, member.email].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
                   {member.status === "waiting_approval" ? (
@@ -236,20 +221,13 @@ export function TeamDetailPage() {
                       type="button"
                       className="button button--quiet"
                       onClick={() =>
-                        setMemberStatus(
-                          team.id,
-                          member.id,
-                          "approved" as TeamMemberStatus,
-                        )
+                        setMemberStatus(team.id, member.id, "approved" as TeamMemberStatus)
                       }
                     >
                       Approve
                     </button>
                   ) : (
-                    <span
-                      className={styles.statusBadge}
-                      data-status={member.status}
-                    >
+                    <span className={styles.statusBadge} data-status={member.status}>
                       {member.status}
                     </span>
                   )}

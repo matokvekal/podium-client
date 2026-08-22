@@ -12,11 +12,6 @@
  *
  * Also shows the app version (lib/config.ts, from package.json) so a screenshot is enough
  * to tell which build someone is on.
- *
- * ⚠ Contains two TEMPORARY developer sign-ins that bypass authentication in development
- * builds — DELETE BEFORE PRODUCTION, see README.md:
- *   - server-backed: POST /auth/dev-login (needs the server running)
- *   - client-only: signInAsLocalDevUser (no network — works with the server down)
  */
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -30,8 +25,6 @@ type Provider = "GOOGLE" | "SMS" | "EMAIL";
 
 interface AuthConfig {
   providers: Provider[];
-  /** ⚠ TEMPORARY: server offers the developer sign-in shortcut. Delete before production. */
-  devLogin?: boolean;
 }
 
 export function LoginPage() {
@@ -59,7 +52,6 @@ export function LoginPage() {
   const smsLoginVisible = false;
 
   useEffect(() => {
-    // devSignInActive un-renders the container, so the ref check below also covers it.
     if (!providers.includes("GOOGLE") || !googleButtonRef.current) return;
 
     renderGoogleButton(googleButtonRef.current, (idToken) => {
@@ -123,11 +115,8 @@ export function LoginPage() {
         </p>
       )}
 
-      {/* Dev-login bypass boxes removed from this page directly — Google is now the one login
-          box shown here. signInAsLocalDevUser/signInAsDevUser/devSignIn are left in place
-          (AuthContext.tsx, api-client) since other test flows may still call them directly;
-          only the UI entry point here is gone. A standard email/password login is planned as
-          a second option later — see the `Provider` union above, which already has "EMAIL". */}
+      {/* A standard email/password login is planned as a second option later — see the
+          `Provider` union above, which already has "EMAIL". */}
       {providers.includes("GOOGLE") && (
         <section className="card stack">
           <h2>Continue with Google</h2>

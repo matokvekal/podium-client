@@ -9,18 +9,13 @@
 
 import { create } from "zustand";
 import { apiRequest } from "../lib/api-client";
-import { getAccessToken } from "../lib/auth-storage";
 import {
+  clearCachedEvents,
   type EventSummary,
   getCachedEvents,
   putCachedEvents,
   toggleFavorite,
 } from "../lib/local-db";
-import { MOCK_MY_RIDES } from "../lib/mock-my-rides";
-import { MOCK_OTHER_RIDES } from "../lib/mock-other-rides";
-
-// Sentinel access token AuthContext.signInAsLocalDevUser writes — see mock-my-rides.ts.
-const LOCAL_DEV_TOKEN = "local-dev-fake";
 
 function dedupeById(events: EventSummary[]): EventSummary[] {
   const seen = new Set<string>();
@@ -42,6 +37,9 @@ interface EventsState {
   loadMyRides(authed: boolean): Promise<void>;
   loadOtherRides(): Promise<void>;
   toggleFavoriteRide(id: string): Promise<void>;
+  /** Sign-out: drops in-memory My Rides and the "mine" IndexedDB cache bucket so the next
+   *  rider on a shared device never briefly sees the previous rider's rides. */
+  clearMyRides(): void;
 }
 
 let myRidesRequestId = 0;
@@ -77,18 +75,9 @@ export const useEventsStore = create<EventsState>((set, get) => ({
       set({ myRides: merged });
       putCachedEvents("mine", merged);
     } catch {
-      if (requestId !== myRidesRequestId) return;
-      // A cache read above may already be showing something; leave it. Otherwise, the one
-      // case worth a fallback: signed in via the client-only local dev sign-in (no real
-      // server behind it at all, ever), where an empty My Rides reads as a bug rather than
-      // the expected "nothing to fetch from" — see lib/mock-my-rides.ts.
-      if (cached.length === 0 && getAccessToken() === LOCAL_DEV_TOKEN) {
-        set({ myRides: MOCK_MY_RIDES });
-        // Also cache these, same as the real success path above — without this,
-        // EventDetailPage's getCachedEvent(id) never finds a mock ride by id (it never went
-        // through putCachedEvent either), so opening one from its tile just errors out.
-        putCachedEvents("mine", MOCK_MY_RIDES);
-      }
+      // A cache read above may already be showing something; leave it. Otherwise this fails
+      // silently — the same behavior a real signed-in rider with no cache and no connectivity
+      // already saw.
     } finally {
       if (requestId === myRidesRequestId) set({ myRidesLoading: false });
     }
@@ -111,16 +100,8 @@ export const useEventsStore = create<EventsState>((set, get) => ({
       if (requestId !== otherRidesRequestId) return;
       // A cache read above may already be showing something — a failed refresh with cached
       // data on screen fails silently, same as My Rides; only nothing-cached gets the banner.
-      // Same one exception as loadMyRides: local dev sign-in has no real server behind it at
-      // all, so an empty Find Rides there reads as a bug rather than the expected "nothing to
-      // fetch from" — see lib/mock-other-rides.ts.
       if (get().otherRides.length === 0) {
-        if (getAccessToken() === LOCAL_DEV_TOKEN) {
-          set({ otherRides: MOCK_OTHER_RIDES, otherError: null });
-          putCachedEvents("guest", MOCK_OTHER_RIDES);
-        } else {
-          set({ otherError: "Could not load rides right now." });
-        }
+        set({ otherError: "Could not load rides right now." });
       }
     } finally {
       if (requestId === otherRidesRequestId) set({ otherLoading: false });
@@ -132,5 +113,10 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     set((state) => ({
       myRides: state.myRides.map((event) => (event.id === id ? { ...event, favorite } : event)),
     }));
+  },
+
+  clearMyRides() {
+    set({ myRides: [] });
+    void clearCachedEvents("mine");
   },
 }));

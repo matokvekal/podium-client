@@ -34,6 +34,13 @@ export interface EventSummary {
   /** Optional — not yet in the frozen API contract; older/unmigrated events won't have it. */
   area?: string | null;
   ownerId: number | null;
+  /** Owner's nickname if set, else "first last" (either half optional), else null — resolved
+   * server-side (event.queries.ts). Null for a legacy/ownerless event or an owner who set
+   * neither. */
+  ownerName: string | null;
+  /** Owner's Google profile photo, or null for legacy/ownerless events and any owner who
+   * hasn't signed in with Google. */
+  ownerAvatarUrl: string | null;
   /**
    * Client-only, not part of any server response — there is no server field for it yet.
    * Lives entirely in this cache; see toggleFavorite. Optional because a fresh row straight
@@ -42,8 +49,8 @@ export interface EventSummary {
   favorite?: boolean;
   /**
    * Client-only, same as `favorite` — no server column exists for either yet (see
-   * plan/server-tasks.md). Only ever set on mock data (lib/mock-my-rides.ts); a real event
-   * from the API just won't have these until a route is attached server-side.
+   * plan/server-tasks.md). Only ever set on mock data; a real event from the API just won't
+   * have these until a route is attached server-side.
    */
   distanceKm?: number;
   climbM?: number;
@@ -87,6 +94,22 @@ export async function getCachedEvents(source: EventSource): Promise<EventSummary
     // IndexedDB unavailable (private mode, disabled) — the app still works, it just loses
     // the instant cold-start paint and falls back to whatever the network returns.
     return [];
+  }
+}
+
+/**
+ * Deletes every cached row for one source — used on sign-out so a shared device never briefly
+ * shows the previous rider's cached "mine" rows to whoever signs in next. Best effort, same as
+ * every other function here: IndexedDB unavailable should never throw up to the caller.
+ */
+export async function clearCachedEvents(source: EventSource): Promise<void> {
+  try {
+    const db = await getDb();
+    const tx = db.transaction("events", "readwrite");
+    const existing = await tx.store.index("source").getAll(source);
+    await Promise.all([...existing.map((row) => tx.store.delete(row.id)), tx.done]);
+  } catch {
+    // Best effort — a failed cache clear should never break sign-out.
   }
 }
 

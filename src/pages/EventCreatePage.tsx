@@ -61,9 +61,10 @@
  * plan/server-tasks.md for what real support needs.
  *
  * "Copy track from an existing event" (below the activity-type picker) is the same story:
- * picks any of the rider's own or other public events, shows its mock route (via
- * lib/mock-results.ts's getEventResults — the same stand-in EventDetailPage uses, so every
- * event already "has" a route to copy) as a live map preview (RouteMap, lazy-loaded), not just
+ * picks any of the rider's own or other public events, shows its real saved route (via
+ * GET /events/:eventId/route — the same source EventDetailPage uses; an event with no saved
+ * route shows the missing-route state instead of a fabricated one) as a live map preview
+ * (RouteMap, lazy-loaded), not just
  * distance/climb text, and goes no further than that. There is no `event_routes` attach
  * endpoint yet (plan/08-routes-and-maps.md has the table design, not built) so the picked
  * route is never sent in the POST body either. Uploading your own track file (GPX/TCX/Garmin
@@ -103,6 +104,7 @@ import {
   Eye,
   FileText,
   Gauge,
+  ImagePlus,
   Lock,
   Map as MapIcon,
   MapPin,
@@ -117,18 +119,21 @@ import {
 } from "lucide-react";
 import {
   type FormEvent,
+  type ChangeEvent,
   type KeyboardEvent,
   lazy,
   Suspense,
   useEffect,
+  useRef,
   useState
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { resizeCoverFileToDataUrl } from "../lib/cover-image";
+import type { EventRoute } from "../lib/event-route";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
-import { type EventRoute, getEventResults } from "../lib/mock-results";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/mock-tracks";
 import {
   nextUpcomingSaturdayStart,
@@ -176,6 +181,11 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "hiking", label: "Hiking" }
 ];
 
+const COVER_PRESETS = {
+  fast: { maxWidth: 1280, maxHeight: 720, quality: 0.72, maxBytes: 320 * 1024 },
+  sharp: { maxWidth: 1600, maxHeight: 900, quality: 0.84, maxBytes: 450 * 1024 }
+} as const;
+
 const NEW_TEAM_OPTION = "__new__";
 
 export function EventCreatePage() {
@@ -189,6 +199,7 @@ export function EventCreatePage() {
   const setEventTeam = useEventExtrasStore((s) => s.setTeam);
   const setEventActivityType = useEventExtrasStore((s) => s.setActivityType);
   const setEventDistanceClimb = useEventExtrasStore((s) => s.setDistanceClimb);
+  const setEventCoverImage = useEventExtrasStore((s) => s.setCoverImage);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const setEventRoute = useEventRouteStore((s) => s.setRoute);
   const teams = useTeamsStore((s) => s.teams);
@@ -255,6 +266,12 @@ export function EventCreatePage() {
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
   const [area, setArea] = useState(lastDefaults?.area ?? "");
   const [description, setDescription] = useState("");
+  const [coverImageDataUrl, setCoverImageDataUrl] = useState<string | null>(
+    null
+  );
+  const [coverPreset, setCoverPreset] = useState<"fast" | "sharp">("sharp");
+  const [coverBusy, setCoverBusy] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
   // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
   // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
   // on every edit save risked adding a duplicate roster row each time. Checking it adds the
@@ -272,6 +289,7 @@ export function EventCreatePage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Mandatory-on-create fields (name/map/date) — asked for directly. Clicking Save with any
@@ -362,6 +380,9 @@ export function EventCreatePage() {
           setClimbMInput(String(existingExtras.climbM));
           setClimbEdited(true);
         }
+        if (existingExtras.coverImageDataUrl) {
+          setCoverImageDataUrl(existingExtras.coverImageDataUrl);
+        }
       }
     })();
     return () => {
@@ -436,9 +457,17 @@ export function EventCreatePage() {
     }
 
     try {
-      const results = await getEventResults(event.id);
-      setCopiedRoute(results.route);
-      applyRouteDistanceClimb(results.route);
+      const route = await apiRequest<EventRoute | null>(
+        `/events/${event.id}/route`
+      );
+      if (!route) {
+        // The source event has no saved route — never fabricate one (BUGS.md: never show
+        // mock/fake route). The invalidRoute flag surfaces the missing-route state.
+        setInvalidRoute(true);
+        return;
+      }
+      setCopiedRoute(route);
+      applyRouteDistanceClimb(route);
     } finally {
       setCopyLoading(false);
     }
@@ -495,7 +524,25 @@ export function EventCreatePage() {
   function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
-    if (copiedRoute) setEventRoute(id, copiedRoute);
+    if (copiedRoute) {
+      // Instant, same-device feedback (and an offline fallback) — see eventRouteStore.ts.
+      setEventRoute(id, copiedRoute);
+      // Also save it to the server so every other viewer sees the same route instead of
+      // resultsStore.ts's fabricated mock one (the "different map" bug this fixes). Best
+      // effort and fire-and-forget: the event itself already saved successfully by the time
+      // this runs, and a route-save failure (offline, transient 5xx) shouldn't turn that into
+      // a visible error for the organizer — just a quiet, discoverable warning.
+      apiRequest(`/events/${id}/route`, {
+        method: "POST",
+        body: {
+          points: copiedRoute.points,
+          distanceKm: copiedRoute.distanceKm,
+          elevationM: copiedRoute.elevationM
+        }
+      }).catch((err) => {
+        console.warn("Could not save this event's route to the server", err);
+      });
+    }
     const parsedDistance = distanceKm.trim() ? Number(distanceKm) : null;
     const parsedClimb = climbM.trim() ? Number(climbM) : null;
     setEventDistanceClimb(
@@ -503,8 +550,9 @@ export function EventCreatePage() {
       parsedDistance != null && !Number.isNaN(parsedDistance)
         ? parsedDistance
         : null,
-      parsedClimb != null && !Number.isNaN(parsedClimb) ? parsedClimb : null,
+      parsedClimb != null && !Number.isNaN(parsedClimb) ? parsedClimb : null
     );
+    setEventCoverImage(id, coverImageDataUrl);
 
     if (teamId === NEW_TEAM_OPTION && newTeamName.trim() && profile) {
       const team = createTeam(newTeamName, profile.id);
@@ -516,6 +564,39 @@ export function EventCreatePage() {
     } else if (organizerGroup.trim()) {
       setOrganizerGroup(id, organizerGroup);
     }
+  }
+
+  async function handleCoverPick(changeEvent: ChangeEvent<HTMLInputElement>) {
+    const file = changeEvent.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Cover file must be an image.");
+      return;
+    }
+
+    setCoverBusy(true);
+    setError(null);
+    try {
+      const resized = await resizeCoverFileToDataUrl(
+        file,
+        COVER_PRESETS[coverPreset]
+      );
+      setCoverImageDataUrl(resized);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not process this cover image."
+      );
+    } finally {
+      setCoverBusy(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  }
+
+  function clearCover() {
+    setCoverImageDataUrl(null);
+    if (coverInputRef.current) coverInputRef.current.value = "";
   }
 
   // Enter in any single-line field (name, location, team name, …) would otherwise submit the
@@ -631,6 +712,12 @@ export function EventCreatePage() {
         requiresApproval,
         ridersListVisible
       });
+      // Small delayed success state before redirecting home: requested as a short green
+      // confirmation moment, not an instant route jump right after tapping Save.
+      setCreateSuccess(true);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 1500);
+      });
       // Land back on the home screen instead of the new event's own page — asked for
       // directly. The event id/name ride along in router state so the home screen can point
       // straight at it (a banner linking to it) instead of making the organizer hunt for it
@@ -642,6 +729,7 @@ export function EventCreatePage() {
       setError(
         err instanceof ApiError ? err.message : "Could not save. Try again."
       );
+      setCreateSuccess(false);
     } finally {
       setBusy(false);
     }
@@ -663,7 +751,7 @@ export function EventCreatePage() {
       navigate("/");
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Could not delete this event.",
+        err instanceof ApiError ? err.message : "Could not delete this event."
       );
       setConfirmDelete(false);
     } finally {
@@ -710,12 +798,105 @@ export function EventCreatePage() {
               style={{ width: `${readinessPct}%` }}
             />
           </div>
+
+          <div
+            className={styles.field}
+            style={{ marginBottom: "var(--space-4)" }}
+          >
+            <span className={styles.fieldLabel}>
+              <ImagePlus aria-hidden="true" />
+              Cover image (optional)
+            </span>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverPick}
+              style={{ display: "none" }}
+            />
+            <div className={styles.coverRow}>
+              <button
+                type="button"
+                className={styles.trackBtn}
+                onClick={() => coverInputRef.current?.click()}
+                disabled={coverBusy}
+              >
+                <span className={styles.trackBtnLabel}>
+                  <ImagePlus
+                    aria-hidden="true"
+                    size={18}
+                    className={styles.trackBtnIcon}
+                  />
+                  {coverBusy
+                    ? "Processing cover image…"
+                    : coverImageDataUrl
+                      ? "Replace cover image"
+                      : "Upload cover image"}
+                </span>
+              </button>
+              {coverImageDataUrl && (
+                <button
+                  type="button"
+                  className={styles.trackRemove}
+                  onClick={clearCover}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <div className={styles.coverPresetRow}>
+              <button
+                type="button"
+                className={styles.coverPresetBtn}
+                data-active={coverPreset === "fast"}
+                onClick={() => setCoverPreset("fast")}
+              >
+                Fast
+              </button>
+              <button
+                type="button"
+                className={styles.coverPresetBtn}
+                data-active={coverPreset === "sharp"}
+                onClick={() => setCoverPreset("sharp")}
+              >
+                Sharp
+              </button>
+              <span className={styles.coverPresetHint}>
+                {coverPreset === "fast"
+                  ? "Smaller file, quicker processing"
+                  : "Better detail, larger local file"}
+              </span>
+            </div>
+            {coverImageDataUrl && (
+              <div className={styles.coverPreviewWrap}>
+                <img
+                  src={coverImageDataUrl}
+                  alt="Selected event cover preview"
+                  className={styles.coverPreview}
+                />
+              </div>
+            )}
+            <p className={styles.hint}>
+              Saved locally on this device for now. Server/CDN sync comes later.
+            </p>
+          </div>
         </div>
 
         {error && (
           <div className={styles.errorBanner} role="alert">
             <AlertTriangle aria-hidden="true" />
             <p>{error}</p>
+          </div>
+        )}
+
+        {createSuccess && (
+          <div
+            className={styles.successBanner}
+            role="status"
+            aria-live="polite"
+          >
+            <Check aria-hidden="true" />
+            <p>Event created successfully.</p>
           </div>
         )}
 
@@ -1030,15 +1211,14 @@ export function EventCreatePage() {
                 <div className={styles.levelRow}>
                   <div
                     className={styles.levelBars}
-                    role="radiogroup"
+                    role="group"
                     aria-labelledby="levelLabel"
                   >
                     {LEVELS.map((l, i) => (
                       <button
                         key={l.value}
                         type="button"
-                        role="radio"
-                        aria-checked={level === l.value}
+                        aria-pressed={level === l.value}
                         aria-label={l.label}
                         title={l.label}
                         className={styles.levelBar}
@@ -1191,9 +1371,13 @@ export function EventCreatePage() {
             </div>
           </div>
 
-          <button className={styles.launchBtn} type="submit" disabled={busy}>
+          <button
+            className={styles.launchBtn}
+            type="submit"
+            disabled={busy || createSuccess}
+          >
             <Bike aria-hidden="true" />
-            {busy ? "Saving…" : "Save event"}
+            {createSuccess ? "Saved" : busy ? "Saving…" : "Save event"}
           </button>
         </form>
 

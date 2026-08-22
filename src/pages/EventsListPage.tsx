@@ -55,7 +55,7 @@ import {
   Map as MapIcon,
   Plus,
   Search,
-  X,
+  X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -66,7 +66,7 @@ import {
   consumeOpenedEventId,
   FIGMA_TAG_LABEL,
   type FigmaStatus,
-  figmaStatus,
+  figmaStatus
 } from "../app/event-visuals";
 import { InvitedEventsTab } from "../app/InvitedEventsTab";
 import { useAuth } from "../auth/AuthContext";
@@ -83,7 +83,7 @@ const FIND_FILTERS: { value: FindFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "live", label: FIGMA_TAG_LABEL.live },
   { value: "upcoming", label: FIGMA_TAG_LABEL.upcoming },
-  { value: "finished", label: FIGMA_TAG_LABEL.finished },
+  { value: "finished", label: FIGMA_TAG_LABEL.finished }
 ];
 
 function byStatus(events: EventSummary[], filter: FindFilter): EventSummary[] {
@@ -102,7 +102,7 @@ const SORT_CYCLE: SortKey[] = ["date", "name", "area"];
 const SORT_LABEL: Record<SortKey, string> = {
   date: "Date",
   name: "Name",
-  area: "Area",
+  area: "Area"
 };
 
 // Home row: most recent My Rides only, before "See All" takes over.
@@ -131,15 +131,17 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [createdEvent?.createdEventId]);
   const newEventId =
-    createdEvent?.createdEventId && !newHighlightExpired ? createdEvent.createdEventId : null;
+    createdEvent?.createdEventId && !newHighlightExpired
+      ? createdEvent.createdEventId
+      : null;
 
   // "the event we came from need glow shadow under for 10 seconds to know where we came from"
   // — whichever card was clicked into (EventCard.tsx/EventTile.tsx record it) lights up again
   // for 10s once this page remounts from a back navigation. Read once via a lazy initializer,
   // not an effect, so it's already known on the very first render — an effect would paint one
   // frame without the glow first.
-  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(() =>
-    consumeOpenedEventId(),
+  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(
+    () => consumeOpenedEventId()
   );
   useEffect(() => {
     if (!returnHighlightId) return;
@@ -147,7 +149,9 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [returnHighlightId]);
 
-  const [activeTab, setActiveTab] = useState<EventTab>(authed ? "myRides" : "findRides");
+  const [activeTab, setActiveTab] = useState<EventTab>(
+    authed ? "myRides" : "findRides"
+  );
   // A guest (or a session that just expired) can't be sitting on My Rides — everything else
   // (Find Rides, Find Races, Track) is public.
   useEffect(() => {
@@ -163,7 +167,9 @@ export function EventsListPage() {
   const otherError = useEventsStore((state) => state.otherError);
   const loadMyRides = useEventsStore((state) => state.loadMyRides);
   const loadOtherRides = useEventsStore((state) => state.loadOtherRides);
-  const toggleFavoriteRide = useEventsStore((state) => state.toggleFavoriteRide);
+  const toggleFavoriteRide = useEventsStore(
+    (state) => state.toggleFavoriteRide
+  );
 
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -199,10 +205,13 @@ export function EventsListPage() {
   // Upcoming, then Past, filling in up to HOME_ROW_LIMIT total tiles.
   const homeRow = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const upcomingSlice = upcoming.slice(0, Math.max(0, HOME_ROW_LIMIT - live.length));
+    const upcomingSlice = upcoming.slice(
+      0,
+      Math.max(0, HOME_ROW_LIMIT - live.length)
+    );
     const pastSlice = past.slice(
       0,
-      Math.max(0, HOME_ROW_LIMIT - live.length - upcomingSlice.length),
+      Math.max(0, HOME_ROW_LIMIT - live.length - upcomingSlice.length)
     );
     return { live, upcoming: upcomingSlice, past: pastSlice };
   }, [myRidesByBucket]);
@@ -216,7 +225,8 @@ export function EventsListPage() {
       if (favoritesOnly && !event.favorite) return false;
       if (!q) return true;
       return (
-        event.name.toLowerCase().includes(q) || (event.location ?? "").toLowerCase().includes(q)
+        event.name.toLowerCase().includes(q) ||
+        (event.location ?? "").toLowerCase().includes(q)
       );
     });
     // Date sort direction depends on the bucket — "rides are list top to bottom, the top is the
@@ -228,7 +238,8 @@ export function EventsListPage() {
     // regardless of bucket.
     function comparator(bucket: "live" | "upcoming" | "past") {
       if (sortBy === "name") {
-        return (a: EventSummary, b: EventSummary) => a.name.localeCompare(b.name);
+        return (a: EventSummary, b: EventSummary) =>
+          a.name.localeCompare(b.name);
       }
       if (sortBy === "area") {
         return (a: EventSummary, b: EventSummary) =>
@@ -236,16 +247,22 @@ export function EventsListPage() {
           timestamp(b.startsAt) - timestamp(a.startsAt);
       }
       return bucket === "upcoming"
-        ? (a: EventSummary, b: EventSummary) => timestamp(a.startsAt) - timestamp(b.startsAt)
-        : (a: EventSummary, b: EventSummary) => timestamp(b.startsAt) - timestamp(a.startsAt);
+        ? (a: EventSummary, b: EventSummary) =>
+            timestamp(a.startsAt) - timestamp(b.startsAt)
+        : (a: EventSummary, b: EventSummary) =>
+            timestamp(b.startsAt) - timestamp(a.startsAt);
     }
     return {
-      live: matches.filter((e) => figmaStatus(e.status) === "live").sort(comparator("live")),
+      live: matches
+        .filter((e) => figmaStatus(e.status) === "live")
+        .sort(comparator("live")),
       upcoming: matches
         .filter((e) => figmaStatus(e.status) === "upcoming")
         .sort(comparator("upcoming")),
-      past: matches.filter((e) => figmaStatus(e.status) === "finished").sort(comparator("past")),
-      total: matches.length,
+      past: matches
+        .filter((e) => figmaStatus(e.status) === "finished")
+        .sort(comparator("past")),
+      total: matches.length
     };
   }, [myRides, q, favoritesOnly, sortBy]);
 
@@ -260,10 +277,17 @@ export function EventsListPage() {
     loadOtherRides();
   }, [loadOtherRides]);
 
+  const myRideIds = useMemo(
+    () => new Set(myRides.map((event) => event.id)),
+    [myRides]
+  );
+
   const findQ = findSearch.trim().toLowerCase();
   const visibleFindRides = byStatus(
-    otherRides.filter((event) => event.type === "RIDE"),
-    findFilter,
+    otherRides.filter(
+      (event) => event.type === "RIDE" && (!authed || !myRideIds.has(event.id))
+    ),
+    findFilter
   ).filter((event) => {
     if (!findQ) return true;
     return (
@@ -289,7 +313,10 @@ export function EventsListPage() {
             >
               Add riders
             </Link>
-            <Link className="button" to={`/events/${createdEvent.createdEventId}`}>
+            <Link
+              className="button"
+              to={`/events/${createdEvent.createdEventId}`}
+            >
               View event
             </Link>
             <button
@@ -345,7 +372,11 @@ export function EventsListPage() {
         <section className="stack">
           {showAll ? (
             <div className={styles.toolbarTop}>
-              <button type="button" className={styles.backBtn} onClick={() => setShowAll(false)}>
+              <button
+                type="button"
+                className={styles.backBtn}
+                onClick={() => setShowAll(false)}
+              >
                 ← My Rides
               </button>
             </div>
@@ -353,11 +384,17 @@ export function EventsListPage() {
             <div className="section-header">
               <div className="section-title-row">
                 <h2>My Rides</h2>
-                {myRides.length > 0 && <span className="section-count">{myRides.length}</span>}
+                {myRides.length > 0 && (
+                  <span className="section-count">{myRides.length}</span>
+                )}
               </div>
               <div className={styles.toolbarLeft}>
                 {myRides.length > 0 && (
-                  <button type="button" className={styles.backBtn} onClick={() => setShowAll(true)}>
+                  <button
+                    type="button"
+                    className={styles.backBtn}
+                    onClick={() => setShowAll(true)}
+                  >
                     See All
                   </button>
                 )}
@@ -394,17 +431,26 @@ export function EventsListPage() {
                     type="button"
                     className={styles.iconBtn}
                     onClick={() =>
-                      setSortBy(SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length])
+                      setSortBy(
+                        SORT_CYCLE[
+                          (SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length
+                        ]
+                      )
                     }
                     title="Sort by date / name / status"
                   >
-                    <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
+                    <ArrowUpDown
+                      className={styles.iconGlyph}
+                      aria-hidden="true"
+                    />
                     <span>{SORT_LABEL[sortBy]}</span>
                   </button>
                   <button
                     type="button"
                     className={
-                      favoritesOnly ? `${styles.iconBtn} ${styles.heartActive}` : styles.iconBtn
+                      favoritesOnly
+                        ? `${styles.iconBtn} ${styles.heartActive}`
+                        : styles.iconBtn
                     }
                     onClick={() => setFavoritesOnly((v) => !v)}
                     aria-label="Show favorites only"
@@ -593,7 +639,9 @@ export function EventsListPage() {
               <button
                 key={item.value}
                 type="button"
-                className={item.value === findFilter ? styles.pillActive : styles.pill}
+                className={
+                  item.value === findFilter ? styles.pillActive : styles.pill
+                }
                 onClick={() => setFindFilter(item.value)}
               >
                 {item.label}

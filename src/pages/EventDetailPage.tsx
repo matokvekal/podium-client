@@ -161,6 +161,35 @@ interface EventDetail {
   myParticipant: MyParticipant | null;
 }
 
+function mergeParticipantStatus(
+  previous: EventDetail | null,
+  incoming: EventDetail
+): EventDetail {
+  const prev = previous?.myParticipant;
+  const next = incoming.myParticipant;
+
+  // Approval is monotonic in this UI flow: there is no "unapprove back to pending" action.
+  // If a stale poll response arrives right after an approved read, keep approved to avoid
+  // a visible green->pending bounce for the same participant row.
+  if (
+    prev &&
+    next &&
+    prev.id === next.id &&
+    prev.registrationStatus === "approved" &&
+    next.registrationStatus === "waiting_approval"
+  ) {
+    return {
+      ...incoming,
+      myParticipant: {
+        ...next,
+        registrationStatus: "approved"
+      }
+    };
+  }
+
+  return incoming;
+}
+
 /** Mirrors the server's transition graph (event.service.ts): published (and any older event
  * still sitting in registration_open/ready) can go straight to live — those two are optional
  * waypoints, not required steps before Go Live. */
@@ -348,7 +377,7 @@ export function EventDetailPage() {
 
     try {
       const found = await apiRequest<EventDetail>(`/events/${eventId}`);
-      setEvent(found);
+      setEvent((previous) => mergeParticipantStatus(previous, found));
       putCachedEvent(found);
     } catch (err) {
       // A cached summary is still on screen — a failed refresh shouldn't blank it out.
@@ -380,7 +409,7 @@ export function EventDetailPage() {
       try {
         const found = await apiRequest<EventDetail>(`/events/${eventId}`);
         if (cancelled) return;
-        setEvent(found);
+        setEvent((previous) => mergeParticipantStatus(previous, found));
         putCachedEvent(found);
       } catch {
         // Keep current UI state; a later poll will retry.
@@ -472,7 +501,7 @@ export function EventDetailPage() {
           body: { status: nextStatus }
         }
       );
-      setEvent(updated);
+      setEvent((previous) => mergeParticipantStatus(previous, updated));
       // Clicking "Start — go live" only re-labeled the header button to "LIVE" before,
       // requiring a second tap to actually get there — asked for directly ("i click at go
       // live but got stary at same page... muve me to live scen"). Jump straight to the live
@@ -571,7 +600,7 @@ export function EventDetailPage() {
       const updated = await apiRequest<EventDetail>(`/events/${eventId}`, {
         method: "DELETE"
       });
-      setEvent(updated);
+      setEvent((previous) => mergeParticipantStatus(previous, updated));
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Could not cancel this event."
@@ -1099,22 +1128,34 @@ export function EventDetailPage() {
                     visibleRealRoster.length === 0 ? (
                       <p className="muted">No riders yet.</p>
                     ) : (
-                      visibleRealRoster.map((rider) => (
-                        <div key={rider.id} className={styles.realRiderRow}>
-                          <Avatar
-                            className={styles.realRiderAvatar}
-                            name={rider.name}
-                            avatarUrl={rider.avatarUrl}
-                            seed={String(rider.id)}
-                          />
-                          <span className={styles.realRiderName}>
-                            {rider.name?.trim() || "Unnamed rider"}
-                            {rider.bib && (
-                              <span className="muted"> #{rider.bib}</span>
-                            )}
-                          </span>
-                        </div>
-                      ))
+                      [...visibleRealRoster]
+                        .sort((a, b) => {
+                          const meId = event.myParticipant?.id ?? null;
+                          if (meId === null) return 0;
+                          if (a.id === meId) return -1;
+                          if (b.id === meId) return 1;
+                          return 0;
+                        })
+                        .map((rider) => {
+                          const isMe = event.myParticipant?.id === rider.id;
+                          return (
+                            <div key={rider.id} className={styles.realRiderRow}>
+                              <Avatar
+                                className={styles.realRiderAvatar}
+                                name={rider.name}
+                                avatarUrl={rider.avatarUrl}
+                                seed={String(rider.id)}
+                              />
+                              <span className={styles.realRiderName}>
+                                {rider.name?.trim() || "Unnamed rider"}
+                                {isMe && <span className="muted"> (ME)</span>}
+                                {rider.bib && (
+                                  <span className="muted"> #{rider.bib}</span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })
                     )
                   ) : (
                     // Real list not visible/available to this viewer yet (still loading, or a
@@ -1210,13 +1251,15 @@ export function EventDetailPage() {
                       ? "Approved — see you there"
                       : "You're in"}
               </span>
-              <button
-                type="button"
-                className={styles.leaveBtn}
-                onClick={() => setConfirming("leave")}
-              >
-                Leave
-              </button>
+              {event.myParticipant.registrationStatus !== "approved" && (
+                <button
+                  type="button"
+                  className={styles.leaveBtn}
+                  onClick={() => setConfirming("leave")}
+                >
+                  Leave
+                </button>
+              )}
             </>
           ) : (
             <button

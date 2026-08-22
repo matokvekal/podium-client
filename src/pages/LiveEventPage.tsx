@@ -43,7 +43,7 @@ import {
   Settings,
   Share2,
   UsersRound,
-  X,
+  X
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -57,7 +57,10 @@ import type { LiveRider } from "../lib/live-types";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
 import { formatAge } from "../lib/time";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
-import { type EventGroup, useEventGroupsStore } from "../store/eventGroupsStore";
+import {
+  type EventGroup,
+  useEventGroupsStore
+} from "../store/eventGroupsStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./LiveEventPage.module.css";
 
@@ -85,7 +88,10 @@ interface LiveEventInfo {
 // Same "paint the cache instantly, let the real fetch replace it" pattern as
 // EventDetailPage.tsx's detailFromCachedSummary — a list-cached EventSummary has no isPaused/
 // showLiveLocations/myParticipant, so those get honest defaults until the real fetch resolves.
-function liveInfoFromCachedSummary(summary: EventSummary, viewerId: number | null): LiveEventInfo {
+function liveInfoFromCachedSummary(
+  summary: EventSummary,
+  viewerId: number | null
+): LiveEventInfo {
   return {
     id: summary.id,
     name: summary.name,
@@ -93,7 +99,7 @@ function liveInfoFromCachedSummary(summary: EventSummary, viewerId: number | nul
     isPaused: false,
     showLiveLocations: true,
     startsAt: summary.startsAt,
-    myParticipant: null,
+    myParticipant: null
   };
 }
 
@@ -127,7 +133,7 @@ export function LiveEventPage() {
   const results = useResultsStore((s) => s.results);
   const loadResults = useResultsStore((s) => s.loadResults);
   const groups = useEventGroupsStore((s) =>
-    eventId && s.byEvent[eventId] ? s.byEvent[eventId] : EMPTY_GROUPS,
+    eventId && s.byEvent[eventId] ? s.byEvent[eventId] : EMPTY_GROUPS
   );
 
   const [riders, setRiders] = useState<LiveRider[]>([]);
@@ -141,7 +147,9 @@ export function LiveEventPage() {
   const [rosterNote, setRosterNote] = useState<string | null>(null);
 
   const [sharingLocation, setSharingLocation] = useState(false);
-  const [selfPosition, setSelfPosition] = useState<[number, number] | null>(null);
+  const [selfPosition, setSelfPosition] = useState<[number, number] | null>(
+    null
+  );
   const [geoError, setGeoError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
@@ -150,8 +158,12 @@ export function LiveEventPage() {
   // Per-rider speed, derived from consecutive real fixes (distance delta / time delta) — the
   // server has no speed field (lib/live-types.ts's doc comment). A ref (not state) holds the
   // previous fix so the poll loop below can diff against it without a stale closure.
-  const prevFixRef = useRef<Map<number, { distanceKm: number; at: number }>>(new Map());
-  const [riderSpeeds, setRiderSpeeds] = useState<Map<number, number>>(new Map());
+  const prevFixRef = useRef<Map<number, { distanceKm: number; at: number }>>(
+    new Map()
+  );
+  const [riderSpeeds, setRiderSpeeds] = useState<Map<number, number>>(
+    new Map()
+  );
 
   // Ticks once a second while this page is open, purely to keep the elapsed-time badge live —
   // never sent anywhere, never affects any other state.
@@ -176,7 +188,10 @@ export function LiveEventPage() {
 
       const cached = await getCachedEvent(eventId);
       if (cached && !cancelled) {
-        const asLiveInfo = liveInfoFromCachedSummary(cached, profile?.id ?? null);
+        const asLiveInfo = liveInfoFromCachedSummary(
+          cached,
+          profile?.id ?? null
+        );
         setEvent(asLiveInfo);
         setPaused(asLiveInfo.isPaused);
         // Paint the cached summary now; the real fetch below still runs and replaces it.
@@ -197,7 +212,7 @@ export function LiveEventPage() {
             ? "This event is private."
             : err instanceof ApiError && err.status === 404
               ? "Event not found."
-              : "Could not load this event.",
+              : "Could not load this event."
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -237,7 +252,8 @@ export function LiveEventPage() {
         if (!cancelled) setRoster(list);
       })
       .catch(() => {
-        if (!cancelled) setRosterNote("The rider list isn't open for this event.");
+        if (!cancelled)
+          setRosterNote("The rider list isn't open for this event.");
       });
     return () => {
       cancelled = true;
@@ -284,7 +300,7 @@ export function LiveEventPage() {
             }
             prevFixRef.current.set(r.participantId, {
               distanceKm: r.distanceKm,
-              at,
+              at
             });
           }
           return nextSpeeds;
@@ -324,7 +340,7 @@ export function LiveEventPage() {
         setGeoError("Location permission was denied.");
         setSharingLocation(false);
       },
-      { enableHighAccuracy: true, maximumAge: 10_000 },
+      { enableHighAccuracy: true, maximumAge: 10_000 }
     );
     watchIdRef.current = id;
     return () => {
@@ -349,18 +365,40 @@ export function LiveEventPage() {
     setSelectedRiderIds(isOwner ? ids : ids.slice(0, MAX_RIDERS_FOR_NON_OWNER));
   }
 
-  const selectedSet = useMemo(() => new Set(selectedRiderIds), [selectedRiderIds]);
-  const ridersById = useMemo(() => new Map(riders.map((r) => [r.participantId, r])), [riders]);
-  const capReached = !isOwner && selectedRiderIds.length >= MAX_RIDERS_FOR_NON_OWNER;
+  const selectedSet = useMemo(
+    () => new Set(selectedRiderIds),
+    [selectedRiderIds]
+  );
+  const ridersById = useMemo(
+    () => new Map(riders.map((r) => [r.participantId, r])),
+    [riders]
+  );
+  const capReached =
+    !isOwner && selectedRiderIds.length >= MAX_RIDERS_FOR_NON_OWNER;
+  const orderedRoster = useMemo(() => {
+    if (!roster) return null;
+    const meId = event?.myParticipant?.id ?? null;
+    if (meId === null) return roster;
+    return [...roster].sort((a, b) => {
+      if (a.id === meId) return -1;
+      if (b.id === meId) return 1;
+      return 0;
+    });
+  }, [roster, event?.myParticipant?.id]);
 
   // Leader = whoever has gone furthest right now, among riders this device can actually see —
   // the same figure "remaining"/"avg speed" below are built from. Never a fabricated ranking.
-  const leaderDistance = riders.reduce((max, r) => Math.max(max, r.distanceKm ?? 0), 0);
+  const leaderDistance = riders.reduce(
+    (max, r) => Math.max(max, r.distanceKm ?? 0),
+    0
+  );
   const myDistance = event?.myParticipant
     ? (ridersById.get(event.myParticipant.id)?.distanceKm ?? null)
     : null;
   const progressKm = myDistance ?? (leaderDistance > 0 ? leaderDistance : null);
-  const elapsedMs = event?.startsAt ? Math.max(0, now - new Date(event.startsAt).getTime()) : null;
+  const elapsedMs = event?.startsAt
+    ? Math.max(0, now - new Date(event.startsAt).getTime())
+    : null;
   const avgSpeedKmh =
     progressKm != null && elapsedMs != null && elapsedMs > 0
       ? progressKm / (elapsedMs / 3_600_000)
@@ -398,7 +436,11 @@ export function LiveEventPage() {
     <div className={styles.wrap}>
       {/* --- header ------------------------------------------------------------------- */}
       <div className={styles.header}>
-        <Link to={`/events/${event.id}`} className={styles.backBtn} aria-label="Back to event">
+        <Link
+          to={`/events/${event.id}`}
+          className={styles.backBtn}
+          aria-label="Back to event"
+        >
           <ArrowLeft aria-hidden="true" />
         </Link>
         <div className={styles.headerText}>
@@ -408,9 +450,15 @@ export function LiveEventPage() {
             </span>
             <h1 className={styles.headerTitle}>{event.name}</h1>
           </div>
-          <p className={styles.headerSub}>{roster ? roster.length : "—"} riders</p>
+          <p className={styles.headerSub}>
+            {roster ? roster.length : "—"} riders
+          </p>
         </div>
-        <button type="button" className={styles.headerIconBtn} aria-label="Share this event">
+        <button
+          type="button"
+          className={styles.headerIconBtn}
+          aria-label="Share this event"
+        >
           <Share2 aria-hidden="true" />
         </button>
         {isOwner && (
@@ -424,7 +472,11 @@ export function LiveEventPage() {
           </Link>
         )}
         {!isOwner && (
-          <button type="button" className={styles.headerIconBtn} aria-label="More">
+          <button
+            type="button"
+            className={styles.headerIconBtn}
+            aria-label="More"
+          >
             <MoreHorizontal aria-hidden="true" />
           </button>
         )}
@@ -467,7 +519,12 @@ export function LiveEventPage() {
         {/* On-map utility stack — visual only (compass/layers aren't wired to anything real
             yet); "locate" re-centers on this device's own shared position, when there is one. */}
         <div className={styles.mapControls}>
-          <button type="button" className={styles.mapControlBtn} aria-label="North" disabled>
+          <button
+            type="button"
+            className={styles.mapControlBtn}
+            aria-label="North"
+            disabled
+          >
             <Compass width={16} height={16} aria-hidden="true" />
           </button>
           <button
@@ -500,8 +557,12 @@ export function LiveEventPage() {
             className={styles.mapControlBtn}
             onClick={() => setSharingLocation((v) => !v)}
             aria-pressed={sharingLocation}
-            aria-label={sharingLocation ? "Sharing my location" : "Share my location"}
-            title={sharingLocation ? "Sharing my location" : "Share my location"}
+            aria-label={
+              sharingLocation ? "Sharing my location" : "Share my location"
+            }
+            title={
+              sharingLocation ? "Sharing my location" : "Share my location"
+            }
             data-active={sharingLocation || undefined}
           >
             <Crosshair width={16} height={16} aria-hidden="true" />
@@ -519,7 +580,9 @@ export function LiveEventPage() {
           aria-hidden={!ridersModalOpen}
         >
           <div className={styles.ridersModalHeader}>
-            <h2 className={styles.ridersModalTitle}>Riders {roster ? `(${roster.length})` : ""}</h2>
+            <h2 className={styles.ridersModalTitle}>
+              Riders {roster ? `(${roster.length})` : ""}
+            </h2>
             <div className={styles.ridersModalActions}>
               {roster && roster.length > 0 && (
                 <button
@@ -550,12 +613,14 @@ export function LiveEventPage() {
             </div>
           </div>
           <div className={styles.ridersModalList}>
-            {rosterNote && !roster && <p className={styles.ridersModalNote}>{rosterNote}</p>}
+            {rosterNote && !roster && (
+              <p className={styles.ridersModalNote}>{rosterNote}</p>
+            )}
             {roster && roster.length === 0 && (
               <p className={styles.ridersModalNote}>No one has joined yet.</p>
             )}
-            {roster &&
-              roster.map((r) => {
+            {orderedRoster &&
+              orderedRoster.map((r) => {
                 const selected = selectedSet.has(r.id);
                 const disabled = !selected && capReached;
                 const isMe = event.myParticipant?.id === r.id;
@@ -566,8 +631,13 @@ export function LiveEventPage() {
                     data-selected={selected || undefined}
                     data-disabled={disabled || undefined}
                   >
-                    <span className={styles.riderCheckbox} data-checked={selected}>
-                      {selected && <Check width={13} height={13} aria-hidden="true" />}
+                    <span
+                      className={styles.riderCheckbox}
+                      data-checked={selected}
+                    >
+                      {selected && (
+                        <Check width={13} height={13} aria-hidden="true" />
+                      )}
                       <input
                         type="checkbox"
                         checked={selected}
@@ -582,7 +652,8 @@ export function LiveEventPage() {
                       seed={String(r.id)}
                     />
                     <span className={styles.ridersModalName}>
-                      {isMe ? "You" : r.name?.trim() || "Unnamed rider"}
+                      {r.name?.trim() || "Unnamed rider"}
+                      {isMe && <span className="muted"> (ME)</span>}
                       {r.bib && <span className="muted"> #{r.bib}</span>}
                     </span>
                   </label>
@@ -603,13 +674,17 @@ export function LiveEventPage() {
         <div className={styles.statCell}>
           <span className={styles.statLabel}>Distance</span>
           <span className={styles.statValue}>
-            {results?.route?.distanceKm != null ? `${results.route.distanceKm} km` : "—"}
+            {results?.route?.distanceKm != null
+              ? `${results.route.distanceKm} km`
+              : "—"}
           </span>
         </div>
         <div className={styles.statCell}>
           <span className={styles.statLabel}>Elevation</span>
           <span className={styles.statValue}>
-            {results?.route?.elevationM != null ? `${results.route.elevationM} m` : "—"}
+            {results?.route?.elevationM != null
+              ? `${results.route.elevationM} m`
+              : "—"}
           </span>
         </div>
         <div className={styles.statCell}>
@@ -627,7 +702,9 @@ export function LiveEventPage() {
         <div className={styles.statCell}>
           <span className={styles.statLabel}>Weather</span>
           <span className={styles.statValue}>
-            {forecast ? `${Math.round((forecast.tempMinC + forecast.tempMaxC) / 2)}°` : "—"}
+            {forecast
+              ? `${Math.round((forecast.tempMinC + forecast.tempMaxC) / 2)}°`
+              : "—"}
             {forecast && (
               <span aria-hidden="true" style={{ marginLeft: 4 }}>
                 {forecast.emoji}
@@ -653,7 +730,12 @@ export function LiveEventPage() {
         >
           Groups ({groups.length})
         </button>
-        <button type="button" className={styles.tabIconBtn} aria-label="Search riders" disabled>
+        <button
+          type="button"
+          className={styles.tabIconBtn}
+          aria-label="Search riders"
+          disabled
+        >
           <Search width={16} height={16} aria-hidden="true" />
         </button>
       </div>
@@ -661,15 +743,19 @@ export function LiveEventPage() {
       {activeTab === "riders" ? (
         <div className={styles.panelBody}>
           {rosterNote && !roster && <p className="muted">{rosterNote}</p>}
-          {roster && roster.length === 0 && <p className="muted">No one has joined yet.</p>}
-          {roster && (
+          {roster && roster.length === 0 && (
+            <p className="muted">No one has joined yet.</p>
+          )}
+          {orderedRoster && (
             <div className={styles.riderList}>
-              {roster.map((r) => {
+              {orderedRoster.map((r) => {
                 const live = ridersById.get(r.id);
                 const selected = selectedSet.has(r.id);
                 const disabled = !selected && capReached;
                 const isMe = event.myParticipant?.id === r.id;
-                const isLeader = leaderDistance > 0 && (live?.distanceKm ?? -1) === leaderDistance;
+                const isLeader =
+                  leaderDistance > 0 &&
+                  (live?.distanceKm ?? -1) === leaderDistance;
                 const speed = riderSpeeds.get(r.id);
                 const gapKm =
                   !isLeader && live?.distanceKm != null && leaderDistance > 0
@@ -686,8 +772,13 @@ export function LiveEventPage() {
                     data-selected={selected || undefined}
                     data-disabled={disabled || undefined}
                   >
-                    <span className={styles.riderCheckbox} data-checked={selected}>
-                      {selected && <Check width={13} height={13} aria-hidden="true" />}
+                    <span
+                      className={styles.riderCheckbox}
+                      data-checked={selected}
+                    >
+                      {selected && (
+                        <Check width={13} height={13} aria-hidden="true" />
+                      )}
                       <input
                         type="checkbox"
                         checked={selected}
@@ -709,10 +800,13 @@ export function LiveEventPage() {
                     <span className={styles.riderInfo}>
                       <span className={styles.riderNameRow}>
                         <span className={styles.riderName}>
-                          {isMe ? "You" : r.name?.trim() || "Unnamed rider"}
+                          {r.name?.trim() || "Unnamed rider"}
+                          {isMe && <span className="muted"> (ME)</span>}
                           {r.bib && <span className="muted"> #{r.bib}</span>}
                         </span>
-                        {isLeader && <span className={styles.leaderBadge}>Leader</span>}
+                        {isLeader && (
+                          <span className={styles.leaderBadge}>Leader</span>
+                        )}
                       </span>
                       <span className={styles.riderSub}>
                         {live?.lat != null
@@ -731,7 +825,10 @@ export function LiveEventPage() {
                         <span className={styles.riderGapValue}>
                           {live.distanceKm.toFixed(1)} km
                           {gapKm != null && gapKm > 0 && (
-                            <span className={styles.riderGap}> +{gapKm.toFixed(1)} km</span>
+                            <span className={styles.riderGap}>
+                              {" "}
+                              +{gapKm.toFixed(1)} km
+                            </span>
                           )}
                         </span>
                       </span>
@@ -760,7 +857,7 @@ export function LiveEventPage() {
                         Starts{" "}
                         {new Intl.DateTimeFormat(undefined, {
                           hour: "2-digit",
-                          minute: "2-digit",
+                          minute: "2-digit"
                         }).format(new Date(g.startsAt))}
                       </span>
                     )}

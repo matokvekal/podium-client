@@ -173,6 +173,57 @@ interface ExistingEvent {
   showParticipants: boolean;
 }
 
+const EVENT_ROUTE_MAX_POINTS = 5000;
+const EVENT_ROUTE_MAX_PAYLOAD_BYTES = 900_000;
+
+function downsampleRoutePoints(
+  points: [number, number][],
+  maxPoints: number
+): [number, number][] {
+  if (points.length <= maxPoints) return points;
+  if (maxPoints <= 2) return [points[0], points[points.length - 1]];
+
+  const result: [number, number][] = [points[0]];
+  const interior = points.length - 2;
+  const slots = maxPoints - 2;
+
+  for (let i = 1; i <= slots; i += 1) {
+    const idx = Math.round((i * interior) / (slots + 1));
+    result.push(points[idx]);
+  }
+
+  result.push(points[points.length - 1]);
+  return result;
+}
+
+function routePayloadBytes(
+  points: [number, number][],
+  distanceKm: number,
+  elevationM: number | null
+): number {
+  const body = JSON.stringify({ points, distanceKm, elevationM });
+  return new TextEncoder().encode(body).length;
+}
+
+function capRoutePayload(
+  points: [number, number][],
+  distanceKm: number,
+  elevationM: number | null
+): [number, number][] {
+  let reduced = downsampleRoutePoints(points, EVENT_ROUTE_MAX_POINTS);
+  while (
+    reduced.length > 2 &&
+    routePayloadBytes(reduced, distanceKm, elevationM) >
+      EVENT_ROUTE_MAX_PAYLOAD_BYTES
+  ) {
+    reduced = downsampleRoutePoints(
+      reduced,
+      Math.max(2, Math.floor(reduced.length / 2))
+    );
+  }
+  return reduced;
+}
+
 const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "road", label: "Road" },
   { value: "mtb", label: "MTB" },
@@ -463,6 +514,8 @@ export function EventCreatePage() {
       if (!route) {
         // The source event has no saved route — never fabricate one (BUGS.md: never show
         // mock/fake route). The invalidRoute flag surfaces the missing-route state.
+        setCopiedFrom(null);
+        setCopiedRoute(null);
         setInvalidRoute(true);
         return;
       }
@@ -521,26 +574,26 @@ export function EventCreatePage() {
     setNewTeamName("");
   }
 
-  function saveExtras(id: string) {
+  async function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
     if (copiedRoute) {
       // Instant, same-device feedback (and an offline fallback) — see eventRouteStore.ts.
       setEventRoute(id, copiedRoute);
-      // Also save it to the server so every other viewer sees the same route instead of
-      // resultsStore.ts's fabricated mock one (the "different map" bug this fixes). Best
-      // effort and fire-and-forget: the event itself already saved successfully by the time
-      // this runs, and a route-save failure (offline, transient 5xx) shouldn't turn that into
-      // a visible error for the organizer — just a quiet, discoverable warning.
-      apiRequest(`/events/${id}/route`, {
+      // Also persist to the server so every viewer sees the same route. Await this so
+      // navigation never races ahead of route persistence.
+      const points = capRoutePayload(
+        copiedRoute.points,
+        copiedRoute.distanceKm,
+        copiedRoute.elevationM
+      );
+      await apiRequest(`/events/${id}/route`, {
         method: "POST",
         body: {
-          points: copiedRoute.points,
+          points,
           distanceKm: copiedRoute.distanceKm,
           elevationM: copiedRoute.elevationM
         }
-      }).catch((err) => {
-        console.warn("Could not save this event's route to the server", err);
       });
     }
     const parsedDistance = distanceKm.trim() ? Number(distanceKm) : null;
@@ -620,7 +673,7 @@ export function EventCreatePage() {
     // re-picking a track it already has.
     const missingName = name.trim().length === 0;
     const missingStartsAt = !isEditing && startsAt.trim().length === 0;
-    const missingRoute = !isEditing && !copiedFrom && !uploadedFileName;
+    const missingRoute = !isEditing && !copiedRoute;
     setInvalidName(missingName);
     setInvalidStartsAt(missingStartsAt);
     setInvalidRoute(missingRoute);
@@ -649,7 +702,7 @@ export function EventCreatePage() {
             showParticipants: ridersListVisible
           }
         });
-        saveExtras(eventId);
+        await saveExtras(eventId);
         navigate(`/events/${eventId}`);
         return;
       }
@@ -700,7 +753,7 @@ export function EventCreatePage() {
           // Non-fatal — see comment above.
         }
       }
-      saveExtras(created.id);
+      await saveExtras(created.id);
       setLastDefaults({
         location,
         area,

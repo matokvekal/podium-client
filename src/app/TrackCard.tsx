@@ -32,7 +32,7 @@ import {
 import { type FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { countryFlagEmoji } from "../lib/country-flag";
-import type { Track } from "../lib/mock-tracks";
+import type { Track } from "../lib/track-types";
 import { formatAge } from "../lib/time";
 import styles from "./TrackCard.module.css";
 

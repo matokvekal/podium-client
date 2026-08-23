@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SurfaceType } from "../lib/mock-tracks";
+import type { SurfaceType } from "../lib/surface-types";
 import type { RiderLevel } from "../lib/rider-level";
 
 export interface LastEventDefaults {

@@ -17,17 +17,35 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(
+    status: number,
+    message: string,
+    code: string | null = null,
+    offline = false,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.offline = offline;
   }
 
-  /** The request never left the device — worth saying "you are offline" rather than "failed". */
+  /**
+   * No response was received at all — a dead network, a refused connection, or a request the
+   * browser itself blocked. Callers use this to mean "transport failed, so this proves nothing
+   * about the session/permissions" (see AuthContext's cold start, resultsStore's local
+   * fallback). It deliberately does NOT mean the device is offline — see `offline`.
+   */
   get isOffline(): boolean {
     return this.status === 0;
   }
+
+  /**
+   * The browser itself says there is no network. Only this justifies telling a rider they are
+   * offline; `isOffline` alone does not, and saying so on every failed request is how a CORS
+   * rejection spent a debugging session disguised as a connectivity problem.
+   */
+  readonly offline: boolean;
 }
 
 /** Raised when the session is gone for good. The app listens for this and shows login. */
@@ -124,7 +142,32 @@ async function send(path: string, options: RequestOptions, retryOn401: boolean):
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
-    throw new ApiError(0, "You appear to be offline");
+    // fetch() rejects with the same opaque TypeError for every failure where no response came
+    // back: a genuinely dead network, a refused connection, and — indistinguishably — a
+    // request the BROWSER blocked before sending, which in practice means CORS. Claiming
+    // "you appear to be offline" for all three is a lie in two of them, and it is exactly how
+    // a preflight the browser rejected (server answered the OPTIONS, then no PATCH was ever
+    // sent) surfaced to a rider as a connectivity problem instead of the real cause.
+    //
+    // navigator.onLine is the only thing here that actually knows about the network, so it is
+    // the only thing allowed to produce the offline message.
+    const offline = navigator.onLine === false;
+    if (!offline) {
+      console.error(
+        `Request to ${config.apiUrl}${path} never reached the server, but the browser reports it is online. ` +
+          `Most often this is CORS: the API must answer with Access-Control-Allow-Origin for ${window.location.origin}. ` +
+          `Otherwise the API is not listening on ${config.apiUrl}.`,
+        err,
+      );
+    }
+    throw new ApiError(
+      0,
+      offline
+        ? "You appear to be offline"
+        : `Could not reach the server at ${config.apiUrl}. See the browser console for details.`,
+      null,
+      offline,
+    );
   }
 
   if (response.status === 401 && retryOn401 && !options.anonymous) {

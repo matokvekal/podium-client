@@ -67,6 +67,13 @@ import styles from "./LiveEventPage.module.css";
 // Same lazy-Leaflet convention as RouteMap.tsx/LiveTracking.tsx used to — a page that never
 // goes live still shouldn't pull the map library into its bundle.
 const LiveRidersMap = lazy(() => import("../app/LiveRidersMap"));
+// The qrcode package is real weight for a sheet most rides never open — lazy, same as the map
+// above and same as EventDetailPage.tsx does with this exact component.
+const ShareEventSheet = lazy(() =>
+  import("../app/ShareEventSheet").then((m) => ({
+    default: m.ShareEventSheet
+  }))
+);
 
 const MAX_RIDERS_FOR_NON_OWNER = 5;
 
@@ -77,6 +84,8 @@ const EMPTY_GROUPS: EventGroup[] = [];
 
 interface LiveEventInfo {
   id: string;
+  /** Join code — the share sheet's whole payload (it builds /join/:code and the QR from it). */
+  code: string;
   name: string;
   isOwner: boolean;
   isPaused: boolean;
@@ -94,6 +103,7 @@ function liveInfoFromCachedSummary(
 ): LiveEventInfo {
   return {
     id: summary.id,
+    code: summary.code,
     name: summary.name,
     isOwner: viewerId != null && viewerId === summary.ownerId,
     isPaused: false,
@@ -147,6 +157,7 @@ export function LiveEventPage() {
   const [rosterNote, setRosterNote] = useState<string | null>(null);
 
   const [sharingLocation, setSharingLocation] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [selfPosition, setSelfPosition] = useState<[number, number] | null>(
     null
   );
@@ -261,6 +272,31 @@ export function LiveEventPage() {
   }, [eventId]);
 
   const isOwner = event?.isOwner ?? false;
+
+  // A rider opening this page used to land on an empty map: the poll below skips entirely for
+  // a non-owner with nothing selected, so until they found the Riders tab and ticked names by
+  // hand, the live view showed nothing while the organizer's showed everyone. Riders are meant
+  // to get the same page the creator does — asked for directly — so seed the selection from
+  // the roster the moment it arrives. Themselves first (following your own dot is the whole
+  // point of opening this on a ride), then the rest, up to the same MAX_RIDERS_FOR_NON_OWNER
+  // cap a manual selection is held to. Owners are untouched: their poll already returns the
+  // full field with no rider filter at all.
+  //
+  // Guarded by a ref rather than "is the selection empty", so a rider who deliberately
+  // unticks everyone is not immediately re-seeded on the next render.
+  const seededSelection = useRef(false);
+  useEffect(() => {
+    if (isOwner || seededSelection.current) return;
+    if (!roster || roster.length === 0) return;
+    seededSelection.current = true;
+    const meId = event?.myParticipant?.id ?? null;
+    const ids = roster.map((r) => r.id);
+    const ordered =
+      meId != null && ids.includes(meId)
+        ? [meId, ...ids.filter((id) => id !== meId)]
+        : ids;
+    setSelectedRiderIds(ordered.slice(0, MAX_RIDERS_FOR_NON_OWNER));
+  }, [isOwner, roster, event?.myParticipant?.id]);
 
   useEffect(() => {
     if (!eventId || !event) return;
@@ -454,10 +490,16 @@ export function LiveEventPage() {
             {roster ? roster.length : "—"} riders
           </p>
         </div>
+        {/* This was a dead button — rendered, but wired to nothing, which is exactly what
+            AGENT.md says this app does not ship. It now opens the same ShareEventSheet
+            (join link + QR + copy) EventDetailPage.tsx uses, so sharing a ride works from
+            inside the live view too, mid-ride — asked for directly ("even in live he can
+            share"). Same sheet, not a second implementation. */}
         <button
           type="button"
           className={styles.headerIconBtn}
           aria-label="Share this event"
+          onClick={() => setShareOpen(true)}
         >
           <Share2 aria-hidden="true" />
         </button>
@@ -876,6 +918,16 @@ export function LiveEventPage() {
       <Link to={`/events/${event.id}`} className={styles.rideInfoBtn}>
         Ride info
       </Link>
+
+      {shareOpen && (
+        <Suspense fallback={null}>
+          <ShareEventSheet
+            eventName={event.name}
+            eventCode={event.code}
+            onClose={() => setShareOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

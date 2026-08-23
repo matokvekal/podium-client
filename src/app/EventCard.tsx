@@ -18,26 +18,19 @@
  * location; level + who's organizing. (The rider count used to be shown here from a mock
  * seed — removed, see BUGS.md "Remove fake/mock riders"; no real count endpoint exists yet.)
  * Level and organizer are real data when this rider (or their device) set them via
- * EventCreatePage — otherwise event-visuals.ts's mockLevel/mockOrganizerName fill in something
+ * EventCreatePage — otherwise the difficulty scale is simply not rendered (no invented value)
  * deterministic rather than leaving a blank, since neither has a server column yet to sync a
  * real value from someone else's device.
  */
 
-import {
-  CalendarDays,
-  Clock3,
-  MapPin,
-  Mountain,
-  Pencil,
-  Ruler
-} from "lucide-react";
+import { CalendarDays, Clock3, MapPin, Mountain, Pencil, Ruler } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
-import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/mock-tracks";
 import { wazeUrl } from "../lib/nav-links";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
+import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useTeamsStore } from "../store/teamsStore";
@@ -48,13 +41,12 @@ import {
   FIGMA_TAG_LABEL,
   figmaStatus,
   initialOf,
-  mockLevel,
-  recordOpenedEvent
+  recordOpenedEvent,
 } from "./event-visuals";
 
 const shortDateFormat = new Intl.DateTimeFormat(undefined, {
   day: "2-digit",
-  month: "short"
+  month: "short",
 });
 
 function shortDate(iso: string | null): string {
@@ -66,7 +58,7 @@ function shortDate(iso: string | null): string {
 export function EventCard({
   event,
   isNew,
-  justOpened
+  justOpened,
 }: {
   event: EventSummary;
   isNew?: boolean;
@@ -76,16 +68,18 @@ export function EventCard({
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const teams = useTeamsStore((s) => s.teams);
   const extras = getEventExtras(extrasByEvent, event.id);
-  const level = extras.level ?? mockLevel(event.id);
-  const levelIndex = LEVELS.findIndex((l) => l.value === level);
-  const organizer =
-    extras.organizerGroup ?? event.ownerName ?? "Independent ride";
-  const organizerAvatarUrl = extras.organizerGroup
-    ? null
-    : event.ownerAvatarUrl;
+  // No fallback: an event whose organizer never set a difficulty simply does not show one.
+  const level = extras.level ?? null;
+  const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
+  // No fallback: an event with no club name set on this device and no owner name from the
+  // server shows no organizer line at all. "Independent ride" used to stand in here, which
+  // reads as a fact about the ride rather than as "we don't know".
+  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
+  const organizerAvatarUrl = extras.organizerGroup ? null : event.ownerAvatarUrl;
   const teamName = extras.teamId ? (teams[extras.teamId]?.name ?? null) : null;
-  const organizerLine =
-    teamName && teamName !== organizer
+  const organizerLine = !organizer
+    ? null
+    : teamName && teamName !== organizer
       ? `${organizer} · ${teamName}`
       : organizer;
   // Real distance/climb (set on EventCreatePage.tsx, from the picked route or typed by hand)
@@ -93,10 +87,7 @@ export function EventCard({
   // a real event never has those set server-side.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
-  const coverBackground = eventCoverBackground(
-    event.id,
-    extras.coverImageDataUrl
-  );
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
   // Same fallback EventDetailPage.tsx uses when this device never set one (no server column
   // yet — see EventCreatePage.tsx's doc comment on Activity type).
   const activityType = extras.activityType ?? "road";
@@ -106,8 +97,7 @@ export function EventCard({
   // Edit shortcut right on the card — asked for directly, and only while there's still time
   // to change anything: once a ride goes live/finishes, EventDetailPage's own edit action is
   // gone too, so this mirrors that same "upcoming only" rule rather than inventing a new one.
-  const canEdit =
-    status === "upcoming" && profile != null && profile.id === event.ownerId;
+  const canEdit = status === "upcoming" && profile != null && profile.id === event.ownerId;
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();
@@ -148,9 +138,7 @@ export function EventCard({
             </button>
           )}
           <span className={styles.tag} data-status={status}>
-            {status === "live" && (
-              <span className={styles.liveDot} aria-hidden="true" />
-            )}
+            {status === "live" && <span className={styles.liveDot} aria-hidden="true" />}
             {FIGMA_TAG_LABEL[status]}
           </span>
         </div>
@@ -189,32 +177,29 @@ export function EventCard({
           )}
 
           {/* Same read-only "stairs" as EventDetailPage.tsx's difficulty display — asked for
-              directly ("dificalty icons stairs it important"). */}
-          <span
-            className={styles.levelScale}
-            title={`Difficulty: ${LEVEL_LABEL[level]}`}
-          >
-            <span className={styles.levelEdge}>Easy</span>
-            <span
-              className={styles.levelBars}
-              title={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
-            >
-              {LEVELS.map((l, i) => (
-                <span
-                  key={l.value}
-                  className={styles.levelBar}
-                  data-level={l.value}
-                  data-filled={i === levelIndex}
-                  style={{ height: `${5 + i * 3}px` }}
-                />
-              ))}
+              directly ("dificalty icons stairs it important"). Hidden entirely when the
+              organizer set no difficulty: an empty scale would read as "easiest". */}
+          {level && (
+            <span className={styles.levelScale} title={`Difficulty: ${LEVEL_LABEL[level]}`}>
+              <span className={styles.levelEdge}>Easy</span>
+              <span
+                className={styles.levelBars}
+                title={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
+              >
+                {LEVELS.map((l, i) => (
+                  <span
+                    key={l.value}
+                    className={styles.levelBar}
+                    data-level={l.value}
+                    data-filled={i === levelIndex}
+                    style={{ height: `${5 + i * 3}px` }}
+                  />
+                ))}
+              </span>
+              <span className={styles.levelEdge}>Hard</span>
             </span>
-            <span className={styles.levelEdge}>Hard</span>
-          </span>
-          <span
-            className={styles.metaItem}
-            title={SURFACE_TYPE_LABEL[activityType]}
-          >
+          )}
+          <span className={styles.metaItem} title={SURFACE_TYPE_LABEL[activityType]}>
             <TypeIcon className={styles.metaIcon} aria-hidden="true" />
           </span>
         </div>
@@ -232,15 +217,17 @@ export function EventCard({
               {climbM} m
             </span>
           )}
-          <span className={`${styles.metaItem} ${styles.creatorMeta}`}>
-            <Avatar
-              name={organizer}
-              avatarUrl={organizerAvatarUrl}
-              seed={event.ownerId != null ? String(event.ownerId) : event.id}
-              className={styles.creatorAvatar}
-            />
-            {organizerLine}
-          </span>
+          {organizerLine && (
+            <span className={`${styles.metaItem} ${styles.creatorMeta}`}>
+              <Avatar
+                name={organizer}
+                avatarUrl={organizerAvatarUrl}
+                seed={event.ownerId != null ? String(event.ownerId) : event.id}
+                className={styles.creatorAvatar}
+              />
+              {organizerLine}
+            </span>
+          )}
         </div>
       </div>
     </Link>

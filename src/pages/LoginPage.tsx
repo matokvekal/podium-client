@@ -192,7 +192,9 @@ export function LoginPage() {
 
 function messageFor(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.isOffline) return "You appear to be offline.";
+    // Only a browser that says it has no network gets the offline line — a request that
+    // simply never reached the server (CORS, API down) reports what actually happened.
+    if (err.offline) return "You appear to be offline.";
     if (err.status === 401) return "That code is not right. Try again.";
     if (err.status === 429) return "Too many attempts. Wait a little and try again.";
     return err.message;

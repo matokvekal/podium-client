@@ -42,7 +42,6 @@
  */
 
 import {
-  AlertTriangle,
   CalendarDays,
   MapPin,
   Mountain,
@@ -53,46 +52,23 @@ import {
   Share2,
   Users,
   UsersRound,
-  Wind,
-  X
+  X,
 } from "lucide-react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
-import {
-  eventCoverBackground,
-  FIGMA_TAG_LABEL,
-  figmaStatus,
-  mockLevel,
-  mockOrganizerName
-} from "../app/event-visuals";
+import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 
 import { useAuth } from "../auth/AuthContext";
-import { getEventAirQuality } from "../lib/air-quality";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 
-import {
-  type EventStatus,
-  type EventSummary,
-  getCachedEvent,
-  putCachedEvent
-} from "../lib/local-db";
-
-import { SURFACE_TYPE_ICON } from "../lib/mock-tracks";
+import { type EventStatus, type EventSummary, getCachedEvent } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
+import { SURFACE_TYPE_ICON } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
-import { getEventTraffic } from "../lib/traffic";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -111,17 +87,13 @@ const RouteMap = lazy(() => import("../app/RouteMap"));
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
   import("../app/ShareEventSheet").then((m) => ({
-    default: m.ShareEventSheet
-  }))
+    default: m.ShareEventSheet,
+  })),
 );
 
 interface MyParticipant {
   id: number;
-  registrationStatus:
-    | "registered"
-    | "waiting_approval"
-    | "approved"
-    | "rejected";
+  registrationStatus: "registered" | "waiting_approval" | "approved" | "rejected";
   attendanceStatus: "unknown" | "present" | "dns" | "started";
 }
 
@@ -161,10 +133,7 @@ interface EventDetail {
   myParticipant: MyParticipant | null;
 }
 
-function mergeParticipantStatus(
-  previous: EventDetail | null,
-  incoming: EventDetail
-): EventDetail {
+function mergeParticipantStatus(previous: EventDetail | null, incoming: EventDetail): EventDetail {
   const prev = previous?.myParticipant;
   const next = incoming.myParticipant;
 
@@ -182,8 +151,8 @@ function mergeParticipantStatus(
       ...incoming,
       myParticipant: {
         ...next,
-        registrationStatus: "approved"
-      }
+        registrationStatus: "approved",
+      },
     };
   }
 
@@ -192,24 +161,22 @@ function mergeParticipantStatus(
 
 /** Mirrors the server's transition graph (event.service.ts): published (and any older event
  * still sitting in registration_open/ready) can go straight to live — those two are optional
- * waypoints, not required steps before Go Live. */
-const NEXT_STATUS: Partial<
-  Record<EventStatus, { status: EventStatus; label: string }>
-> = {
-  draft: { status: "published", label: "Publish" },
+ * waypoints, not required steps before Go Live.
+ *
+ * `draft` is deliberately absent, and there is no Publish action anywhere in this app. Create
+ * is a single step: POST /events returns an event already published, so draft is not a state
+ * this client produces, transitions out of, or compensates for. Asked for directly ("why i
+ * need button PUBLISH At all?"). An event that somehow arrives here as a draft therefore shows
+ * no start action — that is a server-side inconsistency to report, and quietly patching it
+ * from the client would only hide it. */
+const NEXT_STATUS: Partial<Record<EventStatus, { status: EventStatus; label: string }>> = {
   published: { status: "live", label: "Start — go live" },
   registration_open: { status: "live", label: "Start — go live" },
   ready: { status: "live", label: "Start — go live" },
-  live: { status: "finished", label: "Finish" }
+  live: { status: "finished", label: "Finish" },
 };
 
-const CANCELLABLE: EventStatus[] = [
-  "draft",
-  "published",
-  "registration_open",
-  "ready",
-  "live"
-];
+const CANCELLABLE: EventStatus[] = ["draft", "published", "registration_open", "ready", "live"];
 
 // The cache only ever holds the summary shape (whatever a list screen last saw) — the
 // fields a list never has (description, requiresBib, finishedAt, isOwner) get an honest
@@ -217,10 +184,7 @@ const CANCELLABLE: EventStatus[] = [
 // The real fetch is what normally decides isOwner; while it's still in flight, fall back to
 // the same profile.id === ownerId check EventTile.tsx already uses on the tile itself, so a
 // cached "my ride" doesn't look read-only for the instant before the real fetch resolves.
-function detailFromCachedSummary(
-  summary: EventSummary,
-  viewerId: number | null
-): EventDetail {
+function detailFromCachedSummary(summary: EventSummary, viewerId: number | null): EventDetail {
   return {
     ...summary,
     requiresBib: false,
@@ -232,7 +196,7 @@ function detailFromCachedSummary(
     effectiveStatus: summary.status,
     showParticipants: true,
     showLiveLocations: true,
-    myParticipant: null
+    myParticipant: null,
   };
 }
 
@@ -240,8 +204,7 @@ export function EventDetailPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectMessage =
-    (location.state as { message?: string } | null)?.message ?? null;
+  const redirectMessage = (location.state as { message?: string } | null)?.message ?? null;
   const { profile } = useAuth();
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
 
@@ -254,16 +217,12 @@ export function EventDetailPage() {
   // alert"). null means the normal action button(s) show; otherwise the owner-actions row (or,
   // for "leave", the rider's own sticky bottom bar) swaps to a small message + Cancel/Confirm
   // pair for that one action.
-  const [confirming, setConfirming] = useState<
-    "live" | "finish" | "leave" | null
-  >(null);
+  const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
-  const [approvalFxPhase, setApprovalFxPhase] = useState<
-    "idle" | "arming" | "celebrate"
-  >("idle");
+  const [approvalFxPhase, setApprovalFxPhase] = useState<"idle" | "arming" | "celebrate">("idle");
   const [approvalFxProgress, setApprovalFxProgress] = useState(0);
   const previousRegistrationStatusRef = useRef<string | null>(null);
 
@@ -331,15 +290,11 @@ export function EventDetailPage() {
     async function poll() {
       if (!eventId) return;
       try {
-        const list = await apiRequest<RealParticipant[]>(
-          `/events/${eventId}/participants`
-        );
+        const list = await apiRequest<RealParticipant[]>(`/events/${eventId}/participants`);
         if (cancelled) return;
         setRealRiderCount(list.length);
         setRealRoster(list);
-        setPendingCount(
-          list.filter((p) => p.registrationStatus === "waiting_approval").length
-        );
+        setPendingCount(list.filter((p) => p.registrationStatus === "waiting_approval").length);
       } catch {
         // Not visible to this viewer, or not built for this event — mock stands in.
       }
@@ -357,9 +312,7 @@ export function EventDetailPage() {
   // the only rider list this page ever renders.
   const visibleRealRoster = useMemo(() => {
     if (!realRoster) return null;
-    return [...realRoster].sort((a, b) =>
-      (a.name ?? "").localeCompare(b.name ?? "")
-    );
+    return [...realRoster].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
   }, [realRoster]);
 
   const load = useCallback(async () => {
@@ -370,15 +323,22 @@ export function EventDetailPage() {
     const cached = await getCachedEvent(eventId);
     if (cached) {
       const asDetail = detailFromCachedSummary(cached, profile?.id ?? null);
-      setEvent(asDetail);
-      // Paint the cached summary now; the real fetch below still runs and replaces it.
+      // The cache paint exists to fill an EMPTY screen while the real fetch is in flight — it
+      // is never an update. Writing it unconditionally is what let a stale summary walk a
+      // started ride backwards: refreshing (or landing back here from the live screen) could
+      // repaint "published" over a live event and put START back on screen for a ride already
+      // under way. Anything already in state came from the server or from a transition this
+      // page just performed, so it outranks the cache by definition — keep it.
+      setEvent((previous) => (previous && previous.id === asDetail.id ? previous : asDetail));
       setLoading(false);
     }
 
     try {
       const found = await apiRequest<EventDetail>(`/events/${eventId}`);
       setEvent((previous) => mergeParticipantStatus(previous, found));
-      putCachedEvent(found);
+      // Keep Zustand and the cache in step with the server response, not just this component
+      // — the same single write path every status transition uses.
+      useEventsStore.getState().upsertRide(found);
     } catch (err) {
       // A cached summary is still on screen — a failed refresh shouldn't blank it out.
       if (cached) return;
@@ -387,7 +347,7 @@ export function EventDetailPage() {
           ? "This event is private."
           : err instanceof ApiError && err.status === 404
             ? "Event not found."
-            : "Could not load this event."
+            : "Could not load this event.",
       );
     } finally {
       setLoading(false);
@@ -410,7 +370,7 @@ export function EventDetailPage() {
         const found = await apiRequest<EventDetail>(`/events/${eventId}`);
         if (cancelled) return;
         setEvent((previous) => mergeParticipantStatus(previous, found));
-        putCachedEvent(found);
+        useEventsStore.getState().upsertRide(found);
       } catch {
         // Keep current UI state; a later poll will retry.
       }
@@ -439,8 +399,7 @@ export function EventDetailPage() {
     const alreadySeen = window.sessionStorage.getItem(seenKey) === "1";
     // Show this when approval is newly observed from a pending state, or first seen while
     // approved and not yet acknowledged in this browser session.
-    if (alreadySeen || (previous !== "waiting_approval" && previous !== null))
-      return;
+    if (alreadySeen || (previous !== "waiting_approval" && previous !== null)) return;
 
     let alive = true;
     setApprovalFxPhase("arming");
@@ -488,20 +447,26 @@ export function EventDetailPage() {
   // The two consequential transitions (going live, and finishing/stopping) are confirmed via
   // the inline confirm bar below (see `confirming` state) rather than a window.confirm() popup
   // — asked for directly ("good ui ux like small button... not just simple alert"). The
-  // earlier low-stakes steps (Publish, Open registration, Mark ready) stay one-tap.
+  // earlier low-stakes steps (Open registration, Mark ready) stay one-tap.
   async function changeStatus(nextStatus: EventStatus) {
     if (!eventId) return;
     setBusy(true);
     setError(null);
     try {
-      const updated = await apiRequest<EventDetail>(
-        `/events/${eventId}/status`,
-        {
-          method: "PATCH",
-          body: { status: nextStatus }
-        }
-      );
+      const updated = await apiRequest<EventDetail>(`/events/${eventId}/status`, {
+        method: "PATCH",
+        body: { status: nextStatus },
+      });
       setEvent((previous) => mergeParticipantStatus(previous, updated));
+      // The server's updated event is the authoritative state — push it into Zustand and the
+      // IndexedDB cache together, not just this component. Without that, the transition lived
+      // only in local state: navigating to the live page and coming back to the ride info
+      // re-painted from the stale cached summary, which still said "published" — so the
+      // organizer was shown "Start — go live" for a ride that had already started ("he not
+      // need start since the ride already start", asked for directly). The real fetch would
+      // eventually correct it, but that is a flash of the wrong button at best, and mid-ride
+      // on a phone with no signal it never corrects at all.
+      useEventsStore.getState().upsertRide(updated);
       // Clicking "Start — go live" only re-labeled the header button to "LIVE" before,
       // requiring a second tap to actually get there — asked for directly ("i click at go
       // live but got stary at same page... muve me to live scen"). Jump straight to the live
@@ -520,11 +485,7 @@ export function EventDetailPage() {
         navigate(`/events/live/${eventId}`);
         return;
       }
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Could not change the event status."
-      );
+      setError(err instanceof ApiError ? err.message : "Could not change the event status.");
     } finally {
       setBusy(false);
       setConfirming(null);
@@ -540,13 +501,11 @@ export function EventDetailPage() {
     try {
       await apiRequest(`/events/join`, {
         method: "POST",
-        body: { eventCode: event.code }
+        body: { eventCode: event.code },
       });
       await load();
     } catch (err) {
-      setRegisterError(
-        err instanceof ApiError ? err.message : "Could not register. Try again."
-      );
+      setRegisterError(err instanceof ApiError ? err.message : "Could not register. Try again.");
     } finally {
       setRegisterBusy(false);
     }
@@ -573,13 +532,11 @@ export function EventDetailPage() {
         code: event.code,
         name: event.name,
         type: event.type,
-        invitedAt: Date.now()
+        invitedAt: Date.now(),
       });
       await Promise.all([load(), useEventsStore.getState().loadMyRides(true)]);
     } catch (err) {
-      setRegisterError(
-        err instanceof ApiError ? err.message : "Could not leave. Try again."
-      );
+      setRegisterError(err instanceof ApiError ? err.message : "Could not leave. Try again.");
     } finally {
       setRegisterBusy(false);
       setConfirming(null);
@@ -588,23 +545,16 @@ export function EventDetailPage() {
 
   async function cancelEvent() {
     if (!eventId) return;
-    if (
-      !window.confirm(
-        "Cancel this event? Riders will no longer be able to join."
-      )
-    )
-      return;
+    if (!window.confirm("Cancel this event? Riders will no longer be able to join.")) return;
     setBusy(true);
     setError(null);
     try {
       const updated = await apiRequest<EventDetail>(`/events/${eventId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       setEvent((previous) => mergeParticipantStatus(previous, updated));
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Could not cancel this event."
-      );
+      setError(err instanceof ApiError ? err.message : "Could not cancel this event.");
     } finally {
       setBusy(false);
     }
@@ -644,42 +594,48 @@ export function EventDetailPage() {
   const displayStatus: EventStatus =
     event.effectiveStatus ?? (isPastDue ? "finished" : event.status);
 
-  const next = NEXT_STATUS[displayStatus];
   const routePoint = results?.route?.points[0] ?? null;
+  // "not all events have team so each event can be ready if have name date /place" — asked
+  // for directly, and this is where that lands: a published event offers Start outright, with
+  // no extra readiness gate on top of it. No team requirement, no minimum rider count, no
+  // registration window, no separate "Mark ready" step. Those three facts are collected on
+  // the create form, so every event that exists already has them.
+  const next = NEXT_STATUS[displayStatus];
   const wazeHref = wazeUrl(event.location, routePoint);
   const googleMapsHref = googleMapsUrl(event.location, routePoint);
-  const airQuality = getEventAirQuality(event.id, event.startsAt);
-  const traffic = getEventTraffic(event.id, event.startsAt);
   const extras = getEventExtras(extrasByEvent, event.id);
   const ActivityIcon = SURFACE_TYPE_ICON[extras.activityType ?? "road"];
   // Same fallback chain EventCard.tsx/EventTile.tsx use on the list cards — a team or manual
   // club name the organizer explicitly picked on EventCreatePage.tsx (extras.organizerGroup)
-  // wins over everything; failing that, the real signed-in owner's name (event.ownerName —
-  // nickname, else first+last, resolved server-side) is honest real data and preferred over a
-  // fabricated one; only an event with neither (no server column set, legacy/manual owner)
-  // falls all the way back to a deterministic mock club name so the card never shows blank.
-  // Only the "real owner" branch has a photo to show — a club/team name and the mock name are
-  // not real accounts, so there is no server avatar for either.
-  const level = extras.level ?? mockLevel(event.id);
-  const levelIndex = LEVELS.findIndex((l) => l.value === level);
+  // wins; failing that, the real signed-in owner's name (event.ownerName — nickname, else
+  // first+last, resolved server-side). An event with neither now shows NO organizer line at
+  // all. There used to be a third fallback that invented a club name from the event id; that
+  // is gone, because a made-up organization on a real ride is indistinguishable from the
+  // truth to the rider reading it.
+  // Only the "real owner" branch has a photo to show — a club/team name is not an account,
+  // so there is no server avatar for it.
+  const level = extras.level ?? null;
+  const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   const organizerIsRealOwner = !extras.organizerGroup && !!event.ownerName;
-  const organizer =
-    extras.organizerGroup ?? event.ownerName ?? mockOrganizerName(event.id);
+  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
   const organizerAvatarUrl = organizerIsRealOwner ? event.ownerAvatarUrl : null;
-  const coverBackground = eventCoverBackground(
-    event.id,
-    extras.coverImageDataUrl
-  );
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
   const riderCount = realRiderCount;
   const bucket = figmaStatus(displayStatus);
-  const canEditNow =
-    event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
+  const canEditNow = event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
+  // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
+  // hid the live map from the ride's own registered riders: show_live_locations defaults to
+  // FALSE (plan/02-database-schema.md:195), so on a typical event nobody but the organizer
+  // ever saw a way in. The server's actual rule is narrower than that flag suggests — per
+  // 07-api-contract.md:372, GET /events/:eventId/live only 403s when the flag is off *and the
+  // caller is not a member*. So a rider who joined this ride always belongs on that page, and
+  // the flag only decides whether a passing non-member viewer does too.
+  const canSeeLive = event.myParticipant != null || event.showLiveLocations;
+
   // Owner never registers for their own ride; a rider who already finished/cancelled events
   // can't join either — same guard the old bottom card and sign-in link used.
   const showRiderCta =
-    !event.isOwner &&
-    displayStatus !== "finished" &&
-    displayStatus !== "cancelled";
+    !event.isOwner && displayStatus !== "finished" && displayStatus !== "cancelled";
 
   return (
     <section className={styles.page}>
@@ -705,9 +661,7 @@ export function EventDetailPage() {
           )}
           <div className={styles.heroTopRight}>
             <span className={styles.statusPill} data-bucket={bucket}>
-              {displayStatus === "cancelled"
-                ? "Cancelled"
-                : FIGMA_TAG_LABEL[bucket]}
+              {displayStatus === "cancelled" ? "Cancelled" : FIGMA_TAG_LABEL[bucket]}
             </span>
             <button
               type="button"
@@ -735,15 +689,17 @@ export function EventDetailPage() {
 
         <div className={styles.heroBottom}>
           <h1 className={styles.title}>{event.name}</h1>
-          <div className={styles.organizerRow}>
-            <Avatar
-              className={styles.avatar}
-              name={organizer}
-              avatarUrl={organizerAvatarUrl}
-              seed={organizer}
-            />
-            Organized by {organizer}
-          </div>
+          {organizer && (
+            <div className={styles.organizerRow}>
+              <Avatar
+                className={styles.avatar}
+                name={organizer}
+                avatarUrl={organizerAvatarUrl}
+                seed={organizer}
+              />
+              Organized by {organizer}
+            </div>
+          )}
         </div>
       </div>
 
@@ -793,11 +749,7 @@ export function EventDetailPage() {
                     ? "neutral"
                     : "ready"
             }
-            title={
-              isPastDue
-                ? "Automatically marked finished — the date has passed"
-                : undefined
-            }
+            title={isPastDue ? "Automatically marked finished — the date has passed" : undefined}
           >
             {displayStatus.replace("_", " ")}
           </span>
@@ -823,21 +775,24 @@ export function EventDetailPage() {
             </span>
           )}
           {/* Same steps visual (and color-per-level scheme) as the create page's difficulty
-              picker — read-only here, just the current level lit. */}
-          <span
-            className={`${styles.levelBars} ${styles.tagsRowSpacer}`}
-            title={LEVEL_LABEL[level]}
-          >
-            {LEVELS.map((l, i) => (
-              <span
-                key={l.value}
-                className={styles.levelBar}
-                data-level={l.value}
-                data-filled={i === levelIndex}
-                style={{ height: `${6 + i * 4}px` }}
-              />
-            ))}
-          </span>
+              picker — read-only here, just the current level lit. Hidden when the organizer
+              set no difficulty, rather than showing an unlit scale that reads as "easiest". */}
+          {level && (
+            <span
+              className={`${styles.levelBars} ${styles.tagsRowSpacer}`}
+              title={LEVEL_LABEL[level]}
+            >
+              {LEVELS.map((l, i) => (
+                <span
+                  key={l.value}
+                  className={styles.levelBar}
+                  data-level={l.value}
+                  data-filled={i === levelIndex}
+                  style={{ height: `${6 + i * 4}px` }}
+                />
+              ))}
+            </span>
+          )}
         </div>
 
         {/* --- owner actions: Edit + Start/LIVE/Stop — the rest (Participants/Groups/Cancel)
@@ -865,35 +820,23 @@ export function EventDetailPage() {
                     className={styles.confirmOkBtn}
                     data-tone={confirming === "finish" ? "danger" : undefined}
                     disabled={busy}
-                    onClick={() =>
-                      changeStatus(confirming === "live" ? "live" : "finished")
-                    }
+                    onClick={() => changeStatus(confirming === "live" ? "live" : "finished")}
                   >
-                    {busy
-                      ? "…"
-                      : confirming === "live"
-                        ? "Go live"
-                        : "Stop event"}
+                    {busy ? "…" : confirming === "live" ? "Go live" : "Stop event"}
                   </button>
                 </div>
               </div>
             ) : (
               <>
                 {canEditNow && (
-                  <Link
-                    className={styles.editBtn}
-                    to={`/events/${event.id}/edit`}
-                  >
+                  <Link className={styles.editBtn} to={`/events/${event.id}/edit`}>
                     <Pencil width={16} height={16} aria-hidden="true" />
                     Edit
                   </Link>
                 )}
                 {displayStatus === "live" ? (
                   <>
-                    <Link
-                      className={styles.startBtn}
-                      to={`/events/live/${event.id}`}
-                    >
+                    <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
                       LIVE
                     </Link>
                     <button
@@ -912,9 +855,7 @@ export function EventDetailPage() {
                       className={styles.startBtn}
                       disabled={busy}
                       onClick={() =>
-                        next.status === "live"
-                          ? setConfirming("live")
-                          : changeStatus(next.status)
+                        next.status === "live" ? setConfirming("live") : changeStatus(next.status)
                       }
                     >
                       {next.label}
@@ -926,14 +867,27 @@ export function EventDetailPage() {
           </div>
         )}
 
-        {/* Owner gets the LIVE entry point above — this compact summary is only for a
-            non-owner viewer, who has no such control. The full live map itself is never
-            embedded here; it's the fully separate /events/:eventId/live page. */}
-        {displayStatus === "live" &&
-          !event.isOwner &&
-          event.showLiveLocations && (
-            <LiveTracking eventId={event.id} isPaused={event.isPaused} />
-          )}
+        {/* Riders get the same LIVE button in the same slot as the organizer — asked for
+            directly ("if ride start the riders/client also have to see LIVE button and see
+            similar page live as we see for the creator"). It goes to the very same
+            /events/live/:eventId page the owner's button does (LiveEventPage.tsx already
+            serves both, with the owner-only extras kept inside it), so there is no separate
+            second-class rider view to keep in sync. The full live map is never embedded here
+            for anyone. */}
+        {displayStatus === "live" && !event.isOwner && canSeeLive && (
+          <div className={styles.ownerActions}>
+            <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
+              LIVE
+            </Link>
+          </div>
+        )}
+
+        {/* Only kept for the paused case now, where it explains why the markers on that map
+            are standing still. The "live now" version of this card was redundant next to the
+            button above. */}
+        {displayStatus === "live" && !event.isOwner && canSeeLive && event.isPaused && (
+          <LiveTracking eventId={event.id} isPaused={event.isPaused} />
+        )}
 
         {/* --- at a glance: where/when/who, one card, one source of truth per field --------- */}
         <div className="card stack">
@@ -1020,36 +974,17 @@ export function EventDetailPage() {
 
         {results && (
           <>
-            {/* --- conditions ------------------------------------------------------------- */}
-            <div className="card stack">
-              <p className={styles.infoLabel}>Conditions</p>
-              <div className="row" style={{ flexWrap: "wrap" }}>
-                <span
-                  className={`${styles.conditionBadge} ${
-                    airQuality.label === "Good"
-                      ? styles.conditionGood
-                      : airQuality.label === "Moderate"
-                        ? styles.conditionModerate
-                        : styles.conditionBad
-                  }`}
-                  title={`Air quality index ${airQuality.aqi} — illustrative, no live provider yet`}
-                >
-                  <Wind width={12} height={12} aria-hidden="true" />
-                  Air: {airQuality.label}
-                </span>
-                <span
-                  className={`${styles.conditionBadge} ${
-                    traffic.level === "ok"
-                      ? styles.conditionGood
-                      : styles.conditionBad
-                  }`}
-                  title="Illustrative — no live traffic provider yet"
-                >
-                  <AlertTriangle width={12} height={12} aria-hidden="true" />
-                  Roads: {traffic.label}
-                </span>
-              </div>
-              {forecast && (
+            {/* --- conditions -------------------------------------------------------------
+                Real weather only (lib/weather.ts, Open-Meteo). Two badges used to sit beside
+                it — "Air: Good" and "Roads clear" — both invented from a hash of the event id
+                because no provider exists for either. A fabricated air-quality or traffic
+                reading on a real ride is a safety claim this app cannot back up, and a rider
+                cannot tell it apart from a measurement. Removed rather than replaced with a
+                placeholder; when a real provider is wired up, add them back reading it.
+                The card only appears when there is something real to show. */}
+            {forecast && (
+              <div className="card stack">
+                <p className={styles.infoLabel}>Conditions</p>
                 <p
                   className="muted row"
                   style={{ margin: 0, gap: "6px", flexWrap: "wrap" }}
@@ -1058,35 +993,27 @@ export function EventDetailPage() {
                   <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
                     {forecast.emoji}
                   </span>
-                  {forecast.source === "historical" ? "Recorded" : "Forecast"}:{" "}
-                  {forecast.label} · {forecast.tempMinC}°–{forecast.tempMaxC}°C
-                  {forecast.cloudCoverPct != null &&
-                    ` · ${forecast.cloudCoverPct}% cloud`}
-                  {forecast.windSpeedKmh != null &&
-                    ` · ${forecast.windSpeedKmh} km/h wind`}
+                  {forecast.source === "historical" ? "Recorded" : "Forecast"}: {forecast.label} ·{" "}
+                  {forecast.tempMinC}°–{forecast.tempMaxC}°C
+                  {forecast.cloudCoverPct != null && ` · ${forecast.cloudCoverPct}% cloud`}
+                  {forecast.windSpeedKmh != null && ` · ${forecast.windSpeedKmh} km/h wind`}
                   {forecast.precipitationChancePct != null &&
                     ` · ${forecast.precipitationChancePct}% rain`}
-                  {!!forecast.precipitationMm &&
-                    ` (${forecast.precipitationMm} mm)`}
+                  {!!forecast.precipitationMm && ` (${forecast.precipitationMm} mm)`}
                   {!!forecast.snowfallCm && ` · ${forecast.snowfallCm} cm snow`}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* --- route preview ------------------------------------------------------------ */}
             <div className="card stack">
               <p className={styles.infoLabel}>Route preview</p>
               {results.route ? (
                 <>
-                  <Suspense
-                    fallback={<div className="row muted">Loading the map…</div>}
-                  >
+                  <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                     <RouteMap points={results.route.points} />
                   </Suspense>
-                  <div
-                    className={styles.statsRow}
-                    style={{ marginTop: "var(--space-2)" }}
-                  >
+                  <div className={styles.statsRow} style={{ marginTop: "var(--space-2)" }}>
                     <span className={styles.statItem}>
                       <Ruler width={15} height={15} aria-hidden="true" />
                       {results.route.distanceKm} km
@@ -1121,7 +1048,7 @@ export function EventDetailPage() {
                   style={{
                     maxHeight: "60vh",
                     overflowY: "auto",
-                    paddingRight: "2px"
+                    paddingRight: "2px",
                   }}
                 >
                   {visibleRealRoster ? (
@@ -1149,9 +1076,7 @@ export function EventDetailPage() {
                               <span className={styles.realRiderName}>
                                 {rider.name?.trim() || "Unnamed rider"}
                                 {isMe && <span className="muted"> (ME)</span>}
-                                {rider.bib && (
-                                  <span className="muted"> #{rider.bib}</span>
-                                )}
+                                {rider.bib && <span className="muted"> #{rider.bib}</span>}
                               </span>
                             </div>
                           );
@@ -1171,25 +1096,17 @@ export function EventDetailPage() {
 
         {/* Bottom-bar CTA takes over the rider join flow below — this reserves its height so
             the last card never sits underneath the fixed bar. */}
-        {showRiderCta && (
-          <div className={styles.bottomBarSpacer} aria-hidden="true" />
-        )}
+        {showRiderCta && <div className={styles.bottomBarSpacer} aria-hidden="true" />}
       </div>
 
       {/* --- sticky bottom CTA — "I'M IN", asked for directly ---------------------------- */}
       {showRiderCta && (
         <div className={styles.bottomBar}>
           {approvalFxPhase !== "idle" && (
-            <div
-              className={styles.approvalFx}
-              data-phase={approvalFxPhase}
-              role="status"
-            >
+            <div className={styles.approvalFx} data-phase={approvalFxPhase} role="status">
               {approvalFxPhase === "arming" ? (
                 <>
-                  <span className={styles.approvalFxTitle}>
-                    Approval update incoming…
-                  </span>
+                  <span className={styles.approvalFxTitle}>Approval update incoming…</span>
                   <div className={styles.approvalFxTrack} aria-hidden="true">
                     <div
                       className={styles.approvalFxFill}
@@ -1198,9 +1115,7 @@ export function EventDetailPage() {
                   </div>
                 </>
               ) : (
-                <span className={styles.approvalFxTitle}>
-                  Approved. See you at the ride.
-                </span>
+                <span className={styles.approvalFxTitle}>Approved. See you at the ride.</span>
               )}
             </div>
           )}
@@ -1230,11 +1145,7 @@ export function EventDetailPage() {
               </div>
             </div>
           ) : !profile ? (
-            <Link
-              className={styles.ctaBtn}
-              to="/login"
-              state={{ from: `/events/${event.id}` }}
-            >
+            <Link className={styles.ctaBtn} to="/login" state={{ from: `/events/${event.id}` }}>
               Sign in to join
             </Link>
           ) : event.myParticipant ? (
@@ -1268,19 +1179,11 @@ export function EventDetailPage() {
               disabled={registerBusy}
               onClick={handleRegister}
             >
-              {registerBusy
-                ? "Joining…"
-                : event.requiresApproval
-                  ? "Request to join"
-                  : "I'M IN"}
+              {registerBusy ? "Joining…" : event.requiresApproval ? "Request to join" : "I'M IN"}
             </button>
           )}
           {registerError && (
-            <p
-              className="banner banner--error"
-              role="alert"
-              style={{ margin: 0 }}
-            >
+            <p className="banner banner--error" role="alert" style={{ margin: 0 }}>
               {registerError}
             </p>
           )}

@@ -5,13 +5,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  CLIMB_MAX,
-  CLIMB_MIN,
-  DISTANCE_MAX,
-  DISTANCE_MIN,
-  type SurfaceType,
-} from "../lib/mock-tracks";
+import type { SurfaceType } from "../lib/surface-types";
+import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-types";
 
 interface TrackFiltersState {
   location: string;
@@ -39,7 +34,7 @@ interface TrackFiltersState {
   clearFilters(): void;
 }
 
-// Kept in sync by hand with mock-tracks.ts's SurfaceType union and TracksPage.tsx's
+// Kept in sync by hand with surface-types.ts's SurfaceType union and TracksPage.tsx's
 // COUNTRY_FILTERS — used only to sanitize whatever a returning rider already has in
 // localStorage (see the persist `migrate` below), not as a source of truth elsewhere.
 const VALID_SURFACE_TYPES: SurfaceType[] = ["road", "gravel", "mtb", "running", "hiking"];
@@ -79,7 +74,7 @@ export const useTrackFiltersStore = create<TrackFiltersState>()(
     {
       name: "podium.trackFilters",
       // Bumped once: an earlier build persisted surfaceType "walking", later renamed to
-      // "hiking" (see mock-tracks.ts). Without this, a rider who opened Find Tracks before
+      // "hiking" (see surface-types.ts). Without this, a rider who opened Find Tracks before
       // that rename gets stuck on a surface value no track can ever match again — an
       // empty-forever result list with no visible error. `migrate` below repairs that stored
       // value in place instead of silently discarding the rest of their saved filters.

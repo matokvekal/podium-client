@@ -13,6 +13,7 @@ import {
   clearCachedEvents,
   type EventSummary,
   getCachedEvents,
+  putCachedEvent,
   putCachedEvents,
   toggleFavorite,
 } from "../lib/local-db";
@@ -37,6 +38,10 @@ interface EventsState {
   loadMyRides(authed: boolean): Promise<void>;
   loadOtherRides(): Promise<void>;
   toggleFavoriteRide(id: string): Promise<void>;
+  /** Files one authoritative server event — a create response, or the event returned by a
+   *  status transition — into My Rides and the IndexedDB cache in one step, so the two never
+   *  disagree about an event the server has already told us the truth about. */
+  upsertRide(event: EventSummary): void;
   /** Sign-out: drops in-memory My Rides and the "mine" IndexedDB cache bucket so the next
    *  rider on a shared device never briefly sees the previous rider's rides. */
   clearMyRides(): void;
@@ -113,6 +118,21 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     set((state) => ({
       myRides: state.myRides.map((event) => (event.id === id ? { ...event, favorite } : event)),
     }));
+  },
+
+  upsertRide(event) {
+    set((state) => {
+      const index = state.myRides.findIndex((ride) => ride.id === event.id);
+      if (index === -1) return { myRides: [event, ...state.myRides] };
+      const myRides = [...state.myRides];
+      // Merge, don't replace: a list response carries `favorite` (and whatever else the cache
+      // filed) that a single-event response has no reason to know about.
+      myRides[index] = { ...myRides[index], ...event };
+      return { myRides };
+    });
+    // "mine" rather than the default "guest" — every caller is the owner acting on their own
+    // ride. putCachedEvent keeps an existing source if the event was already filed.
+    void putCachedEvent(event, "mine");
   },
 
   clearMyRides() {

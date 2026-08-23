@@ -4,7 +4,7 @@
  * this was built from for why).
  *
  * Route:    /routes
- * Loads:    lib/mock-tracks.ts via store/tracksStore.ts — stands in for a future GET /tracks.
+ * Loads:    store/tracksStore.ts, which returns an empty list until GET /tracks is built.
  *           Air quality, hazards and POIs are all illustrative mock values; no real data
  *           provider is chosen for any of them yet.
  * Actions:  country + surface-type dropdowns (top, always visible, small, icons on the
@@ -46,13 +46,8 @@ import { RangeSlider } from "../app/RangeSlider";
 import { TrackCard } from "../app/TrackCard";
 import { useAuth } from "../auth/AuthContext";
 import { countryFlagEmoji } from "../lib/country-flag";
-import {
-  CLIMB_MAX,
-  CLIMB_MIN,
-  DISTANCE_MAX,
-  DISTANCE_MIN,
-  type SurfaceType,
-} from "../lib/mock-tracks";
+import type { SurfaceType } from "../lib/surface-types";
+import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-types";
 import { useTrackFiltersStore } from "../store/trackFiltersStore";
 import { useTracksStore } from "../store/tracksStore";
 import styles from "./TracksPage.module.css";

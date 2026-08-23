@@ -22,8 +22,8 @@ import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
-import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/mock-tracks";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
+import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { Avatar } from "./Avatar";
@@ -32,8 +32,7 @@ import {
   eventCoverBackground,
   FIGMA_TAG_LABEL,
   figmaStatus,
-  mockLevel,
-  recordOpenedEvent
+  recordOpenedEvent,
 } from "./event-visuals";
 
 interface EventTileProps {
@@ -46,13 +45,7 @@ interface EventTileProps {
   compact?: boolean;
 }
 
-export function EventTile({
-  event,
-  onToggleFavorite,
-  isNew,
-  justOpened,
-  compact
-}: EventTileProps) {
+export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact }: EventTileProps) {
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -63,29 +56,27 @@ export function EventTile({
   const navigate = useNavigate();
   const bucket = figmaStatus(event.status);
   // Same "upcoming, and mine" rule as EventCard.tsx's canEdit.
-  const canEdit =
-    bucket === "upcoming" && profile != null && profile.id === event.ownerId;
+  const canEdit = bucket === "upcoming" && profile != null && profile.id === event.ownerId;
 
   // Same data + fallbacks EventCard.tsx shows in the See-All list, so a ride reads the same
   // wherever it appears.
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const extras = getEventExtras(extrasByEvent, event.id);
-  const level = extras.level ?? mockLevel(event.id);
-  const levelIndex = LEVELS.findIndex((l) => l.value === level);
+  // No fallback: an event whose organizer never set a difficulty simply does not show one.
+  const level = extras.level ?? null;
+  const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   const activityType = extras.activityType ?? "road";
   const TypeIcon = SURFACE_TYPE_ICON[activityType];
-  const organizer =
-    extras.organizerGroup ?? event.ownerName ?? "Independent ride";
-  const organizerAvatarUrl = extras.organizerGroup
-    ? null
-    : event.ownerAvatarUrl;
+  // No fallback, same rule as the difficulty above: with no club name set on this device and
+  // no owner name from the server, the "Organized by" caption is simply not shown. It used to
+  // say "Independent ride", which states something about the ride instead of admitting the
+  // field is unknown.
+  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
+  const organizerAvatarUrl = extras.organizerGroup ? null : event.ownerAvatarUrl;
   // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
-  const coverBackground = eventCoverBackground(
-    event.id,
-    extras.coverImageDataUrl
-  );
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();
@@ -104,7 +95,7 @@ export function EventTile({
         <div
           className={styles.bg}
           style={{
-            background: coverBackground
+            background: coverBackground,
           }}
         >
           {/* No real cover-image field exists yet (event-visuals.ts) — the event's own name,
@@ -159,9 +150,7 @@ export function EventTile({
                     : styles.photoIconBtn
                 }
                 onClick={handleFavorite}
-                aria-label={
-                  event.favorite ? "Remove from favorites" : "Add to favorites"
-                }
+                aria-label={event.favorite ? "Remove from favorites" : "Add to favorites"}
               >
                 <Heart
                   width={13}
@@ -174,17 +163,19 @@ export function EventTile({
           </div>
         </div>
 
-        <div className={styles.photoBottom}>
-          <div className={styles.organizerRow}>
-            <Avatar
-              name={organizer}
-              avatarUrl={organizerAvatarUrl}
-              seed={event.ownerId != null ? String(event.ownerId) : event.id}
-              className={styles.organizerAvatar}
-            />
-            Organized by {organizer}
+        {organizer && (
+          <div className={styles.photoBottom}>
+            <div className={styles.organizerRow}>
+              <Avatar
+                name={organizer}
+                avatarUrl={organizerAvatarUrl}
+                seed={event.ownerId != null ? String(event.ownerId) : event.id}
+                className={styles.organizerAvatar}
+              />
+              Organized by {organizer}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className={styles.cardBody}>
@@ -201,9 +192,10 @@ export function EventTile({
               {climbM} m
             </span>
           )}
-          {!compact && (
+          {!compact && level && (
             /* Same read-only "stairs" as EventDetailPage.tsx/EventCard.tsx's difficulty
-               display — asked for directly ("dificalty icons stairs it important"). */
+               display — asked for directly ("dificalty icons stairs it important"). Hidden
+               when no difficulty was set: an empty scale would read as "easiest". */
             <span
               className={`${styles.levelBars} ${styles.metaRowSpacer}`}
               title={LEVEL_LABEL[level]}
@@ -220,10 +212,7 @@ export function EventTile({
             </span>
           )}
           {!compact && (
-            <span
-              className={styles.metaItem}
-              title={SURFACE_TYPE_LABEL[activityType]}
-            >
+            <span className={styles.metaItem} title={SURFACE_TYPE_LABEL[activityType]}>
               <TypeIcon className={styles.metaIcon} aria-hidden="true" />
             </span>
           )}

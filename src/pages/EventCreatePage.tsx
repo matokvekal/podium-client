@@ -134,7 +134,7 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { resizeCoverFileToDataUrl } from "../lib/cover-image";
 import type { EventRoute } from "../lib/event-route";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
-import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/mock-tracks";
+import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
 import {
   nextUpcomingSaturdayStart,
   parseQuickAdd,
@@ -146,18 +146,16 @@ import {
   LEVELS,
   type RiderLevel
 } from "../lib/rider-level";
+import { validateCreateEventForm } from "../validation/forms";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
+import { useEventsStore } from "../store/eventsStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useParticipantsStore } from "../store/participantsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCreatePage.module.css";
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
-
-interface CreatedEvent {
-  id: string;
-}
 
 interface ExistingEvent {
   id: string;
@@ -671,13 +669,17 @@ export function EventCreatePage() {
     // ever requires a name, same as before: route is never prefilled back in edit (see the
     // Track section's doc comment above), so demanding one there would trap every edit behind
     // re-picking a track it already has.
-    const missingName = name.trim().length === 0;
-    const missingStartsAt = !isEditing && startsAt.trim().length === 0;
-    const missingRoute = !isEditing && !copiedRoute;
-    setInvalidName(missingName);
-    setInvalidStartsAt(missingStartsAt);
-    setInvalidRoute(missingRoute);
-    if (missingName || missingStartsAt || missingRoute) {
+    // Rules live in src/validation/forms.ts — same rules as before, readable in one place.
+    const { ok, errors } = validateCreateEventForm({
+      name,
+      startsAt,
+      hasRoute: copiedRoute != null,
+      isEditing,
+    });
+    setInvalidName(errors.name != null);
+    setInvalidStartsAt(errors.startsAt != null);
+    setInvalidRoute(errors.route != null);
+    if (!ok) {
       setError("Fill in the highlighted fields before saving.");
       return;
     }
@@ -707,7 +709,13 @@ export function EventCreatePage() {
         return;
       }
 
-      const created = await apiRequest<CreatedEvent>("/events", {
+      // The one and only request that creates an event. The server returns it already
+      // published, so there is deliberately no follow-up PATCH to /status here: creating is a
+      // single step, and the share code is usable the moment this resolves. If a freshly
+      // created event ever fails to resolve by its code, that is a server-side inconsistency
+      // to report, not something for this page to paper over with a retry or a local
+      // "published" guess.
+      const created = await apiRequest<EventSummary>("/events", {
         method: "POST",
         body: {
           name,
@@ -726,26 +734,15 @@ export function EventCreatePage() {
           showParticipants: ridersListVisible
         }
       });
-      // Auto-publish right after create — a fresh event starts in "draft" server-side, which
-      // is NOT active (an event code only resolves once status is out of draft/cancelled/
-      // finished, per 02-database-schema.md's is_active rule), so a still-draft event can't
-      // even be found by its code yet. Organizer already filled in everything on this form, so
-      // there's nothing left to decide before Publish — asked for directly ("i dont need
-      // publish"), skip the separate manual tap on EventDetailPage. Best-effort: if this call
-      // fails, the event still exists (just sitting in draft) and Publish is still there on
-      // EventDetailPage as a manual fallback.
-      try {
-        await apiRequest(`/events/${created.id}/status`, {
-          method: "PATCH",
-          body: { status: "published" }
-        });
-      } catch {
-        // Non-fatal — see comment above.
-      }
+      // The server's response is the authoritative state for this event — file it into both
+      // My Rides and the IndexedDB cache before anything else, so the home screen and an
+      // offline reopen both see the real event (status included) without waiting for a
+      // refetch.
+      useEventsStore.getState().upsertRide(created);
       // "Am I also riding?" — add the organizer to the real start list under the nickname
-      // they typed, same addParticipant call EventParticipantsPage.tsx uses. Best-effort/
-      // non-fatal, same pattern as auto-publish above: the event still exists either way, and
-      // the organizer can always add themselves by hand afterward from Participants.
+      // they typed, same addParticipant call EventParticipantsPage.tsx uses. Best-effort and
+      // non-fatal: the event exists either way, and the organizer can always add themselves
+      // by hand afterward from Participants.
       if (imRiding && riderNickname.trim()) {
         try {
           await addParticipant(created.id, { name: riderNickname.trim() });

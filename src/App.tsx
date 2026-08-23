@@ -169,7 +169,7 @@ export function App() {
         }
       />
       {/* Find Tracks — the route planner. Public, same as everything else browse-shaped.
-          Mock data (lib/mock-tracks.ts) until the server has real routes/hazards/POI/air
+          No data source yet — GET /tracks is unbuilt, so this lists nothing. Real routes/hazards/POI/air
           quality — see plan/server-tasks.md. */}
       <Route
         path="/routes"

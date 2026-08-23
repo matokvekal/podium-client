@@ -2,7 +2,6 @@
 // look as a card" so the home row and the Other Rides list read as the same design system.
 
 import type { EventStatus } from "../lib/local-db";
-import { LEVELS, type RiderLevel } from "../lib/rider-level";
 
 function hashSeed(seed: string | null | undefined): number {
   const s = seed ?? "";
@@ -139,26 +138,10 @@ export function consumeOpenedEventId(): string | null {
 
 // Level and organizer/club name are client-only (see store/eventExtrasStore.ts) — set on the
 // organizer's own device when they create the event, with no server column to sync them
-// anywhere else yet. That means a card for someone else's ride, on someone else's device, has
-// real data for neither. Rather than show a hole where "who's running this / how hard is it"
-// should be, cards fall back to a deterministic mock pick — asked for directly ("if you dont
-// see data ad to mock those fields"). Same "hash the id, pick something plausible" trick as
-// lib/mock-participants.ts's seedParticipantCount and lib/mock-results.ts's route generation.
-// Never overrides real data — callers do `extras.level ?? mockLevel(event.id)`, real data
-// first.
-const MOCK_CLUBS = [
-  "Galilee Cycling Club",
-  "Negev Gravel Collective",
-  "Sharon Road Team",
-  "Jerusalem Hills Riders",
-  "Tel Aviv Coastal Spinners",
-  "Carmel MTB Crew",
-];
-
-export function mockOrganizerName(eventId: string): string {
-  return MOCK_CLUBS[hashSeed(eventId) % MOCK_CLUBS.length];
-}
-
-export function mockLevel(eventId: string): RiderLevel {
-  return LEVELS[hashSeed(eventId) % LEVELS.length].value;
-}
+// anywhere else yet. A card for someone else's ride therefore has real data for neither.
+//
+// It used to fill that hole with a deterministic fake: a club name hashed out of the event id
+// and a random-but-stable difficulty. That is gone. A fabricated club name on a REAL event is
+// worse than a blank one — a rider cannot tell it apart from the truth, and it attributes a
+// stranger's ride to an organization that never ran it. Callers now show the real value or
+// omit the field.

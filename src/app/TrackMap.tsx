@@ -12,7 +12,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import { config } from "../lib/config";
-import type { Track } from "../lib/mock-tracks";
+import type { Track } from "../lib/track-types";
 import {
   bearingDeg,
   directionArrowIcon,

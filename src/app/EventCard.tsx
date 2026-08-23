@@ -1,58 +1,72 @@
 /**
- * A single row in the "Other Rides" list, and in "My Rides"'s See-All full list. Ported
- * directly from Figma (Tomer-Design / new-commissaire, "All Races" > Card/N), not from the
- * old race-pwa code — see EventCard.module.css for the full note.
+ * A ride card in the My Rides / Find Rides lists.
  *
- * No favourite affordance in this design (unlike the previous pass) — the toolbar's
- * favourites-only filter in EventsListPage.tsx currently has no way to set one back on,
- * pending a spec for that.
+ * Rebuilt to the "all-events" reference design supplied directly (all-events.jpg). The previous
+ * version is kept at src/_backup-pre-newui/EventCard.tsx.bak — same convention as the earlier
+ * cockpit backup, and it stays until asked to delete it.
  *
- * The status tag gets a blinking dot when live, so a live ride reads as urgent ("live ride
- * ... has to be at top in some blinking so i can get in fast" — same request EventTile's live
- * bar answers for the home row). An Organizing/Joined tag lived here too, briefly — pulled
- * after a look at real data: this rider's own events all say "Organizing," so with nothing to
- * contrast against it just read as noise. See EventTile.tsx's doc comment for the same call.
+ * Layout, top to bottom:
+ *   row 1   date block (AUG / 29 / FRI) · thumbnail · title · status pill · favourite heart
+ *   row 2   tag chips — surface, visibility, "Approval Required"
+ *   row 3   four stats — distance, elevation, est. time, difficulty
+ *   row 4   footer — date + time, location, participants
  *
- * Rows of "should I join this" data, asked for directly ("i need extra data at card ...
- * number of riders register the dificalty and the orgenizer/club/team"): date; time +
- * location; level + who's organizing. (The rider count used to be shown here from a mock
- * seed — removed, see BUGS.md "Remove fake/mock riders"; no real count endpoint exists yet.)
- * Level and organizer are real data when this rider (or their device) set them via
- * EventCreatePage — otherwise the difficulty scale is simply not rendered (no invented value)
- * deterministic rather than leaving a blank, since neither has a server column yet to sync a
- * real value from someone else's device.
+ * WHERE THE DATA COMES FROM, and what is deliberately blank:
+ *
+ *   real, server        name, status, visibility, startsAt, location, activityType, level,
+ *                       organizerGroup (the last four are on the summary — see EventSummary's
+ *                       doc comment for why they used to be missing)
+ *   real, this device   distance / elevation / cover image, from store/eventExtrasStore.ts,
+ *                       which only exists on the device that created the ride. Server values
+ *                       win where both exist; nothing is invented when neither does.
+ *   client-only         the favourite heart (lib/local-db.ts's toggleFavorite — no server
+ *                       column for it)
+ *   NOT AVAILABLE       est. time, participants "n / capacity", and "Approval Required" on a
+ *                       list card. The list endpoint returns no duration, no participant count,
+ *                       no capacity and no requiresApproval, and there is no way to derive any
+ *                       of them from what it does return. They render as "soon" rather than
+ *                       being computed, guessed, or silently dropped — see NOT_YET below.
  */
 
-import { CalendarDays, Clock3, MapPin, Mountain, Pencil, Ruler } from "lucide-react";
+import { CalendarDays, Heart, MapPin, Mountain, Ruler, Timer, UsersRound } from "lucide-react";
 import type { MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
-import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
+import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalTime } from "../lib/time";
+import { useEventsStore } from "../store/eventsStore";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
-import { useTeamsStore } from "../store/teamsStore";
-import { Avatar } from "./Avatar";
 import styles from "./EventCard.module.css";
 import {
   eventCoverBackground,
   FIGMA_TAG_LABEL,
   figmaStatus,
-  initialOf,
   recordOpenedEvent,
 } from "./event-visuals";
 
-const shortDateFormat = new Intl.DateTimeFormat(undefined, {
-  day: "2-digit",
-  month: "short",
-});
+/**
+ * The placeholder for a stat the API genuinely cannot answer yet. One shared constant so every
+ * such cell reads the same, and so a grep for it lists exactly what is still owed — rather than
+ * each gap being papered over differently (or, worse, filled with a plausible-looking number).
+ */
+const NOT_YET = "soon";
 
-function shortDate(iso: string | null): string {
-  if (!iso) return "";
+const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
+const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+const dayTimeFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+
+function dateParts(iso: string | null): { month: string; day: string; weekday: string } | null {
+  if (!iso) return null;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : shortDateFormat.format(date);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    month: monthFormat.format(date).toUpperCase(),
+    day: String(date.getDate()),
+    weekday: weekdayFormat.format(date).toUpperCase(),
+  };
 }
 
 export function EventCard({
@@ -66,43 +80,33 @@ export function EventCard({
 }) {
   const status = figmaStatus(event.status);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
-  const teams = useTeamsStore((s) => s.teams);
   const extras = getEventExtras(extrasByEvent, event.id);
-  // No fallback: an event whose organizer never set a difficulty simply does not show one.
-  const level = extras.level ?? null;
+
+  // Written through eventsStore.toggleFavoriteRide, which updates BOTH IndexedDB and the
+  // in-memory My Rides list — so the See-All view's favourites-only filter agrees with the
+  // heart immediately. The local mirror exists for the Find Rides list, whose events are not
+  // in myRides and so would otherwise not repaint until the next load.
+  const toggleFavoriteRide = useEventsStore((s) => s.toggleFavoriteRide);
+  const [favorite, setFavorite] = useState(event.favorite === true);
+
+  // Server first, this device's copy second. No third fallback: a ride whose organizer never
+  // set a difficulty shows no difficulty scale at all, because an empty scale reads as "easiest".
+  const level = event.level ?? extras.level ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
-  // No fallback: an event with no club name set on this device and no owner name from the
-  // server shows no organizer line at all. "Independent ride" used to stand in here, which
-  // reads as a fact about the ride rather than as "we don't know".
-  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
-  const organizerAvatarUrl = extras.organizerGroup ? null : event.ownerAvatarUrl;
-  const teamName = extras.teamId ? (teams[extras.teamId]?.name ?? null) : null;
-  const organizerLine = !organizer
-    ? null
-    : teamName && teamName !== organizer
-      ? `${organizer} · ${teamName}`
-      : organizer;
-  // Real distance/climb (set on EventCreatePage.tsx, from the picked route or typed by hand)
-  // wins over event.distanceKm/climbM, which is only ever populated on hardcoded mock lists —
-  // a real event never has those set server-side.
+  const activityType = event.activityType ?? extras.activityType ?? null;
+  const TypeIcon = activityType ? SURFACE_TYPE_ICON[activityType] : null;
+
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
-  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
-  // Same fallback EventDetailPage.tsx uses when this device never set one (no server column
-  // yet — see EventCreatePage.tsx's doc comment on Activity type).
-  const activityType = extras.activityType ?? "road";
-  const TypeIcon = SURFACE_TYPE_ICON[activityType];
-  const { profile } = useAuth();
-  const navigate = useNavigate();
-  // Edit shortcut right on the card — asked for directly, and only while there's still time
-  // to change anything: once a ride goes live/finishes, EventDetailPage's own edit action is
-  // gone too, so this mirrors that same "upcoming only" rule rather than inventing a new one.
-  const canEdit = status === "upcoming" && profile != null && profile.id === event.ownerId;
 
-  function handleEdit(e: MouseEvent) {
+  const when = dateParts(event.startsAt);
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
+
+  function handleFavorite(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/events/${event.id}/edit`);
+    setFavorite((previous) => !previous);
+    void toggleFavoriteRide(event.id);
   }
 
   function handleNavigate(e: MouseEvent) {
@@ -119,116 +123,139 @@ export function EventCard({
       data-new={isNew || justOpened || undefined}
       onClick={() => recordOpenedEvent(event.id)}
     >
-      <div className={styles.image} style={{ background: coverBackground }}>
-        {initialOf(event.name)}
+      <div className={styles.head}>
+        {/* The date block. Rendered only for a ride that actually has a start date — an
+            empty slot is better than a placeholder date nobody set. */}
+        {when ? (
+          <div className={styles.dateBlock}>
+            <span className={styles.dateMonth}>{when.month}</span>
+            <span className={styles.dateDay}>{when.day}</span>
+            <span className={styles.dateWeekday}>{when.weekday}</span>
+          </div>
+        ) : (
+          <div className={styles.dateBlock} data-empty="true">
+            <span className={styles.dateMonth}>—</span>
+          </div>
+        )}
+
+        {/* Cover art: the organizer's uploaded image when this device has one, otherwise one of
+            the ten built-in abstract scenes, picked deterministically from the event id (see
+            event-visuals.ts's generatedCoverUrl). */}
+        <div className={styles.thumb} style={{ background: coverBackground }} />
+
+        <div className={styles.headMain}>
+          <div className={styles.titleRow}>
+            <span className={styles.title}>{event.name}</span>
+            <span className={styles.tag} data-status={status}>
+              {status === "live" && <span className={styles.liveDot} aria-hidden="true" />}
+              {FIGMA_TAG_LABEL[status]}
+            </span>
+            <button
+              type="button"
+              className={styles.heartBtn}
+              data-on={favorite}
+              onClick={handleFavorite}
+              aria-pressed={favorite}
+              aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
+            >
+              <Heart
+                width={18}
+                height={18}
+                aria-hidden="true"
+                fill={favorite ? "currentColor" : "none"}
+              />
+            </button>
+          </div>
+
+          <div className={styles.chipRow}>
+            {activityType && TypeIcon && (
+              <span className={styles.chip} data-kind="surface" data-surface={activityType}>
+                <TypeIcon width={12} height={12} aria-hidden="true" />
+                {SURFACE_TYPE_LABEL[activityType]}
+              </span>
+            )}
+            <span className={styles.chip} data-kind={event.visibility}>
+              {event.visibility === "private" ? "Private" : "Public"}
+            </span>
+            {/* "Approval Required" belongs here in the design, but requiresApproval is only on
+                the DETAIL response — the list endpoint does not send it, so a card cannot know.
+                Left out entirely rather than defaulted: rendering "Approval Required" (or its
+                absence) from a guess would be a claim about how to join this ride. */}
+          </div>
+        </div>
       </div>
 
-      <div className={styles.text}>
-        <div className={styles.titleRow}>
-          <span className={styles.title}>{event.name}</span>
-          {canEdit && (
-            <button
-              type="button"
-              className={styles.editBtn}
-              onClick={handleEdit}
-              aria-label="Edit ride"
-              title="Edit ride"
-            >
-              <Pencil aria-hidden="true" />
-            </button>
-          )}
-          <span className={styles.tag} data-status={status}>
-            {status === "live" && <span className={styles.liveDot} aria-hidden="true" />}
-            {FIGMA_TAG_LABEL[status]}
-          </span>
+      <div className={styles.stats}>
+        <div className={styles.stat}>
+          <Ruler className={styles.statIcon} aria-hidden="true" />
+          <span className={styles.statValue}>{distanceKm != null ? `${distanceKm} km` : "—"}</span>
+          <span className={styles.statLabel}>Distance</span>
         </div>
-
-        {/* Location sits next to the date now, not off in its own row — asked for directly
-            ("at the card the location will be near the date"). Its icon opens Waze, since the
-            row is inside the card's own Link — a nested <a> would be invalid HTML, so this is
-            a button that stops the click from also opening the ride. */}
-        <div className={styles.metaRow}>
-          {event.startsAt && (
-            <span className={styles.metaItem}>
-              <CalendarDays className={styles.metaIcon} aria-hidden="true" />
-              {shortDate(event.startsAt)}
-            </span>
-          )}
-          {event.location && (
-            <button
-              type="button"
-              className={styles.metaLinkItem}
-              onClick={handleNavigate}
-              aria-label={`Navigate to ${event.location}`}
-              title="Open in Waze"
-            >
-              <MapPin className={styles.metaIcon} aria-hidden="true" />
-              {event.location}
-            </button>
-          )}
+        <div className={styles.stat}>
+          <Mountain className={styles.statIcon} aria-hidden="true" />
+          <span className={styles.statValue}>{climbM != null ? `${climbM} m` : "—"}</span>
+          <span className={styles.statLabel}>Elevation</span>
         </div>
-
-        <div className={styles.metaRow}>
-          {event.startsAt && (
-            <span className={styles.metaItem}>
-              <Clock3 className={styles.metaIcon} aria-hidden="true" />
-              {formatLocalTime(event.startsAt)}
-            </span>
-          )}
-
-          {/* Same read-only "stairs" as EventDetailPage.tsx's difficulty display — asked for
-              directly ("dificalty icons stairs it important"). Hidden entirely when the
-              organizer set no difficulty: an empty scale would read as "easiest". */}
-          {level && (
-            <span className={styles.levelScale} title={`Difficulty: ${LEVEL_LABEL[level]}`}>
-              <span className={styles.levelEdge}>Easy</span>
-              <span
-                className={styles.levelBars}
-                title={`Difficulty ${LEVEL_LABEL[level]} (left easier, right harder)`}
-              >
+        {/* Est. time: no duration field exists anywhere — not on the event, not on the route.
+            Deriving one from distance would need an assumed speed, which is exactly the kind of
+            invented number this app does not ship. */}
+        <div className={styles.stat} data-pending="true">
+          <Timer className={styles.statIcon} aria-hidden="true" />
+          <span className={styles.statValue}>{NOT_YET}</span>
+          <span className={styles.statLabel}>Est. Time</span>
+        </div>
+        <div className={styles.stat}>
+          {level ? (
+            <>
+              <span className={styles.levelBars} aria-hidden="true">
                 {LEVELS.map((l, i) => (
                   <span
                     key={l.value}
                     className={styles.levelBar}
                     data-level={l.value}
-                    data-filled={i === levelIndex}
+                    data-filled={i <= levelIndex}
                     style={{ height: `${5 + i * 3}px` }}
                   />
                 ))}
               </span>
-              <span className={styles.levelEdge}>Hard</span>
-            </span>
+              <span className={styles.statValue}>{levelLabelFor(level, activityType)}</span>
+              <span className={styles.statLabel}>{levelHeadingFor(activityType)}</span>
+            </>
+          ) : (
+            <>
+              <span className={styles.statValue}>—</span>
+              <span className={styles.statLabel}>{levelHeadingFor(activityType)}</span>
+            </>
           )}
-          <span className={styles.metaItem} title={SURFACE_TYPE_LABEL[activityType]}>
-            <TypeIcon className={styles.metaIcon} aria-hidden="true" />
-          </span>
         </div>
+      </div>
 
-        <div className={styles.metaRow}>
-          {distanceKm != null && (
-            <span className={styles.metaItem}>
-              <Ruler className={styles.metaIcon} aria-hidden="true" />
-              {distanceKm} km
-            </span>
-          )}
-          {climbM != null && (
-            <span className={styles.metaItem}>
-              <Mountain className={styles.metaIcon} aria-hidden="true" />
-              {climbM} m
-            </span>
-          )}
-          {organizerLine && (
-            <span className={`${styles.metaItem} ${styles.creatorMeta}`}>
-              <Avatar
-                name={organizer}
-                avatarUrl={organizerAvatarUrl}
-                seed={event.ownerId != null ? String(event.ownerId) : event.id}
-                className={styles.creatorAvatar}
-              />
-              {organizerLine}
-            </span>
-          )}
-        </div>
+      <div className={styles.footer}>
+        {event.startsAt && (
+          <span className={styles.footerItem}>
+            <CalendarDays className={styles.footerIcon} aria-hidden="true" />
+            {dayTimeFormat.format(new Date(event.startsAt))}, {formatLocalTime(event.startsAt)}
+          </span>
+        )}
+        {event.location && (
+          <button
+            type="button"
+            className={styles.footerLink}
+            onClick={handleNavigate}
+            aria-label={`Navigate to ${event.location}`}
+            title="Open in Waze"
+          >
+            <MapPin className={styles.footerIcon} aria-hidden="true" />
+            {event.location}
+          </button>
+        )}
+        {/* Participants "n / capacity": the list endpoint returns neither a count nor a
+            capacity, and there is no capacity column server-side at all. One count would cost a
+            participants call per card. */}
+        <span className={styles.footerItem} data-pending="true">
+          <UsersRound className={styles.footerIcon} aria-hidden="true" />
+          {NOT_YET}
+        </span>
       </div>
     </Link>
   );

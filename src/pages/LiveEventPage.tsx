@@ -54,7 +54,17 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 import { haversineDistanceKm } from "../lib/geo";
 import type { LiveRider } from "../lib/live-types";
-import { type EventSummary, getCachedEvent } from "../lib/local-db";
+import {
+  type CachedParticipant,
+  type EventSummary,
+  getCachedEvent,
+  getCachedEventDetail,
+  getCachedLiveRiders,
+  getCachedParticipants,
+  putCachedLiveRiders,
+  viewerKey
+} from "../lib/local-db";
+import { useConnectivityStore } from "../lib/connectivity";
 import { formatAge } from "../lib/time";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import {
@@ -136,6 +146,10 @@ function formatElapsed(ms: number): string {
 export function LiveEventPage() {
   const { eventId } = useParams();
   const { profile } = useAuth();
+  // Scope for every offline read/write on this page — see lib/local-db.ts.
+  const viewerId = viewerKey(profile?.id);
+  // Bumps once when the server comes back, re-running the loads below.
+  const reconnectNonce = useConnectivityStore((s) => s.reconnectNonce);
   const [event, setEvent] = useState<LiveEventInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,10 +198,13 @@ export function LiveEventPage() {
     return () => window.clearInterval(id);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
-    if (eventId) loadResults(eventId);
-  }, [eventId, loadResults]);
+    // reconnectNonce: refetch the route the instant the server comes back.
+    if (eventId) loadResults(eventId, viewerId);
+  }, [eventId, loadResults, viewerId, reconnectNonce]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
     if (!eventId) return;
     let cancelled = false;
@@ -197,7 +214,19 @@ export function LiveEventPage() {
       setLoading(true);
       setError(null);
 
-      const cached = await getCachedEvent(eventId);
+      // The full cached detail first — a real GET /events/:eventId response to this viewer,
+      // so isPaused/showLiveLocations/myParticipant are this rider's actual state rather than
+      // the honest-but-invented defaults liveInfoFromCachedSummary has to fall back on.
+      const cachedDetail = await getCachedEventDetail(eventId, viewerId);
+      if (cachedDetail && !cancelled) {
+        setEvent(cachedDetail.value);
+        setPaused(cachedDetail.value.isPaused);
+        setLoading(false);
+      }
+
+      // Only when this ride has never been opened on this device: the weaker list-cached
+      // summary. Last resort, not the primary offline path.
+      const cached = cachedDetail ? null : await getCachedEvent(eventId);
       if (cached && !cancelled) {
         const asLiveInfo = liveInfoFromCachedSummary(
           cached,
@@ -216,8 +245,9 @@ export function LiveEventPage() {
         setPaused(found.isPaused);
       } catch (err) {
         if (cancelled) return;
-        // A cached summary is still on screen — a failed refresh shouldn't blank it out.
-        if (cached) return;
+        // Cached data is on screen — a failed refresh must never blank it out. The global
+        // OFFLINE banner says it is last-synced.
+        if (cachedDetail || cached) return;
         setError(
           err instanceof ApiError && err.status === 403
             ? "This event is private."
@@ -234,7 +264,8 @@ export function LiveEventPage() {
     return () => {
       cancelled = true;
     };
-  }, [eventId, profile?.id]);
+    // reconnectNonce: re-pull as soon as the server is back.
+  }, [eventId, profile?.id, viewerId, reconnectNonce]);
 
   // The route's own start point stands in for "where this event is" — same forecast source
   // EventDetailPage.tsx uses. Silently shows nothing outside Open-Meteo's range or on failure.
@@ -255,21 +286,42 @@ export function LiveEventPage() {
 
   // Best-effort — a viewer who can't see the roster (private list, or not a registered rider
   // yet) still gets the map itself; they just have no names to pick from below.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
     if (!eventId) return;
     let cancelled = false;
-    apiRequest<RosterEntry[]>(`/events/${eventId}/participants`)
+    const id = eventId;
+    // Set once a roster has been applied from EITHER source — a slow IndexedDB read must never
+    // land on top of a fresher network response, and the failure path below must know whether
+    // anything is on screen.
+    let applied = false;
+
+    // Cache first — the same eventParticipants store EventDetailPage fills, so a roster synced
+    // on the event page is already here when the live map opens with no server.
+    void (async () => {
+      const cached = await getCachedParticipants(id, viewerId);
+      if (cached && !cancelled && !applied) {
+        applied = true;
+        setRoster(cached.value);
+      }
+    })();
+
+    apiRequest<CachedParticipant[]>(`/events/${id}/participants`)
       .then((list) => {
-        if (!cancelled) setRoster(list);
+        if (cancelled) return;
+        applied = true;
+        setRoster(list);
       })
       .catch(() => {
-        if (!cancelled)
-          setRosterNote("The rider list isn't open for this event.");
+        // Only claim the list is closed when there is nothing at all to show. With a cached
+        // roster on screen the failure is either a permission answer or an unreachable server,
+        // and neither justifies replacing real riders with a note.
+        if (!cancelled && !applied) setRosterNote("The rider list isn't open for this event.");
       });
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, viewerId, reconnectNonce]);
 
   const isOwner = event?.isOwner ?? false;
 
@@ -298,9 +350,23 @@ export function LiveEventPage() {
     setSelectedRiderIds(ordered.slice(0, MAX_RIDERS_FOR_NON_OWNER));
   }, [isOwner, roster, event?.myParticipant?.id]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
     if (!eventId || !event) return;
     let cancelled = false;
+
+    const liveEventId = eventId;
+
+    // Last known positions, painted before the first poll answers — so reopening the live map
+    // with the server down shows where everyone was at the last fix instead of an empty map.
+    // Skipped when there is nothing to show anyway (a non-owner who has selected no riders).
+    if (isOwner || selectedRiderIds.length > 0) {
+      void (async () => {
+        const cached = await getCachedLiveRiders(liveEventId, viewerId);
+        if (!cached || cancelled) return;
+        setRiders((previous) => (previous.length > 0 ? previous : cached.value.riders));
+      })();
+    }
 
     async function poll() {
       if (!isOwner && selectedRiderIds.length === 0) {
@@ -316,6 +382,9 @@ export function LiveEventPage() {
         if (cancelled) return;
         setRiders(found.riders);
         setPaused(found.paused);
+        // The last real positions received. Every marker carries its own recordedAt, so a
+        // cached fix renders correctly aged rather than pretending to be current.
+        void putCachedLiveRiders(liveEventId, viewerId, found.riders, found.paused);
 
         // Diff each rider's new fix against its previous one to derive a speed — only when
         // both a distance and a strictly-later timestamp are present. A functional update
@@ -354,7 +423,7 @@ export function LiveEventPage() {
       window.clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, event, isOwner, selectedRiderIds]);
+  }, [eventId, event, isOwner, selectedRiderIds, viewerId, reconnectNonce]);
 
   // "Share my location" — opt-in only, so opening the live page never triggers a surprise
   // permission prompt. Never transmitted anywhere (AGENT.md: "This app displays positions; it

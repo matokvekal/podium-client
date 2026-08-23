@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" width="800" height="480" role="img" aria-label="Abstract ride cover">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e4d63"/>
+      <stop offset="100%" stop-color="#3fa3b8"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#051c25"/>
+      <stop offset="100%" stop-color="#082c39"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" fill="url(#sky)"/>
+  <circle cx="620" cy="120" r="51" fill="#fdf6e3" opacity="0.9"/>
+  <path d="M0,295 L130,225 L240,290 L370,230 L480,295 L610,235 L730,290 L800,250 L800,480 L0,480 Z" fill="#0b3d4f" opacity="0.85"/>
+  <path d="M0,355 L120,310 L260,355 L390,312 L520,358 L660,315 L800,352 L800,480 L0,480 Z" fill="#082c39" opacity="0.92"/>
+  <path d="M0,400 L800,370 L800,480 L0,480 Z" fill="url(#ground)"/>
+  <path d="M410,480 C428,420 390,405 552,386 L592,380 L502,380 C360,400 378,425 330,480 Z" fill="#c8ebf0" opacity="0.75"/>
+</svg>

@@ -13,6 +13,19 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // The API is proxied instead of called cross-origin. Same-origin means the browser
+    // sends NO preflight at all — which is what a PATCH to /users/me was dying on: the
+    // server answered every OPTIONS with a correct Access-Control-Allow-Methods (PATCH
+    // included, verified on the wire), Chrome reported "Method PATCH is not allowed", and
+    // the PATCH was never sent. Nothing between the two can rewrite a header that is now
+    // never asked for. VITE_API_URL is "/api/v1" in .env to match; set it to an absolute
+    // URL for any build that does not go through this dev server.
+    proxy: {
+      "/api": {
+        target: "http://localhost:6500",
+        changeOrigin: false,
+      },
+    },
   },
   build: {
     // Leaflet is lazy-loaded (see LiveMapPage). Commissaire recorded the cost of importing

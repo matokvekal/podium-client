@@ -12,6 +12,11 @@
 
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "./auth-storage";
 import { config } from "./config";
+import {
+  isServerDownStatus,
+  reportServerReachable,
+  reportServerUnreachable,
+} from "./connectivity";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -150,7 +155,9 @@ async function send(path: string, options: RequestOptions, retryOn401: boolean):
     // sent) surfaced to a rider as a connectivity problem instead of the real cause.
     //
     // navigator.onLine is the only thing here that actually knows about the network, so it is
-    // the only thing allowed to produce the offline message.
+    // the only thing allowed to produce the offline MESSAGE. Whether the SERVER is reachable is
+    // a separate question, and no response at all answers it: unreachable, whatever the cause.
+    reportServerUnreachable();
     const offline = navigator.onLine === false;
     if (!offline) {
       console.error(
@@ -168,6 +175,15 @@ async function send(path: string, options: RequestOptions, retryOn401: boolean):
       null,
       offline,
     );
+  }
+
+  // A response — of any status — proves the server answered. The one exception is a gateway
+  // reporting the application behind it is down, which is "offline" as far as a rider is
+  // concerned. See lib/connectivity.ts for why this split is drawn exactly here.
+  if (isServerDownStatus(response.status)) {
+    reportServerUnreachable();
+  } else {
+    reportServerReachable();
   }
 
   if (response.status === 401 && retryOn401 && !options.anonymous) {

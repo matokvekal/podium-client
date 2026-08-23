@@ -55,13 +55,13 @@ import {
   Map as MapIcon,
   Plus,
   Search,
-  SlidersHorizontal,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { EmptyRidesState } from "../app/EmptyRidesState";
 import { EventCard } from "../app/EventCard";
+import { EventTile } from "../app/EventTile";
 import {
   consumeOpenedEventId,
   FIGMA_TAG_LABEL,
@@ -109,25 +109,8 @@ const SORT_LABEL: Record<SortKey, string> = {
 // Home row: most recent My Rides only, before "See All" takes over.
 const HOME_ROW_LIMIT = 10;
 
-/**
- * The chip row above My Rides, from the all-events reference design. Four plain views over the
- * same list — no new data, no new request:
- *   all       everything, ordered live → upcoming → past
- *   upcoming  live rides included; a ride happening right now is the most upcoming thing there is
- *   past      finished / cancelled
- *   hosted    rides this rider owns, as opposed to ones they joined
- */
-type MyRidesFilter = "all" | "upcoming" | "past" | "hosted";
-
-const MY_RIDES_FILTERS: { value: MyRidesFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "past", label: "Past" },
-  { value: "hosted", label: "Hosted" },
-];
-
 export function EventsListPage() {
-  const { status, profile } = useAuth();
+  const { status } = useAuth();
   const authed = status === "signed-in";
 
   // EventCreatePage.tsx lands back here after a successful create (rather than on the new
@@ -186,6 +169,9 @@ export function EventsListPage() {
   const reconnectNonce = useConnectivityStore((s) => s.reconnectNonce);
   const loadMyRides = useEventsStore((state) => state.loadMyRides);
   const loadOtherRides = useEventsStore((state) => state.loadOtherRides);
+  const toggleFavoriteRide = useEventsStore(
+    (state) => state.toggleFavoriteRide
+  );
 
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -199,6 +185,10 @@ export function EventsListPage() {
     // reconnectNonce: re-pull My Rides when the server comes back, so the list refreshes out
     // of its cached state on its own.
   }, [authed, loadMyRides, reconnectNonce]);
+
+  async function handleToggleFavorite(id: string) {
+    await toggleFavoriteRide(id);
+  }
 
   // My Rides, Meetup-style: Live (any status "live", regardless of organizing or joined) always
   // first and blinking — asked for directly ("live ride ... has to be at top in some blinking
@@ -216,26 +206,20 @@ export function EventsListPage() {
     return { live, upcoming, past };
   }, [myRides]);
 
-  // The chip row's current view. Purely a client-side lens over myRides — every chip shows
-  // real rides that are already loaded, so switching one never triggers a fetch or a spinner.
-  const [myFilter, setMyFilter] = useState<MyRidesFilter>("all");
-
-  // One flat, ordered list for the home view — the reference design shows a single stream of
-  // cards, not the separate Live/Upcoming/Past sections this used to render.
-  const homeList = useMemo(() => {
+  // Home row: live rides always shown in full (there's rarely more than one or two), then
+  // Upcoming, then Past, filling in up to HOME_ROW_LIMIT total tiles.
+  const homeRow = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const ordered =
-      myFilter === "upcoming"
-        ? [...live, ...upcoming]
-        : myFilter === "past"
-          ? past
-          : myFilter === "hosted"
-            ? [...live, ...upcoming, ...past].filter(
-                (event) => profile != null && event.ownerId === profile.id,
-              )
-            : [...live, ...upcoming, ...past];
-    return ordered.slice(0, HOME_ROW_LIMIT);
-  }, [myRidesByBucket, myFilter, profile]);
+    const upcomingSlice = upcoming.slice(
+      0,
+      Math.max(0, HOME_ROW_LIMIT - live.length)
+    );
+    const pastSlice = past.slice(
+      0,
+      Math.max(0, HOME_ROW_LIMIT - live.length - upcomingSlice.length)
+    );
+    return { live, upcoming: upcomingSlice, past: pastSlice };
+  }, [myRidesByBucket]);
 
   // See-All list: search + favourites filter first, then bucketed the same way as the home
   // row, with the chosen sort applied inside each bucket (Live is small enough that its own
@@ -414,7 +398,7 @@ export function EventsListPage() {
                 {myRides.length > 0 && (
                   <button
                     type="button"
-                    className={styles.seeAllLink}
+                    className={styles.backBtn}
                     onClick={() => setShowAll(true)}
                   >
                     See All
@@ -539,58 +523,81 @@ export function EventsListPage() {
               )}
             </div>
           ) : (
-            /* The reference design's My Rides view: one filter chip row over a single flat
-               stream of full cards. This replaces the old separate Live now / Upcoming / Past
-               Rides sections of compact EventTiles — same rides, same order, one list. The
-               previous version is in src/_backup-pre-newui/EventsListPage.tsx.bak. */
+            /* "Upcoming" (large cards) and "Past Rides" (compact list), each with its own
+               See All — matching a reference screenshot supplied directly, replacing the
+               single mixed horizontal tile row this used to be. Both See All links open the
+               same combined list below (still grouped by Live/Upcoming/Past there); splitting
+               that into two fully separate searchable views wasn't asked for. */
             <div className={styles.sections}>
-              <div className={styles.filterChips}>
-                <div className={styles.filterChipGroup}>
-                  {MY_RIDES_FILTERS.map((f) => (
-                    <button
-                      key={f.value}
-                      type="button"
-                      className={styles.filterChip}
-                      data-on={myFilter === f.value}
-                      aria-pressed={myFilter === f.value}
-                      onClick={() => setMyFilter(f.value)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+              {homeRow.live.length > 0 && (
+                <div className={styles.cardSection}>
+                  <div className="section-header">
+                    <h3 className={styles.sectionHeading} data-tone="live">
+                      Live now
+                    </h3>
+                  </div>
+                  <div className={styles.cardList}>
+                    {homeRow.live.map((event) => (
+                      <EventTile
+                        key={event.id}
+                        event={event}
+                        onToggleFavorite={handleToggleFavorite}
+                        isNew={event.id === newEventId}
+                        justOpened={event.id === returnHighlightId}
+                      />
+                    ))}
+                  </div>
                 </div>
-                {/* The reference puts a controls glyph at the end of the chip row. It opens the
-                    search / sort / favourites toolbar, which already exists as the See-All
-                    view — rather than inventing a second, parallel filter surface. */}
-                <button
-                  type="button"
-                  className={styles.filterChipIcon}
-                  onClick={() => setShowAll(true)}
-                  aria-label="Search and sort rides"
-                  title="Search and sort"
-                >
-                  <SlidersHorizontal width={16} height={16} aria-hidden="true" />
-                </button>
-              </div>
-
-              {homeList.length === 0 ? (
-                <p className={styles.noResults}>
-                  {myFilter === "hosted"
-                    ? "You haven't created any rides yet."
-                    : myFilter === "past"
-                      ? "No past rides yet."
-                      : "No upcoming rides."}
-                </p>
-              ) : (
-                <div className={styles.homeList}>
-                  {homeList.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      isNew={event.id === newEventId}
-                      justOpened={event.id === returnHighlightId}
-                    />
-                  ))}
+              )}
+              {homeRow.upcoming.length > 0 && (
+                <div className={styles.cardSection}>
+                  <div className="section-header">
+                    <h3 className={styles.sectionHeading}>Upcoming</h3>
+                    <button
+                      type="button"
+                      className={styles.seeAllLink}
+                      onClick={() => setShowAll(true)}
+                    >
+                      See All
+                    </button>
+                  </div>
+                  <div className={styles.cardList}>
+                    {homeRow.upcoming.map((event) => (
+                      <EventTile
+                        key={event.id}
+                        event={event}
+                        onToggleFavorite={handleToggleFavorite}
+                        isNew={event.id === newEventId}
+                        justOpened={event.id === returnHighlightId}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {homeRow.past.length > 0 && (
+                <div className={styles.cardSection}>
+                  <div className="section-header">
+                    <h3 className={styles.sectionHeading}>Past Rides</h3>
+                    <button
+                      type="button"
+                      className={styles.seeAllLink}
+                      onClick={() => setShowAll(true)}
+                    >
+                      See All
+                    </button>
+                  </div>
+                  <div className={styles.cardList}>
+                    {homeRow.past.map((event) => (
+                      <EventTile
+                        key={event.id}
+                        event={event}
+                        onToggleFavorite={handleToggleFavorite}
+                        isNew={event.id === newEventId}
+                        justOpened={event.id === returnHighlightId}
+                        compact
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

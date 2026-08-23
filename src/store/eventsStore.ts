@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { apiRequest } from "../lib/api-client";
 import {
   clearCachedEvents,
+  clearUserScopedCache,
   type EventSummary,
   getCachedEvents,
   putCachedEvent,
@@ -80,9 +81,10 @@ export const useEventsStore = create<EventsState>((set, get) => ({
       set({ myRides: merged });
       putCachedEvents("mine", merged);
     } catch {
-      // A cache read above may already be showing something; leave it. Otherwise this fails
-      // silently — the same behavior a real signed-in rider with no cache and no connectivity
-      // already saw.
+      // Never blank My Rides because a request failed. Whatever the cache read above painted
+      // stays exactly as it is, and the IndexedDB copy is left untouched — putCachedEvents is
+      // only ever reached on the success path, so a failure cannot erase a synced list. The
+      // global OFFLINE banner is what tells the rider this is last-synced data.
     } finally {
       if (requestId === myRidesRequestId) set({ myRidesLoading: false });
     }
@@ -138,5 +140,8 @@ export const useEventsStore = create<EventsState>((set, get) => ({
   clearMyRides() {
     set({ myRides: [] });
     void clearCachedEvents("mine");
+    // The v2 per-ride caches (detail, route, participants, live) go too — they are the ones
+    // holding a rider's private ride content, not just its name in a list.
+    void clearUserScopedCache();
   },
 }));

@@ -6,6 +6,7 @@
 // this), and EventDetailPage.tsx.
 
 import { Award, Circle, Flame, TrendingUp, Trophy } from "lucide-react";
+import type { SurfaceType } from "./surface-types";
 
 export type RiderLevel = "beginner" | "intermediate" | "masters" | "elite" | "world_tour";
 
@@ -24,3 +25,30 @@ export const LEVEL_LABEL: Record<RiderLevel, string> = Object.fromEntries(
 export const LEVEL_ICON: Record<RiderLevel, typeof Circle> = Object.fromEntries(
   LEVELS.map((l) => [l.value, l.icon]),
 ) as Record<RiderLevel, typeof Circle>;
+
+/**
+ * For a RUNNING event, "difficulty" is pace — asked for directly: beginner is 7+ min/km, then
+ * 6, 5, 4, and 3 min/km at the sharp end. Same five levels, same order, same bars; only the
+ * label changes, because "Masters" tells a runner nothing while "5 min/km" tells them exactly
+ * whether they can hold the group.
+ *
+ * Cycling/gravel/MTB keep the named levels — there is no equivalent single pace number for a
+ * ride, where terrain and wind dominate.
+ */
+export const RUNNING_PACE_LABEL: Record<RiderLevel, string> = {
+  beginner: "7+ min/km",
+  intermediate: "6 min/km",
+  masters: "5 min/km",
+  elite: "4 min/km",
+  world_tour: "3 min/km",
+};
+
+/** The label to show for one level on one kind of event. */
+export function levelLabelFor(level: RiderLevel, activityType: SurfaceType | null): string {
+  return activityType === "running" ? RUNNING_PACE_LABEL[level] : LEVEL_LABEL[level];
+}
+
+/** What the difficulty tile is called for this kind of event. */
+export function levelHeadingFor(activityType: SurfaceType | null): string {
+  return activityType === "running" ? "Pace" : "Difficulty";
+}

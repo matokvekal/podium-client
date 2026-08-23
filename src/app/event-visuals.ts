@@ -96,13 +96,31 @@ export function placeholderCoverGradient(seed: string | null | undefined): strin
   return `linear-gradient(135deg, color-mix(in srgb, var(${baseA}) 80%, #05070c 20%) 0%, color-mix(in srgb, var(${baseB}) 72%, #05070c 28%) 100%)`;
 }
 
+/**
+ * The built-in cover art, in public/event-covers/. Ten abstract SVG landscapes — sky, sun,
+ * layered ridges, a road ribbon — used until the organizer uploads a real cover.
+ *
+ * They are deliberately ABSTRACT, not stock photographs: a photo of a real road on a ride that
+ * does not go there is a claim about the route, and a rider cannot tell it apart from a real
+ * one. A drawn scene reads as decoration, which is what it is.
+ *
+ * Picked deterministically from the event id, so a given ride always wears the same cover
+ * everywhere it appears — list card, hero, and after a reload.
+ */
+const GENERATED_COVER_COUNT = 10;
+
+export function generatedCoverUrl(seed: string | null | undefined): string {
+  return `/event-covers/cover-${(hashSeed(seed) % GENERATED_COVER_COUNT) + 1}.svg`;
+}
+
 export function eventCoverBackground(
   seed: string | null | undefined,
   coverImageDataUrl: string | null | undefined,
 ): string {
-  if (!coverImageDataUrl) return placeholderCoverGradient(seed);
-  const safeUrl = coverImageDataUrl.replaceAll('"', "%22");
-  return `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), url("${safeUrl}")`;
+  // A real uploaded cover always wins; otherwise one of the built-in scenes above. Both get
+  // the same darkening scrim, so overlaid text stays readable whichever is showing.
+  const url = coverImageDataUrl ? coverImageDataUrl.replaceAll('"', "%22") : generatedCoverUrl(seed);
+  return `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), url("${url}")`;
 }
 
 export function initialOf(name: string | null | undefined): string {

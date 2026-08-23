@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { applyColorTheme, type ColorTheme, getInitialColorTheme } from "../lib/color-theme";
+import { apiRequest } from "../lib/api-client";
+import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
 
@@ -31,6 +33,29 @@ const TEAMS_PATH = /^\/teams(\/[^/]+)?$/;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnlineStatus();
+  const serverReachable = useConnectivityStore((s) => s.serverReachable);
+  const connected = online && serverReachable;
+
+  // Recovery probe. Without it, "the server is back" is only noticed the next time some page
+  // happens to poll — up to a few minutes on the event page, and never at all on a list page
+  // that loads once. This retries a single cheap public endpoint while (and only while) the
+  // server is known to be down; the api client flips serverReachable on any response, which
+  // clears the banner and bumps reconnectNonce, which is what makes the open pages refetch.
+  // Nothing here inspects the result — reaching the server at all is the whole signal.
+  useEffect(() => {
+    if (serverReachable) return;
+    const probe = () => {
+      void apiRequest("/auth/config", { anonymous: true }).catch(() => undefined);
+    };
+    const timer = window.setInterval(probe, 15000);
+    // Also probe immediately when the device itself reports the network is back, rather than
+    // waiting out the interval.
+    window.addEventListener("online", probe);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", probe);
+    };
+  }, [serverReachable]);
   const { status } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,9 +126,20 @@ export function AppShell({ children }: { children: ReactNode }) {
         onToggleColorTheme={toggleColorTheme}
       />
 
-      {!online && (
+      {/* The one global offline indicator. Two independent things can put the app in this
+          state, and either is enough:
+            - the device reports no network (navigator.onLine, useOnlineStatus)
+            - a real request found the server unreachable (lib/connectivity.ts)
+          The second is the one that matters when the API is stopped but the wifi is fine.
+          An HTTP business error — 401/403/404/409 — is deliberately NOT offline: the server
+          answered, and labelling a private event "OFFLINE" would hide the real reason.
+
+          It clears itself: the next request that reaches the server flips serverReachable back
+          and bumps reconnectNonce, which is what makes the pages refetch. No copy about queued
+          changes — there is no mutation queue in this app, and a failed write stays failed. */}
+      {!connected && (
         <div className="banner banner--offline" role="status">
-          Offline — showing what was last loaded. Anything you change is sent when you reconnect.
+          OFFLINE — showing last synced data
         </div>
       )}
 

@@ -5,53 +5,42 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SurfaceType } from "../lib/surface-types";
-import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-types";
+import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN, type RouteType } from "../lib/track-types";
 
+// Trimmed to the filters GET /routes/public actually accepts, plus favoritesOnly (a purely
+// client-side pass over the fetched page — favourites have no server column).
+//
+// Removed, because no route field exists to filter on and a control that silently does nothing
+// is worse than no control: countryCode, multiDayOnly, avoidBusyRoads, dayOfWeek, showHazards,
+// showPois. surfaceType became routeType — the library's own road|gravel|mtb|mixed taxonomy,
+// which is what the endpoint validates against.
 interface TrackFiltersState {
   location: string;
-  countryCode: string;
-  surfaceType: SurfaceType;
+  routeType: RouteType | null;
   distanceRange: [number, number];
   climbRange: [number, number];
-  multiDayOnly: boolean;
-  avoidBusyRoads: boolean;
-  dayOfWeek: number | null;
   favoritesOnly: boolean;
-  showHazards: boolean;
-  showPois: boolean;
   setLocation(value: string): void;
-  setCountryCode(value: string): void;
-  setSurfaceType(value: SurfaceType): void;
+  setRouteType(value: RouteType | null): void;
   setDistanceRange(value: [number, number]): void;
   setClimbRange(value: [number, number]): void;
-  setMultiDayOnly(value: boolean): void;
-  setAvoidBusyRoads(value: boolean): void;
-  setDayOfWeek(value: number | null): void;
   setFavoritesOnly(value: boolean): void;
-  setShowHazards(value: boolean): void;
-  setShowPois(value: boolean): void;
   clearFilters(): void;
 }
 
-// Kept in sync by hand with surface-types.ts's SurfaceType union and TracksPage.tsx's
-// COUNTRY_FILTERS — used only to sanitize whatever a returning rider already has in
-// localStorage (see the persist `migrate` below), not as a source of truth elsewhere.
-const VALID_SURFACE_TYPES: SurfaceType[] = ["road", "gravel", "mtb", "running", "hiking"];
-const VALID_COUNTRY_CODES = ["IL", "GB", "ES", "IT", "FR"];
+// Used only to sanitize what a returning rider already has in localStorage (see the persist
+// `migrate` below) — a stored "running" or "hiking" from the old surface filter is not a valid
+// route type and would be rejected by the endpoint.
+const VALID_ROUTE_TYPES: RouteType[] = ["road", "gravel", "mtb", "mixed"];
 
+// routeType defaults to null — "any type". The old default was "road", which silently hid every
+// gravel and MTB route in the library from a rider who never opened the filter.
 const DEFAULTS = {
   location: "",
-  countryCode: "IL",
-  surfaceType: "road" as SurfaceType,
+  routeType: null as RouteType | null,
   distanceRange: [DISTANCE_MIN, DISTANCE_MAX] as [number, number],
   climbRange: [CLIMB_MIN, CLIMB_MAX] as [number, number],
-  multiDayOnly: false,
-  avoidBusyRoads: false,
-  dayOfWeek: null as number | null,
   favoritesOnly: false,
-  showHazards: true,
-  showPois: true,
 };
 
 export const useTrackFiltersStore = create<TrackFiltersState>()(
@@ -59,53 +48,44 @@ export const useTrackFiltersStore = create<TrackFiltersState>()(
     (set) => ({
       ...DEFAULTS,
       setLocation: (location) => set({ location }),
-      setCountryCode: (countryCode) => set({ countryCode }),
-      setSurfaceType: (surfaceType) => set({ surfaceType }),
+      setRouteType: (routeType) => set({ routeType }),
       setDistanceRange: (distanceRange) => set({ distanceRange }),
       setClimbRange: (climbRange) => set({ climbRange }),
-      setMultiDayOnly: (multiDayOnly) => set({ multiDayOnly }),
-      setAvoidBusyRoads: (avoidBusyRoads) => set({ avoidBusyRoads }),
-      setDayOfWeek: (dayOfWeek) => set({ dayOfWeek }),
       setFavoritesOnly: (favoritesOnly) => set({ favoritesOnly }),
-      setShowHazards: (showHazards) => set({ showHazards }),
-      setShowPois: (showPois) => set({ showPois }),
       clearFilters: () => set(DEFAULTS),
     }),
     {
       name: "podium.trackFilters",
-      // Bumped once: an earlier build persisted surfaceType "walking", later renamed to
-      // "hiking" (see surface-types.ts). Without this, a rider who opened Find Tracks before
-      // that rename gets stuck on a surface value no track can ever match again — an
-      // empty-forever result list with no visible error. `migrate` below repairs that stored
-      // value in place instead of silently discarding the rest of their saved filters.
-      version: 1,
-      migrate: (persisted) => {
+      // Bumped to 2 with the move to real route data. A rider who used Find Tracks before this
+      // has a stored surfaceType (possibly "running"/"hiking"/"walking") and a countryCode, and
+      // neither is a thing the route endpoint accepts. Version 1's migrate repaired a renamed
+      // surface value in place; there is nothing to repair now, because the field it repaired
+      // no longer exists.
+      //
+      // Anything stored under the old shape is dropped and replaced with DEFAULTS. That is
+      // deliberate rather than a best-effort carry-over: a stale "road" surface silently became
+      // a route-type filter that hid every gravel and MTB route in the library, which is
+      // exactly the kind of invisible empty-list bug this whole pass is about.
+      version: 2,
+      migrate: (persisted, version) => {
+        if (version < 2) return { ...DEFAULTS };
         const state = persisted as Partial<typeof DEFAULTS>;
         return {
           ...DEFAULTS,
           ...state,
-          surfaceType: VALID_SURFACE_TYPES.includes(state.surfaceType as SurfaceType)
-            ? (state.surfaceType as SurfaceType)
-            : DEFAULTS.surfaceType,
-          countryCode: VALID_COUNTRY_CODES.includes(state.countryCode as string)
-            ? (state.countryCode as string)
-            : DEFAULTS.countryCode,
+          routeType: VALID_ROUTE_TYPES.includes(state.routeType as RouteType)
+            ? (state.routeType as RouteType)
+            : DEFAULTS.routeType,
         };
       },
       // Only the actual filter values persist — the action functions aren't serializable
       // and are re-attached fresh by `create` on every load anyway.
       partialize: (state) => ({
         location: state.location,
-        countryCode: state.countryCode,
-        surfaceType: state.surfaceType,
+        routeType: state.routeType,
         distanceRange: state.distanceRange,
         climbRange: state.climbRange,
-        multiDayOnly: state.multiDayOnly,
-        avoidBusyRoads: state.avoidBusyRoads,
-        dayOfWeek: state.dayOfWeek,
         favoritesOnly: state.favoritesOnly,
-        showHazards: state.showHazards,
-        showPois: state.showPois,
       }),
     },
   ),

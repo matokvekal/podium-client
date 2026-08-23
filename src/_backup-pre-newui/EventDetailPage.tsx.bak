@@ -80,8 +80,8 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
-import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
-import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
+import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
+import { SURFACE_TYPE_ICON } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
@@ -93,9 +93,6 @@ import styles from "./EventDetailPage.module.css";
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
 // string) — kept as two formatters, not one, so there's no risk of the field-order bug
 // formatLocalDateTime hit (lib/time.ts's own doc comment).
-/** Longer than this and the description collapses behind a "… more" toggle, as in the mock. */
-const DESCRIPTION_CLAMP_CHARS = 140;
-
 const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
@@ -276,9 +273,6 @@ function detailFromCachedSummary(summary: EventSummary, viewerId: number | null)
     description: null,
     finishedAt: null,
     isOwner: viewerId != null && viewerId === summary.ownerId,
-    // A list summary has no owner object — only ownerId. Null, not a guess: the organizer row
-    // simply doesn't render until the real fetch resolves.
-    owner: null,
     requiresApproval: false,
     isPaused: false,
     effectiveStatus: summary.status,
@@ -311,7 +305,6 @@ export function EventDetailPage() {
   // for "leave", the rider's own sticky bottom bar) swaps to a small message + Cancel/Confirm
   // pair for that one action.
   const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
-  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
@@ -899,11 +892,7 @@ export function EventDetailPage() {
   const wazeHref = wazeUrl(event.location, routePoint);
   const googleMapsHref = googleMapsUrl(event.location, routePoint);
   const extras = getEventExtras(extrasByEvent, event.id);
-  // Server value first — activityType is a real field on the event now (see EventSummary).
-  // No "road" default any more: an event whose organizer picked no surface shows no surface,
-  // rather than being labelled Road because that happened to be first in the list.
-  const activityType = event.activityType ?? extras.activityType ?? null;
-  const ActivityIcon = activityType ? SURFACE_TYPE_ICON[activityType] : null;
+  const ActivityIcon = SURFACE_TYPE_ICON[extras.activityType ?? "road"];
   // Same fallback chain EventCard.tsx/EventTile.tsx use on the list cards — a team or manual
   // club name the organizer explicitly picked on EventCreatePage.tsx (extras.organizerGroup)
   // wins; failing that, the real signed-in owner's name (event.ownerName — nickname, else
@@ -913,19 +902,11 @@ export function EventDetailPage() {
   // truth to the rider reading it.
   // Only the "real owner" branch has a photo to show — a club/team name is not an account,
   // so there is no server avatar for it.
-  const level = event.level ?? extras.level ?? null;
-  // The organizer's own numbers (typed, or auto-filled from the route they picked) win over
-  // the saved route's, because that is the figure they chose to publish for this ride. Null
-  // when neither exists — the tile is then simply not drawn.
-  const distanceKm = extras.distanceKm ?? results?.route?.distanceKm ?? null;
-  const climbM = extras.climbM ?? results?.route?.elevationM ?? null;
+  const level = extras.level ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
-  // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
-  // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
-  // under), but the avatar only ever comes from a real account, never from a club string.
-  const organizerIsRealOwner = !extras.organizerGroup && !!event.owner?.name;
-  const organizer = extras.organizerGroup ?? event.owner?.name ?? null;
-  const organizerAvatarUrl = organizerIsRealOwner ? (event.owner?.avatarUrl ?? null) : null;
+  const organizerIsRealOwner = !extras.organizerGroup && !!event.ownerName;
+  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
+  const organizerAvatarUrl = organizerIsRealOwner ? event.ownerAvatarUrl : null;
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
   const riderCount = realRiderCount;
   const bucket = figmaStatus(displayStatus);
@@ -950,7 +931,7 @@ export function EventDetailPage() {
           rule as EventCard/EventTile) with the date/status pinned to its corners and the
           name/organizer overlaid at the bottom. ------------------------------------------ */}
       <div className={styles.hero} style={{ background: coverBackground }}>
-        {ActivityIcon && <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />}
+        <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />
         <div className={styles.heroScrim} />
 
         <div className={styles.heroTop}>
@@ -967,11 +948,7 @@ export function EventDetailPage() {
             <span />
           )}
           <div className={styles.heroTopRight}>
-            <span
-              className={styles.statusPill}
-              data-bucket={bucket}
-              title={isPastDue ? "Automatically marked finished — the date has passed" : undefined}
-            >
+            <span className={styles.statusPill} data-bucket={bucket}>
               {displayStatus === "cancelled" ? "Cancelled" : FIGMA_TAG_LABEL[bucket]}
             </span>
             <button
@@ -1022,95 +999,86 @@ export function EventDetailPage() {
         )}
         {redirectMessage && <p className="banner">{redirectMessage}</p>}
 
-        {/* --- stat strip -------------------------------------------------------------------
-            The reference design shows five tiles: Distance, Elevation, Est. Time, Avg. Speed,
-            Difficulty. Only three of those are real.
-
-            Est. Time and Avg. Speed are NOT rendered — in any form. No duration field exists on
-            an event or a route, and average speed of a ride that may not have happened yet is
-            not a thing the server tracks at all. Deriving either would mean inventing an
-            assumed pace and presenting it as this ride's data. They are absent rather than
-            "soon" because neither is a planned feature with a placeholder worth showing.
-
-            Every remaining tile renders only when its value is real, and the strip itself
-            disappears when none of them are. -------------------------------------------- */}
-        {(distanceKm != null || climbM != null || level != null) && (
-          <div className={styles.statStrip}>
-            {distanceKm != null && (
-              <div className={styles.statTile}>
-                <Ruler className={styles.statTileIcon} aria-hidden="true" />
-                <span className={styles.statTileValue}>{distanceKm} km</span>
-                <span className={styles.statTileLabel}>Distance</span>
-              </div>
-            )}
-            {climbM != null && (
-              <div className={styles.statTile}>
-                <Mountain className={styles.statTileIcon} aria-hidden="true" />
-                <span className={styles.statTileValue}>{climbM} m</span>
-                <span className={styles.statTileLabel}>Elevation</span>
-              </div>
-            )}
-            {level && (
-              <div className={styles.statTile}>
-                <span className={styles.levelBars} aria-hidden="true">
-                  {LEVELS.map((l, i) => (
-                    <span
-                      key={l.value}
-                      className={styles.levelBar}
-                      data-level={l.value}
-                      data-filled={i <= levelIndex}
-                      style={{ height: `${6 + i * 3}px` }}
-                    />
-                  ))}
-                </span>
-                <span className={styles.statTileValue}>
-                  {levelLabelFor(level, activityType)}
-                </span>
-                <span className={styles.statTileLabel}>{levelHeadingFor(activityType)}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- chip row: surface / visibility / approval ------------------------------------
-            The reference design's three chips. Status is NOT repeated here — the hero already
-            carries it, and the mock's chip row doesn't show it. Difficulty moved into the stat
-            strip above, where the mock puts it.
-
-            "Approval Required" is shown to everyone now, not just the owner: requiresApproval
-            is real data on this response, and whether joining needs approval is exactly what a
-            rider deciding to tap "I'M IN" needs to know. --------------------------------- */}
-        <div className={styles.chipRow}>
-          {activityType && ActivityIcon && (
-            <span className={styles.chip} data-surface={activityType}>
-              <ActivityIcon width={13} height={13} aria-hidden="true" />
-              {SURFACE_TYPE_LABEL[activityType]}
+        {/* --- stats row ------------------------------------------------------------------ */}
+        <div className={styles.statsRow}>
+          {riderCount != null && (
+            <span className={styles.statItem}>
+              <Users width={15} height={15} aria-hidden="true" />
+              {riderCount} Riders
             </span>
           )}
-          <span className={styles.chip} data-kind={event.visibility}>
-            {event.visibility === "private" ? "Private" : "Public"}
+          {/* Organizer's own distance/climb (typed or auto-filled from a picked route on
+              EventCreatePage.tsx) wins over the saved route's numbers — that's the real value
+              for this event once it's set. */}
+          {(extras.distanceKm ?? results?.route?.distanceKm) != null && (
+            <span className={styles.statItem}>
+              <Ruler width={15} height={15} aria-hidden="true" />
+              {extras.distanceKm ?? results?.route?.distanceKm} km
+            </span>
+          )}
+          {(extras.climbM ?? results?.route?.elevationM) != null && (
+            <span className={styles.statItem}>
+              <Mountain width={15} height={15} aria-hidden="true" />
+              {extras.climbM ?? results?.route?.elevationM} m
+            </span>
+          )}
+        </div>
+
+        {/* --- tags row: status / visibility / difficulty stairs --------------------------- */}
+        <div className={styles.tagsRow}>
+          <span
+            className={styles.pill}
+            data-tone={
+              displayStatus === "cancelled"
+                ? "danger"
+                : bucket === "live"
+                  ? "live"
+                  : bucket === "finished"
+                    ? "neutral"
+                    : "ready"
+            }
+            title={isPastDue ? "Automatically marked finished — the date has passed" : undefined}
+          >
+            {displayStatus.replace("_", " ")}
           </span>
-          {event.requiresApproval && (
+          <span className={styles.pill} data-tone="neutral">
+            {event.visibility}
+          </span>
+          {event.requiresApproval && event.isOwner && (
             <span
-              className={styles.chip}
-              data-kind="approval"
+              className={styles.pill}
+              data-tone="neutral"
               title="Riders who join must be approved before they're in"
             >
-              Approval Required
-            </span>
-          )}
-          {displayStatus === "cancelled" && (
-            <span className={styles.chip} data-kind="cancelled">
-              Cancelled
+              Approval required
             </span>
           )}
           {event.isPaused && (
             <span
-              className={styles.chip}
-              data-kind="paused"
+              className={styles.pill}
+              data-tone="ready"
               title="The organizer has paused live tracking"
             >
               Paused
+            </span>
+          )}
+          {/* Same steps visual (and color-per-level scheme) as the create page's difficulty
+              picker — read-only here, just the current level lit. Hidden when the organizer
+              set no difficulty, rather than showing an unlit scale that reads as "easiest". */}
+          {level && (
+            <span
+              className={`${styles.levelBars} ${styles.tagsRowSpacer}`}
+              title={LEVEL_LABEL[level]}
+            >
+              {LEVELS.map((l, i) => (
+                <span
+                  key={l.value}
+                  className={styles.levelBar}
+                  data-level={l.value}
+                  data-filled={i === levelIndex}
+                  style={{ height: `${6 + i * 4}px` }}
+                />
+              ))}
             </span>
           )}
         </div>
@@ -1209,54 +1177,75 @@ export function EventDetailPage() {
           <LiveTracking eventId={event.id} isPaused={event.isPaused} />
         )}
 
-        {/* --- organizer -------------------------------------------------------------------
-            The reference design gives the organizer their own card. It renders only when there
-            is a real organizer to name: event.owner.name from the server, or the club/team the
-            organizer typed on the create form. An event with neither shows no card at all —
-            there used to be a third fallback that invented a club name from the event id, and
-            a made-up organization on a real ride is indistinguishable from the truth to the
-            rider reading it.
-
-            The mock has a chevron suggesting the row opens something. There is no organizer
-            profile anywhere in this app, so it is not drawn: an affordance that goes nowhere is
-            worse than none. ---------------------------------------------------------------- */}
-        {organizer && (
-          <div className={styles.organizerCard}>
-            <Avatar
-              className={styles.organizerAvatar}
-              name={organizer}
-              avatarUrl={organizerAvatarUrl}
-              seed={organizer}
-            />
-            <div className={styles.organizerText}>
-              <span className={styles.organizerLabel}>Organized by</span>
-              <span className={styles.organizerName}>
-                {organizer}
-                <span className={styles.organizerBadge}>Organizer</span>
+        {/* --- at a glance: where/when/who, one card, one source of truth per field --------- */}
+        <div className="card stack">
+          {event.startsAt && (
+            <p
+              className={`${styles.highlightRow} row`}
+              style={{ margin: 0, gap: "14px", flexWrap: "wrap" }}
+            >
+              <span className="row" style={{ gap: "6px" }}>
+                <CalendarDays width={16} height={16} aria-hidden="true" />
+                {formatLocalDateTime(event.startsAt)}
               </span>
-            </div>
-          </div>
-        )}
-
-        {/* --- description ------------------------------------------------------------------
-            Collapsed to a few lines with a "… more" toggle, as in the mock, but only when the
-            text is actually long enough to need it. */}
-        {event.description && (
-          <div className={styles.description}>
-            <p className={styles.descriptionText} data-expanded={descriptionOpen}>
-              {event.description}
             </p>
-            {event.description.length > DESCRIPTION_CLAMP_CHARS && (
-              <button
-                type="button"
-                className={styles.descriptionToggle}
-                onClick={() => setDescriptionOpen((open) => !open)}
-              >
-                {descriptionOpen ? "less" : "… more"}
-              </button>
-            )}
+          )}
+          {event.location && (
+            <div className={styles.infoBlock}>
+              <p className={styles.infoLabel}>Meeting point</p>
+              <p className="row" style={{ margin: 0, gap: "6px" }}>
+                <MapPin width={16} height={16} aria-hidden="true" />
+                {event.location}
+              </p>
+              {(wazeHref || googleMapsHref) && (
+                <div className="row" style={{ gap: "8px", marginTop: 6 }}>
+                  {wazeHref && (
+                    <a
+                      href={wazeHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.navLink}
+                      aria-label="Navigate with Waze"
+                    >
+                      <Navigation width={14} height={14} aria-hidden="true" />
+                      Waze
+                    </a>
+                  )}
+                  {googleMapsHref && (
+                    <a
+                      href={googleMapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.navLink}
+                      aria-label="Navigate with Google Maps"
+                    >
+                      <MapPin width={14} height={14} aria-hidden="true" />
+                      Maps
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="row" style={{ gap: "6px" }}>
+            <p className="muted row" style={{ margin: 0, gap: "6px" }}>
+              <Users width={14} height={14} aria-hidden="true" />
+              <Avatar
+                className={styles.avatar}
+                name={organizer}
+                avatarUrl={organizerAvatarUrl}
+                seed={organizer}
+              />
+              Organized by {organizer}
+            </p>
           </div>
-        )}
+          {event.description && (
+            <div className={styles.infoBlock}>
+              <p className={styles.infoLabel}>Mission brief</p>
+              <p style={{ margin: 0 }}>{event.description}</p>
+            </div>
+          )}
+        </div>
 
         {resultsLoading && !results && (
           <div className="row">
@@ -1304,116 +1293,34 @@ export function EventDetailPage() {
               </div>
             )}
 
-            {/* --- route preview ------------------------------------------------------------
-                The mock puts the route's distance and elevation in this card's header beside
-                the title, and an ELEVATION PROFILE chart under the map. The chart is not built:
-                drawing one needs an elevation value per point along the route, and a route
-                carries only [lat, lng] pairs plus a single total climb (lib/event-route.ts,
-                matching the server's route schema). There is no series to plot. A profile drawn
-                from anything else would be an invented picture of terrain the rider is about to
-                ride, so this shows the real map and the real total, and nothing more.
-
-                The whole card is skipped when the event has no route, instead of an empty
-                frame. ------------------------------------------------------------------- */}
-            {results.route && (
-              <div className="card stack">
-                <div className={styles.routeHeader}>
-                  <p className={styles.infoLabel}>Route Preview</p>
-                  <span className={styles.routeMeta}>
-                    {results.route.distanceKm != null && (
-                      <span className={styles.routeMetaItem}>
-                        <Ruler width={13} height={13} aria-hidden="true" />
-                        {results.route.distanceKm} km
-                      </span>
-                    )}
+            {/* --- route preview ------------------------------------------------------------ */}
+            <div className="card stack">
+              <p className={styles.infoLabel}>Route preview</p>
+              {results.route ? (
+                <>
+                  <Suspense fallback={<div className="row muted">Loading the map…</div>}>
+                    <RouteMap points={results.route.points} />
+                  </Suspense>
+                  <div className={styles.statsRow} style={{ marginTop: "var(--space-2)" }}>
+                    <span className={styles.statItem}>
+                      <Ruler width={15} height={15} aria-hidden="true" />
+                      {results.route.distanceKm} km
+                    </span>
                     {results.route.elevationM != null && (
-                      <span className={styles.routeMetaItem}>
-                        <Mountain width={13} height={13} aria-hidden="true" />
+                      <span className={styles.statItem}>
+                        <Mountain width={15} height={15} aria-hidden="true" />
                         {results.route.elevationM} m
                       </span>
                     )}
-                  </span>
-                </div>
-                <Suspense fallback={<div className="row muted">Loading the map…</div>}>
-                  <RouteMap points={results.route.points} />
-                </Suspense>
-              </div>
-            )}
-
-            {/* --- info strip -------------------------------------------------------------
-                The mock's four-cell strip: Start · Meeting Point · Finish · Participants.
-
-                FINISH is not rendered. The mock shows "~ 09:15 AM", which is the start plus an
-                estimated duration — and no duration exists anywhere (see the stat strip above).
-                An estimated finish on a group ride is the kind of number people plan pickups
-                around, so it is absent rather than guessed.
-
-                PARTICIPANTS shows the real count only. The mock's "1 / 25" implies a capacity;
-                no capacity column exists server-side, so there is nothing to divide by.
-
-                Each cell renders only with a real value, and the strip disappears when none of
-                them do. ------------------------------------------------------------------ */}
-            {(event.startsAt || event.location || riderCount != null) && (
-              <div className={styles.infoStrip}>
-                {event.startsAt && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <CalendarDays width={13} height={13} aria-hidden="true" />
-                      Start
-                    </span>
-                    <span className={styles.infoCellValue}>
-                      {formatLocalDateTime(event.startsAt)}
-                    </span>
                   </div>
-                )}
-                {event.location && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <MapPin width={13} height={13} aria-hidden="true" />
-                      Meeting Point
-                    </span>
-                    <span className={styles.infoCellValue}>{event.location}</span>
-                    {(wazeHref || googleMapsHref) && (
-                      <span className={styles.infoCellLinks}>
-                        {wazeHref && (
-                          <a
-                            href={wazeHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.navLink}
-                            aria-label="Navigate with Waze"
-                          >
-                            <Navigation width={12} height={12} aria-hidden="true" />
-                            Waze
-                          </a>
-                        )}
-                        {googleMapsHref && (
-                          <a
-                            href={googleMapsHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.navLink}
-                            aria-label="Navigate with Google Maps"
-                          >
-                            <MapPin width={12} height={12} aria-hidden="true" />
-                            Maps
-                          </a>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {riderCount != null && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <Users width={13} height={13} aria-hidden="true" />
-                      Participants
-                    </span>
-                    <span className={styles.infoCellValue}>{riderCount}</span>
-                  </div>
-                )}
-              </div>
-            )}
+                </>
+              ) : (
+                // Neither the organizer's saved route (server, or this device's own local
+                // cache) exists yet — an honest empty state, never a fabricated route
+                // standing in as if it were real (see resultsStore.ts's doc comment).
+                <p className="muted">No route added yet.</p>
+              )}
+            </div>
 
             {/* "if riders are published we will see them" — the organizer's own "Riders list
                 open to view" switch (EventCreatePage.tsx) gates this for everyone else; the

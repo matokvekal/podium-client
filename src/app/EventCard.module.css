@@ -1,321 +1,415 @@
-/* Ported directly from Figma (Tomer-Design / new-commissaire, "All Races" > Card/N — CSS
- * export pasted 2026-08-14), not re-derived from the old race-pwa code. Card is 104px tall:
- * a 90x94 image on the left, then title+status tag, then two icon+text meta rows.
+/*
+ * Ride card — the "all-events" reference design (all-events.jpg). Previous version kept at
+ * src/_backup-pre-newui/EventCard.module.css.bak.
  *
- * The three status colours are literal — they're a fixed part of this design system, not
- * meant to shift with light/dark, so unlike the rest of the app they're not sourced from
- * tokens.css. Text/icon colour on the card body does still use --text/--text-muted so the
- * card itself still adapts to dark mode.
+ * THEMES: the reference is dark, but this app ships light AND dark (styles/tokens.css defines
+ * three states: light :root, prefers-color-scheme dark guarded by :not([data-color-theme]),
+ * and an explicit [data-color-theme="dark"]). So nothing here hardcodes a dark background or a
+ * light text colour — every surface, border and text colour is a token, and the card inverts
+ * with the rest of the app for free.
+ *
+ * The only raw colours are the chip hues below, because "Road is blue, MTB is green, Gravel is
+ * gold" is identity, not theme. Those are declared once as variables and re-declared for dark
+ * with slightly lighter values, since a hue that reads well on white is too dark on #161b22.
  */
 
-/* Fluorescent green/blue border + glow, asked for directly ("green libt blue floruents
-   border") — reuses the same two colors the status tag already carries (upcoming's teal-green,
-   live's light blue) rather than introducing a third accent. Brightens further on hover. */
 .card {
-  position: relative;
+  --chip-road: #2563eb;
+  --chip-mtb: #15803d;
+  --chip-gravel: #a16207;
+  --chip-running: #b91c1c;
+  --chip-hiking: #0f766e;
+  --chip-private: #7c3aed;
+  --chip-public: #2563eb;
+
   display: flex;
-  align-items: stretch;
-  gap: 13px;
-  width: 100%;
-  min-height: 104px;
-  padding: 5px;
-  background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0)
-    )
-    var(--surface);
-  border: 1px solid rgba(62, 221, 164, 0.52);
-  box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.2),
-    0 0 16px rgba(62, 221, 164, 0.24),
-    0 0 26px rgba(99, 166, 252, 0.16);
-  border-radius: 10px;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
-  color: inherit;
   transition:
-    transform 120ms ease,
-    box-shadow 150ms ease,
-    border-color 150ms ease;
+    transform var(--beat-2) ease,
+    box-shadow var(--beat-2) ease,
+    border-color var(--beat-2) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-theme]) .card {
+    --chip-road: #60a5fa;
+    --chip-mtb: #4ade80;
+    --chip-gravel: #fbbf24;
+    --chip-running: #f87171;
+    --chip-hiking: #2dd4bf;
+    --chip-private: #a78bfa;
+    --chip-public: #60a5fa;
+  }
+}
+
+:root[data-color-theme="dark"] .card {
+  --chip-road: #60a5fa;
+  --chip-mtb: #4ade80;
+  --chip-gravel: #fbbf24;
+  --chip-running: #f87171;
+  --chip-hiking: #2dd4bf;
+  --chip-private: #a78bfa;
+  --chip-public: #60a5fa;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(62, 221, 164, 0.86);
-  box-shadow:
-    0 0 0 1px rgba(99, 166, 252, 0.36),
-    0 0 24px rgba(62, 221, 164, 0.38),
-    0 0 36px rgba(99, 166, 252, 0.26),
-    0 6px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
 }
 
-.card:active {
-  transform: scale(0.99);
-}
-
-/* Flags the ride just created on EventCreatePage.tsx — asked for directly, so it stands out
-   from the rest of the list at a glance for a few minutes rather than blending straight in.
-   See EventsListPage.tsx for how long "isNew" stays true. */
+/* A ride just created, or the one just opened — the same "light it up again" affordance the
+   previous card had, kept because it is behaviour, not decoration. */
 .card[data-new] {
-  box-shadow:
-    0 0 0 2px var(--accent-strong),
-    0 0 15px 15px rgba(63, 134, 231, 0.35);
-  animation: new-card-glow 1.8s ease-in-out infinite;
+  border-color: var(--accent);
 }
 
-@keyframes new-card-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 2px var(--accent-strong),
-      0 0 15px 12px rgba(63, 134, 231, 0.28);
-  }
-  50% {
-    box-shadow:
-      0 0 0 2px var(--accent-strong),
-      0 0 15px 18px rgba(63, 134, 231, 0.45);
-  }
+/* --- row 1: date · thumb · title ---------------------------------------------------------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
-.image {
+.dateBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 90px;
-  height: 94px;
-  border-radius: 10px;
+  width: 48px;
+  padding: 6px 0;
+  line-height: 1.15;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.dateBlock[data-empty="true"] {
+  color: var(--text-muted);
+}
+
+.dateMonth {
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--status-danger);
+}
+
+.dateDay {
+  font-size: 18px;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.dateWeekday {
+  font-size: 9px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.thumb {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  width: 74px;
+  height: 62px;
   background-size: cover;
   background-position: center;
-  font-family: "Abel", var(--font-sans);
-  font-size: 28px;
-  color: #fff;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
-.text {
-  flex: 1;
-  min-width: 0;
+.headMain {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
 .titleRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-/* Edit shortcut — only rendered for a ride this rider owns that hasn't started yet (see
-   EventCard.tsx's canEdit). Sits between the title and status tag rather than stealing a
-   whole extra row. */
-.editBtn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.editBtn:hover {
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-}
-
-.editBtn svg {
-  width: 15px;
-  height: 15px;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .title {
-  flex: 1 1 auto;
+  flex: 1;
   min-width: 0;
-  font-family: "Abel", var(--font-sans);
-  font-size: 17px;
+  font-size: 0.98rem;
   font-weight: var(--weight-bold);
-  letter-spacing: 0.01em;
-  line-height: 21px;
+  line-height: 1.25;
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .tag {
-  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  font-family: "Abel", var(--font-sans);
-  font-size: 11px;
-  line-height: 14px;
-  text-align: center;
-  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 0.62rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
-.tag[data-status="upcoming"] {
-  background: rgba(62, 221, 164, 0.17);
-  color: #3edda4;
-}
+
 .tag[data-status="live"] {
-  background: rgba(99, 166, 252, 0.17);
-  color: #63a6fc;
-  animation: live-tag-pulse 1.6s ease-in-out infinite;
+  color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live) 18%, transparent);
+  border-color: color-mix(in srgb, var(--status-live) 45%, transparent);
 }
-.tag[data-status="finished"] {
-  background: rgba(41, 48, 66, 0.17);
-  color: #293042;
+
+.tag[data-status="upcoming"] {
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .liveDot {
   width: 6px;
   height: 6px;
+  background: currentColor;
   border-radius: 50%;
-  background: #63a6fc;
-  animation: pulse-dot 1.4s ease-in-out infinite;
+  animation: cardLiveBlink 1.4s ease-in-out infinite;
 }
 
-@keyframes live-tag-pulse {
+@keyframes cardLiveBlink {
   0%,
   100% {
-    background: rgba(99, 166, 252, 0.17);
+    opacity: 1;
   }
   50% {
-    background: rgba(99, 166, 252, 0.32);
+    opacity: 0.25;
   }
 }
 
-.metaRow {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+@media (prefers-reduced-motion: reduce) {
+  .liveDot {
+    animation: none;
+  }
 }
 
-.metaItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: "Abel", var(--font-sans);
-  font-size: 12px;
-  font-weight: var(--weight-medium);
-  line-height: 15px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Location, as a tappable button (opens Waze) rather than plain text — "icon for location
-   that open waze or google map", asked for directly. Otherwise identical to .metaItem; reset
-   from a native <button> baseline since it's not a <span> like its siblings. */
-.metaLinkItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  font-family: "Abel", var(--font-sans);
-  font-size: 12px;
-  font-weight: var(--weight-medium);
-  line-height: 15px;
-  color: var(--accent-strong);
-  background: none;
-  border: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.metaLinkItem:hover {
-  text-decoration: underline;
-}
-
-.metaIcon {
-  width: 14px;
-  height: 14px;
-  color: #3edda4;
-  flex-shrink: 0;
-}
-
-.creatorMeta {
-  font-size: 13px;
-}
-
-.creatorAvatar {
+.heartBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  font-size: 9px;
-  font-weight: var(--weight-medium);
-  color: #fff;
   flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin: -4px -4px 0 0;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
-/* Difficulty "stairs" — same read-only signal-bars idea and storm-intensity color-per-level
-   scheme as EventCreatePage.module.css's difficulty picker / EventDetailPage.module.css's
-   own copy of it. Only the current level's bar is lit. */
-.levelScale {
+.heartBtn[data-on="true"] {
+  color: var(--status-danger);
+}
+
+.heartBtn:hover {
+  background: var(--surface-raised);
+}
+
+/* --- row 2: tag chips --------------------------------------------------------------------- */
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 4px;
+  padding: 2px 9px;
+  font-size: 0.68rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid transparent;
 }
 
-.levelEdge {
-  font-family: "Abel", var(--font-sans);
-  font-size: 10px;
-  line-height: 1;
-  color: color-mix(in srgb, var(--text-muted) 82%, var(--text));
+/* Each chip picks its identity hue into --chip-hue, then one rule paints all of them. The
+   per-surface hues are what the reference shows: Road blue, MTB green, Gravel gold. */
+.chip[data-surface="road"] {
+  --chip-hue: var(--chip-road);
+}
+.chip[data-surface="mtb"] {
+  --chip-hue: var(--chip-mtb);
+}
+.chip[data-surface="gravel"] {
+  --chip-hue: var(--chip-gravel);
+}
+.chip[data-surface="running"] {
+  --chip-hue: var(--chip-running);
+}
+.chip[data-surface="hiking"] {
+  --chip-hue: var(--chip-hiking);
+}
+.chip[data-kind="private"] {
+  --chip-hue: var(--chip-private);
+}
+.chip[data-kind="public"] {
+  --chip-hue: var(--chip-public);
 }
 
+.chip {
+  color: var(--chip-hue, var(--text-muted));
+  background: color-mix(in srgb, var(--chip-hue, var(--text-muted)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--chip-hue, var(--text-muted)) 35%, transparent);
+}
+
+/* --- row 3: the four stats ---------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.statIcon {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
+
+.statValue {
+  font-size: 0.82rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.statLabel {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+/* A stat the API cannot answer yet ("soon"). Muted and italic so it never reads as a value. */
+.stat[data-pending="true"] .statValue,
+.footerItem[data-pending="true"] {
+  font-style: italic;
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
+/* Difficulty "stairs" — same read-only signal-bars scheme as the create page and the event
+   page, so one ride's difficulty looks identical everywhere. Bars up to the level are lit. */
 .levelBars {
   display: inline-flex;
   align-items: flex-end;
-  gap: 3px;
-  height: 15px;
+  gap: 2px;
+  height: 17px;
 }
 
 .levelBar {
-  width: 5px;
+  width: 4px;
   border-radius: 1px;
-  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {
-  background: #39ff8c;
-  border-color: #39ff8c;
+  background: #39c97c;
+  border-color: #39c97c;
 }
-
 .levelBar[data-level="intermediate"][data-filled="true"] {
-  background: #c3ff39;
-  border-color: #c3ff39;
+  background: #a8d93a;
+  border-color: #a8d93a;
 }
-
 .levelBar[data-level="masters"][data-filled="true"] {
   background: #ffb020;
   border-color: #ffb020;
 }
-
 .levelBar[data-level="elite"][data-filled="true"] {
-  background: #ff3b5c;
-  border-color: #ff3b5c;
+  background: #ef4a6b;
+  border-color: #ef4a6b;
+}
+.levelBar[data-level="world_tour"][data-filled="true"] {
+  background: #9b3ef0;
+  border-color: #9b3ef0;
 }
 
-.levelBar[data-level="world_tour"][data-filled="true"] {
-  background: #b026ff;
-  border-color: #b026ff;
+/* --- row 4: footer ------------------------------------------------------------------------ */
+
+.footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.footerItem,
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.footerLink {
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.footerLink:hover {
+  color: var(--accent-strong);
+}
+
+/* Participants sits at the far right in the reference. `auto` rather than a fixed order so it
+   simply drops onto the next line on a narrow phone instead of being squeezed. */
+.footer > [data-pending="true"]:last-child {
+  margin-left: auto;
+}
+
+.footerIcon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }

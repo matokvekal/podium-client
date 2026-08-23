@@ -1,254 +1,127 @@
 /**
- * One track shown as a single full card in the "Find Tracks" results pager — not a list row
- * like EventCard, since results are browsed one at a time (prev/next, not scrolled).
+ * One public route in Find Tracks.
  *
- * Hazard display rule, set deliberately: only a "high" severity hazard is ever shown, as a
- * plain red alert, and only because a rider reported it — never a green/good sign for a
- * track with no reports. Absence of a report is not evidence a road is safe, just that no
- * one has said anything yet; showing a positive signal for that would be a false safety
- * claim. Low/medium hazards stay in the data (useful later, e.g. a detail view) but are not
- * surfaced here. The disclaimer text is intentional, not filler — see the note this pairs
- * with in plan/09-nfr-privacy-testing.md about versioned consent/terms: hazard content is
- * rider-reported, not verified or an app recommendation, and that needs to be reflected in
- * the app's terms once that system exists (it doesn't yet — see 09's "Reuse" section).
+ * Rewritten to render REAL fields only. The previous card showed an air-quality badge, a
+ * hazard count, point-of-interest counts, a descent figure, a multi-day tag, a like counter
+ * and a comment thread — none of which has a server field. They came from the hand-written
+ * mock library and survived its deletion as type-shaped holes. Every one is gone rather than
+ * defaulted, because a fabricated air-quality or hazard reading on a route someone is about to
+ * ride is a safety claim this app cannot back up.
+ *
+ * What GET /routes/public actually provides, and therefore what can appear here:
+ *   name · route type · place · distance · climb · owner · a preview line for the thumbnail
+ *
+ * Each is rendered only when the server sent a real value, so a sparse route degrades to a
+ * smaller card rather than a card full of dashes. There is no country flag: routes carry a
+ * free-text `placeName` and no country column.
+ *
+ * "Plan a ride with this track" used to be a bare <Link to="/events/new"> that handed over
+ * nothing at all — the picked route was dropped on the floor and the create page opened empty.
+ * It now passes the route id and its reusable metadata through router state.
  */
 
-import {
-  AlertTriangle,
-  Bath,
-  Building2,
-  CalendarDays,
-  Coffee,
-  Fuel,
-  Heart,
-  MessageCircle,
-  Mountain,
-  Ruler,
-  ShoppingBag,
-  ThumbsUp,
-  TrendingDown,
-  Wind,
-} from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { Mountain, Ruler, Route as RouteIcon, MapPin, Heart, User } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { countryFlagEmoji } from "../lib/country-flag";
-import type { Track } from "../lib/track-types";
-import { formatAge } from "../lib/time";
+import {
+  type PublicRoute,
+  ROUTE_TYPE_LABEL,
+  ROUTE_TYPE_TO_SURFACE,
+} from "../lib/track-types";
 import styles from "./TrackCard.module.css";
 
-const SURFACE_LABEL: Record<Track["surfaceType"], string> = {
-  road: "Road",
-  gravel: "Gravel",
-  mtb: "MTB",
-  running: "Running",
-  hiking: "Hiking",
-};
-
-const AQI_TONE: Record<Track["airQuality"]["label"], string> = {
-  Good: styles.aqiGood,
-  Moderate: styles.aqiModerate,
-  Unhealthy: styles.aqiUnhealthy,
-};
-
-const POI_LABEL: Record<Track["pois"][number]["type"], string> = {
-  gas: "Gas",
-  toilet: "Restroom",
-  motel: "Lodging",
-  shop: "Bike shop",
-  rest: "Rest stop",
-};
-
-const POI_ICON: Record<Track["pois"][number]["type"], typeof Fuel> = {
-  gas: Fuel,
-  toilet: Bath,
-  motel: Building2,
-  shop: ShoppingBag,
-  rest: Coffee,
-};
+const RouteMap = lazy(() => import("./RouteMap"));
 
 interface TrackCardProps {
-  track: Track;
-  dayOfWeek: number | null;
-  commentAuthor: string;
-  onToggleFavorite: (id: string) => void;
-  onToggleLike: (id: string) => void;
-  onAddComment: (id: string, author: string, text: string) => void;
+  track: PublicRoute;
+  favorite: boolean;
+  onToggleFavorite(id: number): void;
 }
 
-export function TrackCard({
-  track,
-  dayOfWeek,
-  commentAuthor,
-  onToggleFavorite,
-  onToggleLike,
-  onAddComment,
-}: TrackCardProps) {
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentText, setCommentText] = useState("");
-
-  const flag = countryFlagEmoji(track.countryCode);
-  // Only ever the "very dangerous" ones — see the file doc comment for why.
-  const dangerHazards = track.hazards.filter(
-    (h) => h.severity === "high" && (dayOfWeek == null || h.dayOfWeek === dayOfWeek),
-  );
-
-  const poiCounts = track.pois.reduce<Partial<Record<Track["pois"][number]["type"], number>>>(
-    (counts, poi) => {
-      counts[poi.type] = (counts[poi.type] ?? 0) + 1;
-      return counts;
-    },
-    {},
-  );
-
-  function submitComment(e: FormEvent) {
-    e.preventDefault();
-    onAddComment(track.id, commentAuthor, commentText);
-    setCommentText("");
-  }
+export function TrackCard({ track, favorite, onToggleFavorite }: TrackCardProps) {
+  const typeLabel = track.routeType ? ROUTE_TYPE_LABEL[track.routeType] : null;
+  // Only a route type that also exists as an event activity type is worth handing over; a
+  // "mixed" route has no event equivalent, so the create form is left to ask.
+  const surface = track.routeType ? ROUTE_TYPE_TO_SURFACE[track.routeType] : undefined;
+  const preview = track.previewPoints?.length ? track.previewPoints : null;
 
   return (
     <div className={styles.card}>
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          <span className={styles.surfaceTag}>{SURFACE_LABEL[track.surfaceType]}</span>
-          {track.days.length > 1 && (
-            <span className={styles.daysTag}>
-              <CalendarDays className={styles.tagIcon} aria-hidden="true" />
-              {track.days.length} days
+          {typeLabel && <span className={styles.surfaceTag}>{typeLabel}</span>}
+        </div>
+        <button
+          type="button"
+          className={favorite ? `${styles.favBtn} ${styles.favActive}` : styles.favBtn}
+          onClick={() => onToggleFavorite(track.id)}
+          aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Heart width={16} height={16} fill={favorite ? "currentColor" : "none"} strokeWidth={2} />
+        </button>
+      </div>
+
+      {/* An unnamed route is real and still usable — it just shows its place, or nothing. */}
+      {track.name?.trim() && <h3 className={styles.name}>{track.name}</h3>}
+
+      {track.placeName?.trim() && (
+        <p className={styles.place}>
+          <MapPin className={styles.tagIcon} aria-hidden="true" />
+          {track.placeName}
+        </p>
+      )}
+
+      {preview && (
+        <Suspense fallback={<div className="row muted">Loading the map…</div>}>
+          <RouteMap points={preview} />
+        </Suspense>
+      )}
+
+      {(track.distanceKm != null || track.elevationM != null) && (
+        <div className={styles.stats}>
+          {track.distanceKm != null && (
+            <span className={styles.stat}>
+              <Ruler className={styles.tagIcon} aria-hidden="true" />
+              {track.distanceKm} km
+            </span>
+          )}
+          {track.elevationM != null && (
+            <span className={styles.stat}>
+              <Mountain className={styles.tagIcon} aria-hidden="true" />
+              {track.elevationM} m
+            </span>
+          )}
+          {track.pointCount != null && (
+            <span className={styles.stat}>
+              <RouteIcon className={styles.tagIcon} aria-hidden="true" />
+              {track.pointCount} points
             </span>
           )}
         </div>
-        <button
-          type="button"
-          className={track.favorite ? `${styles.favBtn} ${styles.favActive}` : styles.favBtn}
-          onClick={() => onToggleFavorite(track.id)}
-          aria-label={track.favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart
-            width={16}
-            height={16}
-            fill={track.favorite ? "currentColor" : "none"}
-            strokeWidth={2}
-          />
-        </button>
-      </div>
-
-      <h3 className={styles.name}>{track.name}</h3>
-      <p className={styles.location}>
-        {flag && <span aria-hidden="true">{flag}</span>}
-        {track.area}
-        {track.state ? `, ${track.state}` : ""}, {track.country}
-      </p>
-
-      <div className={styles.statsRow}>
-        <span className={styles.stat}>
-          <Ruler className={styles.statIcon} aria-hidden="true" />
-          {track.distanceKm} km
-        </span>
-        <span className={styles.stat}>
-          <Mountain className={styles.statIcon} aria-hidden="true" />
-          {track.climbM} m
-        </span>
-        <span className={styles.stat}>
-          <TrendingDown className={styles.statIcon} aria-hidden="true" />
-          {track.descentM} m
-        </span>
-      </div>
-
-      <div className={styles.badgeRow}>
-        <span className={`${styles.aqiBadge} ${AQI_TONE[track.airQuality.label]}`}>
-          <Wind className={styles.tagIcon} aria-hidden="true" />
-          Air: {track.airQuality.label}
-        </span>
-      </div>
-
-      {dangerHazards.length > 0 && (
-        <div className={styles.dangerBox}>
-          <div className={styles.dangerHeader}>
-            <AlertTriangle className={styles.dangerIcon} aria-hidden="true" />
-            {dangerHazards.length === 1
-              ? dangerHazards[0].description
-              : `${dangerHazards.length} rider-reported hazards on this track`}
-          </div>
-          <p className={styles.dangerNote}>
-            Reported by riders, not verified — not an El Niño Move recommendation.
-          </p>
-        </div>
       )}
 
-      {Object.keys(poiCounts).length > 0 && (
-        <div className={styles.poiRow}>
-          {(Object.entries(poiCounts) as [Track["pois"][number]["type"], number][]).map(
-            ([type, count]) => {
-              const Icon = POI_ICON[type];
-              return (
-                <span key={type} className={styles.poiItem} title={POI_LABEL[type]}>
-                  <Icon className={styles.tagIcon} aria-hidden="true" />
-                  {count}
-                </span>
-              );
-            },
-          )}
-        </div>
+      {track.ownerName?.trim() && (
+        <p className={styles.owner}>
+          <User className={styles.tagIcon} aria-hidden="true" />
+          {track.ownerName}
+        </p>
       )}
 
-      <div className={styles.socialRow}>
-        <button
-          type="button"
-          className={track.liked ? `${styles.socialBtn} ${styles.socialActive}` : styles.socialBtn}
-          onClick={() => onToggleLike(track.id)}
-        >
-          <ThumbsUp
-            width={15}
-            height={15}
-            aria-hidden="true"
-            fill={track.liked ? "currentColor" : "none"}
-          />
-          {track.likes}
-        </button>
-        <button
-          type="button"
-          className={styles.socialBtn}
-          onClick={() => setCommentsOpen((v) => !v)}
-        >
-          <MessageCircle width={15} height={15} aria-hidden="true" />
-          {track.comments.length}
-        </button>
-      </div>
-
-      {commentsOpen && (
-        <div className={styles.comments}>
-          {track.comments.length === 0 ? (
-            <p className="muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-              No comments yet.
-            </p>
-          ) : (
-            track.comments.map((c) => (
-              <div key={c.id} className={styles.comment}>
-                <div className={styles.commentMeta}>
-                  <span className={styles.commentAuthor}>{c.author}</span>
-                  <span className="muted">{formatAge(c.createdAt)}</span>
-                </div>
-                <p className={styles.commentText}>{c.text}</p>
-              </div>
-            ))
-          )}
-
-          <form className={styles.commentForm} onSubmit={submitComment}>
-            <input
-              className={styles.commentInput}
-              placeholder="Add a comment…"
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-            />
-            <button type="submit" className="button" disabled={!commentText.trim()}>
-              Post
-            </button>
-          </form>
-        </div>
-      )}
-
-      <Link className={styles.planBtn} to="/events/new">
+      {/* The handoff. `routeId` is what the create page attaches with — the server's
+          POST /events/:eventId/route accepts { routeId } and links this very row, so the new
+          ride runs on the real route rather than a copy of its geometry. */}
+      <Link
+        className={styles.planBtn}
+        to="/events/new"
+        state={{
+          fromRouteId: track.id,
+          fromRouteName: track.name,
+          fromRoutePlace: track.placeName,
+          fromRouteDistanceKm: track.distanceKm,
+          fromRouteClimbM: track.elevationM,
+          fromRouteSurface: surface ?? null,
+        }}
+      >
         Plan a ride with this track
       </Link>
     </div>

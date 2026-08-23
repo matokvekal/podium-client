@@ -2,15 +2,19 @@
 // (elnino-server/src/modules/participants). Add/edit/delete and registration approve/reject
 // are real, server-backed mutations now.
 //
-// attendanceStatus/resultStatus have DB columns (event_participants.attendance_status/
-// result_status, per plan/02-database-schema.md's three-axis design) but no write endpoint
-// exists yet — only registration approve/reject shipped this pass (see
-// plan/01-task-list.md milestone 4: "Attendance marking" and "Mark finishers" are separate,
-// still-unbuilt items). Same story for groupId, which has no server concept at all
-// (store/eventGroupsStore.ts is entirely client-only). All three stay as a local overlay,
-// persisted to localStorage and merged on top of the server list on every read — the same
-// "preview until the server supports it" pattern eventExtrasStore used for requiresApproval
-// before that went real.
+// The attendance axis is real and server-owned now: PATCH /events/:eventId/participants/:id/
+// attendance (status: unknown | present | dns | started) exists, so "arrived" and "started"
+// are persisted server-side instead of in the local overlay. That matters beyond durability —
+// EventDetailPage reads the start list straight from GET /events/:eventId/participants, so an
+// arrival kept only in this browser's localStorage could never show up there, and a second
+// organizer (or the same one on another device) would never see it at all.
+//
+// resultStatus and groupId are still a local overlay, persisted to localStorage and merged on
+// top of the server list on every read: resultStatus has a write endpoint but "mark finishers"
+// is its own unbuilt flow (plan/01-task-list.md milestone 4), and groupId has no server
+// concept the client uses at all (store/eventGroupsStore.ts is entirely client-only). An
+// attendanceStatus left in a persisted overlay from before this change is simply ignored —
+// LocalOverlay no longer carries that key, so the server value always wins.
 //
 // Participant ids are numbers server-side; kept as strings on the client Participant type
 // (unchanged from before) so every existing call site (`p.id`, keyed maps, form values)
@@ -53,7 +57,6 @@ interface ServerParticipant {
 }
 
 interface LocalOverlay {
-  attendanceStatus?: AttendanceStatus;
   resultStatus?: ResultStatus;
   groupId?: string | null;
 }
@@ -72,14 +75,15 @@ interface ParticipantsState {
     id: string,
     status: "approved" | "rejected",
   ): Promise<void>;
-  setAttendance(eventId: string, id: string, present: boolean): void;
+  /** attendanceStatus "present" — the rider turned up. Real, server-backed mutation. */
+  setAttendance(eventId: string, id: string, present: boolean): Promise<void>;
   setGroupId(eventId: string, id: string, groupId: string | null): void;
   /** Assign several riders to a group in one action — the common case in practice, per direct
    * feedback ("select all group a and group b and add many"): picking one rider at a time to
    * fill a 20-person group is too slow. */
   setGroupIdBulk(eventId: string, ids: string[], groupId: string | null): void;
-  /** attendanceStatus "started" — a rider has set off. Local overlay only, see file doc comment. */
-  setStarted(eventId: string, id: string, started: boolean): void;
+  /** attendanceStatus "started" — a rider has set off. Same real endpoint as setAttendance. */
+  setStarted(eventId: string, id: string, started: boolean): Promise<void>;
   /** resultStatus "finished" — arrived at the finish. Local overlay only, see file doc comment. */
   setFinished(eventId: string, id: string, finished: boolean): void;
 }
@@ -96,7 +100,7 @@ function toParticipant(server: ServerParticipant, overlay: LocalOverlay | undefi
     phone: server.phone,
     category: server.category,
     registrationStatus: server.registrationStatus,
-    attendanceStatus: overlay?.attendanceStatus ?? server.attendanceStatus,
+    attendanceStatus: server.attendanceStatus,
     resultStatus: overlay?.resultStatus ?? server.resultStatus,
     joinedAt: server.joinedAt,
     groupId: overlay?.groupId ?? null,
@@ -124,6 +128,44 @@ function recompute(
   const list = serverByEvent[eventId];
   if (!list) return {};
   return { [eventId]: list.map((p) => toParticipant(p, overlay[String(p.id)])) };
+}
+
+/** Merges one server row back into an event's list, replacing the row with the same id. */
+function applyServerParticipant(
+  state: ParticipantsState,
+  eventId: string,
+  updated: ServerParticipant,
+) {
+  const list = (state.serverByEvent[eventId] ?? []).map((p) =>
+    p.id === updated.id ? updated : p,
+  );
+  return {
+    serverByEvent: { ...state.serverByEvent, [eventId]: list },
+    byEvent: {
+      ...state.byEvent,
+      ...recompute({ [eventId]: list }, state.overlay, eventId),
+    },
+  };
+}
+
+/**
+ * The one attendance write. Both "arrived" (present) and "set off" (started) are the same
+ * server axis and the same endpoint — three axes, three endpoints, per the server's own
+ * participant.routes.ts. Deliberately NOT optimistic: an organizer ticking riders off at the
+ * start needs the tick to mean "the server has it", not "this tab thinks so", and the two
+ * screens that call this both surface a failure rather than swallowing it.
+ */
+async function writeAttendance(
+  set: (fn: (state: ParticipantsState) => Partial<ParticipantsState>) => void,
+  eventId: string,
+  id: string,
+  status: AttendanceStatus,
+): Promise<void> {
+  const updated = await apiRequest<ServerParticipant>(
+    `/events/${eventId}/participants/${id}/attendance`,
+    { method: "PATCH", body: { status } },
+  );
+  set((state) => applyServerParticipant(state, eventId, updated));
 }
 
 export const useParticipantsStore = create<ParticipantsState>()(
@@ -231,19 +273,7 @@ export const useParticipantsStore = create<ParticipantsState>()(
       },
 
       setAttendance(eventId, id, present) {
-        set((state) => {
-          const overlay = {
-            ...state.overlay,
-            [id]: {
-              ...state.overlay[id],
-              attendanceStatus: present ? "present" : ("unknown" as AttendanceStatus),
-            },
-          };
-          return {
-            overlay,
-            byEvent: { ...state.byEvent, ...recompute(state.serverByEvent, overlay, eventId) },
-          };
-        });
+        return writeAttendance(set, eventId, id, present ? "present" : "unknown");
       },
 
       setGroupId(eventId, id, groupId) {
@@ -268,19 +298,7 @@ export const useParticipantsStore = create<ParticipantsState>()(
       },
 
       setStarted(eventId, id, started) {
-        set((state) => {
-          const overlay = {
-            ...state.overlay,
-            [id]: {
-              ...state.overlay[id],
-              attendanceStatus: started ? "started" : ("unknown" as AttendanceStatus),
-            },
-          };
-          return {
-            overlay,
-            byEvent: { ...state.byEvent, ...recompute(state.serverByEvent, overlay, eventId) },
-          };
-        });
+        return writeAttendance(set, eventId, id, started ? "started" : "unknown");
       },
 
       setFinished(eventId, id, finished) {

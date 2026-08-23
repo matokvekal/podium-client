@@ -74,6 +74,9 @@ export function EventGroupsPage() {
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Separate from `error` above, which is a fatal full-page gate — a failed rider toggle must
+  // not blank out the page the organizer is working on.
+  const [actionError, setActionError] = useState<string | null>(null);
   const [mainRoute, setMainRoute] = useState<EventRoute | null>(null);
 
   const [groupIndex, setGroupIndex] = useState(0);
@@ -246,6 +249,12 @@ export function EventGroupsPage() {
           Participants
         </Link>
       </div>
+
+      {actionError && (
+        <p className="banner banner--error" role="alert">
+          {actionError}
+        </p>
+      )}
 
       {groups.length === 0 ? (
         <div className="card stack">
@@ -432,9 +441,16 @@ export function EventGroupsPage() {
                             ? `${styles.checkBtn} ${styles.checkBtnActive}`
                             : styles.checkBtn
                         }
-                        onClick={() =>
-                          eventId && setStarted(eventId, p.id, p.attendanceStatus !== "started")
-                        }
+                        onClick={() => {
+                          if (!eventId) return;
+                          setActionError(null);
+                          setStarted(eventId, p.id, p.attendanceStatus !== "started").catch(
+                            (err) =>
+                              setActionError(
+                                err instanceof ApiError ? err.message : "Could not update rider.",
+                              ),
+                          );
+                        }}
                         aria-pressed={p.attendanceStatus === "started"}
                       >
                         <Check width={13} height={13} aria-hidden="true" />

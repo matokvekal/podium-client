@@ -1,25 +1,38 @@
-// Event route for one event — real data only. The route comes from the server
-// (GET /events/:eventId/route, elnino-server/src/modules/routes), which is the actual
-// route the organizer attached, visible to every viewer, not just the creator's own
-// device. Falling back to eventRouteStore.ts's local cache (same-device convenience, or
-// the network call failing) covers a viewer who just picked/saved a route seconds ago
-// and is still offline. If genuinely neither exists, `route` is null — the UI shows an
-// honest empty state, never a fabricated route (see BUGS.md: "No route = show proper
-// empty/no-route state, never mock data").
+// Event route for one event — real data only, and now durable.
+//
+// The route comes from the server (GET /events/:eventId/route), which is the actual route the
+// organizer attached, visible to every viewer, not just the creator's own device. What changed:
+// it is persisted to IndexedDB per viewer (lib/local-db.ts's eventRoutes store) the moment the
+// server confirms it, and read back before the network is even attempted.
+//
+// Two real bugs this replaces, both of which lost a route the app already had:
+//
+//   1. The only offline fallback was eventRouteStore.ts — localStorage, and written ONLY by
+//      EventCreatePage. A rider who joined someone else's ride and merely viewed it never had
+//      an entry, so their route vanished the moment the server did. (It was also the wrong
+//      medium: a full point list is not localStorage-sized data.)
+//   2. The fallback was gated on `err.isOffline`, which is status 0 — no response at all. A
+//      server that was reachable but broken (500, or a 502/503 from a proxy) counted as
+//      "server read succeeded", so the store committed `route: null` and wiped a perfectly
+//      good route off the map. "Server goes down" is exactly that case.
+//
+// The rule now: the server can only ever REPLACE the route, never erase it by failing. A null
+// route is committed only when the server actually said so (a 200 with no route), because that
+// is a real answer and the honest empty state — never a fabricated one (BUGS.md: "No route =
+// show proper empty/no-route state, never mock data").
+//
+// eventRouteStore.ts stays as the same-device write-through for a route just picked on
+// EventCreatePage, consulted only when nothing has ever been synced for this event.
 //
 // This store used to also carry a rider list + organizer info from lib/mock-results.ts's
-// getEventResults — fabricated riders that real events never had ("i create ride, i
-// didnt add riders but how i do see riders, its bug"). That is gone: the rider list is
-// the real GET /events/:eventId/participants (see EventDetailPage.tsx's realRoster and
-// store/participantsStore.ts), and organizer name/avatar come from the event itself
-// (ownerName/ownerAvatarUrl).
-//
-// No IndexedDB caching layer here, unlike eventsStore.ts — GET /events/:eventId/route is
-// cheap and polled on every page load, same as the rest of this store.
+// getEventResults — fabricated riders that real events never had ("i create ride, i didnt add
+// riders but how i do see riders, its bug"). That is gone: the rider list is the real
+// GET /events/:eventId/participants, and organizer name/avatar come from the event itself.
 
 import { create } from "zustand";
 import { ApiError, apiRequest } from "../lib/api-client";
 import type { EventRoute } from "../lib/event-route";
+import { getCachedRoute, putCachedRoute } from "../lib/local-db";
 import { getEventRoute } from "./eventRouteStore";
 
 /** What GET /events/:eventId/route actually sends — see routes.schemas.ts server-side. */
@@ -29,7 +42,14 @@ interface ResultsState {
   results: { route: EventRoute | null };
   loading: boolean;
   error: string | null;
-  loadResults(eventId: string): Promise<void>;
+  /** Which event `results` currently describes — guards against a stale write landing after
+   *  the viewer has already navigated to a different ride. */
+  eventId: string | null;
+  /** True when what's on screen came from the cache and the refresh behind it failed. */
+  stale: boolean;
+  /** When the server last confirmed this route. Null if it never has on this device. */
+  lastSyncedAt: number | null;
+  loadResults(eventId: string, userId: number): Promise<void>;
 }
 
 let requestId = 0;
@@ -38,32 +58,69 @@ export const useResultsStore = create<ResultsState>((set) => ({
   results: { route: null },
   loading: true,
   error: null,
+  eventId: null,
+  stale: false,
+  lastSyncedAt: null,
 
-  async loadResults(eventId) {
+  async loadResults(eventId, userId) {
     const thisRequest = ++requestId;
-    set({ loading: true, error: null });
-    try {
-      let route: EventRoute | null = null;
-      let serverReadSucceeded = false;
-      try {
-        const serverRoute = await apiRequest<ServerRoute | null>(`/events/${eventId}/route`);
-        if (thisRequest !== requestId) return;
-        serverReadSucceeded = true;
-        if (serverRoute) route = serverRoute;
-      } catch (err) {
-        if (thisRequest !== requestId) return;
-        // Only true network/offline failures use same-device local fallback. Permission
-        // failures or a real server null route must remain server truth (empty state).
-        if (!(err instanceof ApiError) || !err.isOffline) {
-          serverReadSucceeded = true;
-        }
-      }
-      if (!serverReadSucceeded && !route) route = getEventRoute(eventId);
 
-      set({ results: { route }, loading: false });
-    } catch {
+    // Switching events must clear the previous ride's route immediately — this is a single
+    // shared store, and showing ride A's map under ride B's name for a few hundred ms is worse
+    // than showing nothing. Re-loading the SAME event keeps what's on screen, which is what
+    // makes a reconnect refetch invisible instead of a flash of empty map.
+    set((state) =>
+      state.eventId === eventId
+        ? { loading: true, error: null }
+        : {
+            loading: true,
+            error: null,
+            eventId,
+            results: { route: null },
+            stale: false,
+            lastSyncedAt: null,
+          },
+    );
+
+    // 1. Cache first — paint before the network is even attempted.
+    const cached = await getCachedRoute(eventId, userId);
+    if (thisRequest !== requestId) return;
+    if (cached) {
+      set({ results: { route: cached.value }, loading: false, lastSyncedAt: cached.lastSyncedAt });
+    }
+
+    // 2. Then the server.
+    try {
+      const serverRoute = await apiRequest<ServerRoute | null>(`/events/${eventId}/route`);
       if (thisRequest !== requestId) return;
-      set({ error: "Could not load results right now.", loading: false });
+      // Authoritative, including a null: the organizer may have removed the route.
+      const route = serverRoute ?? null;
+      await putCachedRoute(eventId, userId, route);
+      if (thisRequest !== requestId) return;
+      set({ results: { route }, loading: false, stale: false, lastSyncedAt: Date.now() });
+    } catch (err) {
+      if (thisRequest !== requestId) return;
+
+      // Anything already on screen from the cache stays exactly as it is. This is the whole
+      // point: a failed request is not evidence about the route, so it may not overwrite one.
+      if (cached) {
+        set({ loading: false, stale: true });
+        return;
+      }
+
+      // Nothing synced for this event on this device. A route picked locally on this very
+      // device (EventCreatePage, not yet round-tripped) is the last real thing we could have,
+      // and only a genuine transport failure justifies reaching for it — a 403 means this
+      // viewer is not allowed to see the route, and answering that with a local copy would
+      // leak it.
+      const transportFailed = err instanceof ApiError && err.isOffline;
+      const local = transportFailed ? getEventRoute(eventId) : null;
+      set({
+        results: { route: local },
+        loading: false,
+        stale: transportFailed,
+        error: null,
+      });
     }
   },
 }));

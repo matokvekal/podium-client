@@ -23,15 +23,19 @@
  */
 
 import {
+  AlertTriangle,
   Bike,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Footprints,
   Heart,
+  Layers,
   MapPin,
   Minus,
   Mountain,
   MountainSnow,
+  PersonStanding,
   Route,
   Search,
   Waves,
@@ -40,42 +44,37 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { RangeSlider } from "../app/RangeSlider";
 import { TrackCard } from "../app/TrackCard";
-import {
-  CLIMB_MAX,
-  CLIMB_MIN,
-  DISTANCE_MAX,
-  DISTANCE_MIN,
-  type RouteType,
-} from "../lib/track-types";
+import { useAuth } from "../auth/AuthContext";
+import { countryFlagEmoji } from "../lib/country-flag";
+import type { SurfaceType } from "../lib/surface-types";
+import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-types";
 import { useTrackFiltersStore } from "../store/trackFiltersStore";
 import { useTracksStore } from "../store/tracksStore";
 import styles from "./TracksPage.module.css";
 
 const TrackMap = lazy(() => import("../app/TrackMap"));
 
-/**
- * The route library's own four types — road | gravel | mtb | mixed (server ROUTE_TYPES). NOT
- * the five event activity types: a route has no "running"/"hiking" and an event has no
- * "mixed", so offering the event list here would filter on values the endpoint rejects.
- *
- * The COUNTRY dropdown that used to sit beside this is gone. A route carries only a free-text
- * `placeName`; there is no country column and no country query parameter, so the picker could
- * only ever have filtered nothing — or worse, appeared to work while being ignored. Place is
- * searchable as text in the filter sheet, which is what the server actually supports.
- *
- * The day-of-week picker, "multi-day trips only" and "avoid busy roads" are gone for the same
- * reason: routes have no stages, no busy-road flag and no per-day data of any kind.
- */
-const ROUTE_TYPE_FILTERS: {
-  value: RouteType;
+const SURFACE_FILTERS: {
+  value: SurfaceType;
   label: string;
   icon: typeof Bike;
 }[] = [
   { value: "road", label: "Road", icon: Bike },
   { value: "gravel", label: "Gravel", icon: Route },
   { value: "mtb", label: "MTB", icon: Mountain },
-  { value: "mixed", label: "Mixed", icon: Waves },
+  { value: "running", label: "Running", icon: Footprints },
+  { value: "hiking", label: "Hiking", icon: PersonStanding },
 ];
+
+const COUNTRY_FILTERS: { code: string; label: string }[] = [
+  { code: "IL", label: "Israel" },
+  { code: "GB", label: "England" },
+  { code: "ES", label: "Spain" },
+  { code: "IT", label: "Italy" },
+  { code: "FR", label: "France" },
+];
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const CLIMB_PRESETS: {
   label: string;
@@ -89,47 +88,79 @@ const CLIMB_PRESETS: {
 ];
 
 export function TracksPage() {
+  const { status, profile } = useAuth();
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  const commentAuthor =
+    status === "signed-in" ? profile?.nickname?.trim() || fullName || "Rider" : "Guest";
+
   const tracks = useTracksStore((state) => state.tracks);
   const loading = useTracksStore((state) => state.loading);
   const error = useTracksStore((state) => state.error);
   const loadTracks = useTracksStore((state) => state.loadTracks);
   const toggleFavoriteTrack = useTracksStore((state) => state.toggleFavoriteTrack);
-  const favoriteIds = useTracksStore((state) => state.favoriteIds);
+  const toggleLikeTrack = useTracksStore((state) => state.toggleLikeTrack);
+  const addComment = useTracksStore((state) => state.addComment);
 
   const location = useTrackFiltersStore((s) => s.location);
-  const routeType = useTrackFiltersStore((s) => s.routeType);
+  const countryCode = useTrackFiltersStore((s) => s.countryCode);
+  const surfaceType = useTrackFiltersStore((s) => s.surfaceType);
   const distanceRange = useTrackFiltersStore((s) => s.distanceRange);
   const climbRange = useTrackFiltersStore((s) => s.climbRange);
+  const multiDayOnly = useTrackFiltersStore((s) => s.multiDayOnly);
+  const avoidBusyRoads = useTrackFiltersStore((s) => s.avoidBusyRoads);
+  const dayOfWeek = useTrackFiltersStore((s) => s.dayOfWeek);
   const favoritesOnly = useTrackFiltersStore((s) => s.favoritesOnly);
+  const showHazards = useTrackFiltersStore((s) => s.showHazards);
+  const showPois = useTrackFiltersStore((s) => s.showPois);
   const setLocation = useTrackFiltersStore((s) => s.setLocation);
-  const setRouteType = useTrackFiltersStore((s) => s.setRouteType);
+  const setCountryCode = useTrackFiltersStore((s) => s.setCountryCode);
+  const setSurfaceType = useTrackFiltersStore((s) => s.setSurfaceType);
   const setDistanceRange = useTrackFiltersStore((s) => s.setDistanceRange);
   const setClimbRange = useTrackFiltersStore((s) => s.setClimbRange);
+  const setMultiDayOnly = useTrackFiltersStore((s) => s.setMultiDayOnly);
+  const setAvoidBusyRoads = useTrackFiltersStore((s) => s.setAvoidBusyRoads);
+  const setDayOfWeek = useTrackFiltersStore((s) => s.setDayOfWeek);
   const setFavoritesOnly = useTrackFiltersStore((s) => s.setFavoritesOnly);
+  const setShowHazards = useTrackFiltersStore((s) => s.setShowHazards);
+  const setShowPois = useTrackFiltersStore((s) => s.setShowPois);
   const clearFilters = useTrackFiltersStore((s) => s.clearFilters);
 
+  const [countryOpen, setCountryOpen] = useState(false);
   const [surfaceOpen, setSurfaceOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
   const [index, setIndex] = useState(0);
 
-  // Only what GET /routes/public accepts (routeLibrary.schemas.ts). A slider still at its
-  // extreme is NOT sent: the server compares against distance_km / elevation_m, so sending a
-  // minimum of 1 km would silently drop every route whose distance was never recorded.
   useEffect(() => {
     loadTracks({
-      place: location || undefined,
-      routeType,
-      minDistanceKm: distanceRange[0] > DISTANCE_MIN ? distanceRange[0] : undefined,
-      maxDistanceKm: distanceRange[1] < DISTANCE_MAX ? distanceRange[1] : undefined,
-      minClimbM: climbRange[0] > CLIMB_MIN ? climbRange[0] : undefined,
-      maxClimbM: climbRange[1] < CLIMB_MAX ? climbRange[1] : undefined,
+      location: location || undefined,
+      countryCode,
+      surfaceType,
+      minDistanceKm: distanceRange[0],
+      maxDistanceKm: distanceRange[1],
+      minClimbM: climbRange[0],
+      maxClimbM: climbRange[1],
+      multiDayOnly: multiDayOnly || undefined,
+      avoidBusyRoads: avoidBusyRoads || undefined,
     });
     setIndex(0);
-  }, [location, routeType, distanceRange, climbRange, loadTracks]);
+  }, [
+    location,
+    countryCode,
+    surfaceType,
+    distanceRange,
+    climbRange,
+    multiDayOnly,
+    avoidBusyRoads,
+    loadTracks,
+  ]);
 
   const visibleTracks = useMemo(
-    () => (favoritesOnly ? tracks.filter((t) => favoriteIds.includes(t.id)) : tracks),
-    [tracks, favoritesOnly, favoriteIds],
+    () => (favoritesOnly ? tracks.filter((t) => t.favorite) : tracks),
+    [tracks, favoritesOnly],
   );
 
   // Clamp rather than reset via an effect — visibleTracks can also shrink from the favorites
@@ -137,7 +168,20 @@ export function TracksPage() {
   // second effect whose only job is calling setIndex.
   const clampedIndex = Math.min(index, Math.max(visibleTracks.length - 1, 0));
   const current = visibleTracks[clampedIndex] ?? null;
-  const selectedType = ROUTE_TYPE_FILTERS.find((t) => t.value === routeType);
+  const selectedCountry = COUNTRY_FILTERS.find((c) => c.code === countryCode);
+  const selectedSurface = SURFACE_FILTERS.find((s) => s.value === surfaceType);
+
+  // Quick-scan colour per day-of-week button, from the currently viewed track's own
+  // hazards: red = a rider reported it dangerous, purple = very dangerous. Deliberately two
+  // tiers here (unlike TrackCard/TrackMap, which only ever surface "high" — see their doc
+  // comments) — this is a compact planning aid on the filter itself, not a headline claim.
+  function dayHazardColor(day: number): string | undefined {
+    if (!current) return undefined;
+    const onDay = current.hazards.filter((h) => h.dayOfWeek === day);
+    if (onDay.some((h) => h.severity === "high")) return "#8b5cf6";
+    if (onDay.some((h) => h.severity === "medium")) return "#df4b7b";
+    return undefined;
+  }
 
   return (
     <div className="stack">
@@ -147,44 +191,66 @@ export function TracksPage() {
             <button
               type="button"
               className={`button button--quiet ${styles.dropdownTrigger}`}
-              onClick={() => setSurfaceOpen((v) => !v)}
-              aria-label={`Route type: ${selectedType?.label ?? "Any"}`}
-              title={selectedType?.label ?? "Any type"}
+              onClick={() => {
+                setCountryOpen((v) => !v);
+                setSurfaceOpen(false);
+              }}
+              aria-label={`Country: ${selectedCountry?.label ?? countryCode}`}
+              title={selectedCountry?.label}
             >
-              {selectedType ? (
-                <selectedType.icon width={14} height={14} aria-hidden="true" />
-              ) : (
-                <Route width={14} height={14} aria-hidden="true" />
+              {countryFlagEmoji(countryCode)}
+              <ChevronDown width={12} height={12} aria-hidden="true" style={{ marginLeft: 2 }} />
+            </button>
+            {countryOpen && (
+              <div className={styles.dropdownPanel}>
+                {COUNTRY_FILTERS.map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    className={styles.dropdownOption}
+                    onClick={() => {
+                      setCountryCode(c.code);
+                      setCountryOpen(false);
+                    }}
+                    title={c.label}
+                  >
+                    {countryFlagEmoji(c.code)} {c.code}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.dropdownWrap}>
+            <button
+              type="button"
+              className={`button button--quiet ${styles.dropdownTrigger}`}
+              onClick={() => {
+                setSurfaceOpen((v) => !v);
+                setCountryOpen(false);
+              }}
+              aria-label={`Surface: ${selectedSurface?.label ?? surfaceType}`}
+              title={selectedSurface?.label}
+            >
+              {selectedSurface && (
+                <selectedSurface.icon width={14} height={14} aria-hidden="true" />
               )}
               <ChevronDown width={12} height={12} aria-hidden="true" style={{ marginLeft: 2 }} />
             </button>
             {surfaceOpen && (
               <div className={styles.dropdownPanel}>
-                {/* "Any" first — the default, and the only honest way to browse a library
-                    whose routes may have no type set at all. */}
-                <button
-                  type="button"
-                  className={styles.dropdownOption}
-                  onClick={() => {
-                    setRouteType(null);
-                    setSurfaceOpen(false);
-                  }}
-                >
-                  <Route width={14} height={14} aria-hidden="true" style={{ marginRight: 8 }} />
-                  Any type
-                </button>
-                {ROUTE_TYPE_FILTERS.map((t) => (
+                {SURFACE_FILTERS.map((s) => (
                   <button
-                    key={t.value}
+                    key={s.value}
                     type="button"
                     className={styles.dropdownOption}
                     onClick={() => {
-                      setRouteType(t.value);
+                      setSurfaceType(s.value);
                       setSurfaceOpen(false);
                     }}
                   >
-                    <t.icon width={14} height={14} aria-hidden="true" style={{ marginRight: 8 }} />
-                    {t.label}
+                    <s.icon width={14} height={14} aria-hidden="true" style={{ marginRight: 8 }} />
+                    {s.label}
                   </button>
                 ))}
               </div>
@@ -216,8 +282,40 @@ export function TracksPage() {
           >
             <Search width={15} height={15} aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            className="button button--quiet"
+            onClick={() => setLayersOpen((v) => !v)}
+            aria-label="Layers"
+            title="Layers"
+          >
+            <Layers width={15} height={15} aria-hidden="true" />
+          </button>
         </div>
       </div>
+
+      {layersOpen && (
+        <div className={styles.layersPanel}>
+          <label className={styles.layerToggle}>
+            <input
+              type="checkbox"
+              checked={showHazards}
+              onChange={(e) => setShowHazards(e.target.checked)}
+            />
+            <AlertTriangle width={14} height={14} aria-hidden="true" />
+            Hazards
+          </label>
+          <label className={styles.layerToggle}>
+            <input
+              type="checkbox"
+              checked={showPois}
+              onChange={(e) => setShowPois(e.target.checked)}
+            />
+            <MapPin width={14} height={14} aria-hidden="true" />
+            Gas / restrooms / lodging / shops
+          </label>
+        </div>
+      )}
 
       <div>
         <h1 style={{ margin: 0 }}>{current?.name ?? "Browse tracks"}</h1>
@@ -234,6 +332,9 @@ export function TracksPage() {
           <TrackMap
             tracks={visibleTracks}
             selectedTrackId={current?.id ?? null}
+            showHazards={showHazards}
+            showPois={showPois}
+            dayOfWeek={dayOfWeek}
             onSelectTrack={(id) => {
               const found = visibleTracks.findIndex((t) => t.id === id);
               if (found >= 0) setIndex(found);
@@ -314,6 +415,58 @@ export function TracksPage() {
             onChange={setClimbRange}
           />
 
+          <label className="row" style={{ gap: "8px" }}>
+            <input
+              type="checkbox"
+              checked={multiDayOnly}
+              onChange={(e) => setMultiDayOnly(e.target.checked)}
+            />
+            Multi-day trips only
+          </label>
+          <label className="row" style={{ gap: "8px" }}>
+            <input
+              type="checkbox"
+              checked={avoidBusyRoads}
+              onChange={(e) => setAvoidBusyRoads(e.target.checked)}
+            />
+            Avoid busy roads
+          </label>
+
+          <div className="stack" style={{ gap: "6px" }}>
+            <span className="muted" style={{ fontSize: "0.85rem" }}>
+              Planning to ride on — narrows hazards shown to that day
+            </span>
+            <div className={styles.dayRow}>
+              <button
+                type="button"
+                className={
+                  dayOfWeek === null ? `${styles.dayBtn} ${styles.dayBtnActive}` : styles.dayBtn
+                }
+                onClick={() => setDayOfWeek(null)}
+              >
+                Any
+              </button>
+              {DAY_LABELS.map((label, value) => {
+                const color = dayHazardColor(value);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    className={
+                      dayOfWeek === value
+                        ? `${styles.dayBtn} ${styles.dayBtnActive}`
+                        : styles.dayBtn
+                    }
+                    style={color ? { borderTopColor: color, borderTopWidth: 3 } : undefined}
+                    onClick={() => setDayOfWeek(value)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button type="button" className="button" onClick={() => setFiltersOpen(false)}>
             Show results
           </button>
@@ -365,8 +518,11 @@ export function TracksPage() {
             <div key={current.id} className={styles.cardSlide}>
               <TrackCard
                 track={current}
-                favorite={favoriteIds.includes(current.id)}
+                dayOfWeek={dayOfWeek}
+                commentAuthor={commentAuthor}
                 onToggleFavorite={toggleFavoriteTrack}
+                onToggleLike={toggleLikeTrack}
+                onAddComment={addComment}
               />
             </div>
           </div>

@@ -127,7 +127,7 @@ import {
   useRef,
   useState
 } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -151,7 +151,6 @@ import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
-import { useParticipantsStore } from "../store/participantsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import styles from "./EventCreatePage.module.css";
 
@@ -251,11 +250,28 @@ export function EventCreatePage() {
   const setEventCoverImage = useEventExtrasStore((s) => s.setCoverImage);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const setEventRoute = useEventRouteStore((s) => s.setRoute);
+  const routerLocation = useLocation();
+  const pickedTrack = (routerLocation.state ?? null) as {
+    fromRouteId?: number;
+    fromRouteName?: string | null;
+    fromRoutePlace?: string | null;
+    fromRouteDistanceKm?: number | null;
+    fromRouteClimbM?: number | null;
+    fromRouteSurface?: SurfaceType | null;
+  } | null;
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
   const setLastDefaults = useLastEventDefaultsStore((s) => s.setDefaults);
-  const addParticipant = useParticipantsStore((s) => s.addParticipant);
+
+  // What the organizer will actually show up as on the start list. Mirrors the server's
+  // PARTICIPANT_DISPLAY_COLUMNS — COALESCE(ep.name, first+last, nickname) — with ep.name NULL
+  // for a joinAsRider row, so this is the real answer, not a guess. Shown read-only because
+  // the create request has no name field to override it with.
+  const riderDisplayName =
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim() ||
+    profile?.nickname?.trim() ||
+    null;
 
   const myTeams = Object.values(teams).filter(
     (t) => profile != null && t.createdBy === profile.id
@@ -323,13 +339,21 @@ export function EventCreatePage() {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
   // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
-  // on every edit save risked adding a duplicate roster row each time. Checking it adds the
-  // organizer to the real participant list (same addParticipant EventParticipantsPage.tsx
-  // uses) right after the event is created, under whatever nickname they type — defaults to
-  // their account nickname (Profile.nickname) but can be overridden, since the name they ride
-  // under isn't necessarily their account name.
+  // on every edit save risked adding a duplicate roster row each time.
+  //
+  // This rides along on the create request itself as `joinAsRider`, which is the ONLY way to
+  // put the organizer on the start list as themselves: the server joins them by user_id
+  // (event.service.ts's createEvent → upsertParticipant). The previous approach — creating the
+  // event, then POSTing the organizer through the manual-add endpoint — wrote a row with
+  // user_id NULL, an anonymous rider nobody could match against the signed-in account, so the
+  // organizer never got marked "(ME)" and could rejoin as a second, duplicate row.
+  //
+  // A consequence of joining by account: the roster name comes from the account
+  // (COALESCE(first+last, nickname), server-side), not from a per-event nickname. The free-text
+  // nickname box that used to sit here is gone rather than kept as decoration — it fed only the
+  // manual-add call, and `joinAsRider` carries no name field. Changing that name is an account
+  // edit, which is what riderDisplayName below points at.
   const [imRiding, setImRiding] = useState(false);
-  const [riderNickname, setRiderNickname] = useState(profile?.nickname ?? "");
 
   // Edit-mode only, for the Danger Zone below — "ride that i create and didnt start i can
   // delete," asked for directly. Not read anywhere else; the live/finished check right after
@@ -351,6 +375,17 @@ export function EventCreatePage() {
   const [copySheetOpen, setCopySheetOpen] = useState(false);
   const [copiedFrom, setCopiedFrom] = useState<EventSummary | null>(null);
   const [copiedRoute, setCopiedRoute] = useState<EventRoute | null>(null);
+  /**
+   * A public route picked in Find Tracks (TrackCard's "Plan a ride with this track"), handed
+   * over through router state. Held as an ID, not as geometry, because the server can attach
+   * the existing library row directly — POST /events/:eventId/route accepts { routeId }, which
+   * links this very route instead of storing a second copy of the same line. A fix to the
+   * original then reaches every ride using it.
+   *
+   * Until this existed, that button was a bare <Link to="/events/new"> that passed nothing: the
+   * picked track was dropped and the create form opened blank.
+   */
+  const [fromRouteId, setFromRouteId] = useState<number | null>(null);
   const [copyLoading, setCopyLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedRestStops, setUploadedRestStops] = useState<
@@ -565,6 +600,46 @@ export function EventCreatePage() {
   // Creates the team right away instead of waiting for the whole event to save — asked for
   // directly. Switches the dropdown over to the real team the moment it exists, same as
   // picking any other team, so "New team name" and its Save button both disappear.
+  /**
+   * Apply a track picked in Find Tracks. Runs once, on create only — never in edit mode, where
+   * the form is already showing a saved ride and a stale router state would quietly overwrite
+   * it. Every value comes from the route row the rider actually chose; a field the route does
+   * not carry (its own name, place, distance, climb, type are all nullable server-side) is left
+   * for the organizer to fill rather than defaulted.
+   */
+  useEffect(() => {
+    if (isEditing) return;
+    const picked = pickedTrack;
+    if (!picked?.fromRouteId) return;
+    setFromRouteId(picked.fromRouteId);
+    if (picked.fromRoutePlace?.trim()) {
+      setLocation((current: string) => current || picked.fromRoutePlace!);
+    }
+    if (picked.fromRouteDistanceKm != null) {
+      setDistanceKmInput((current: string) => current || String(picked.fromRouteDistanceKm));
+    }
+    if (picked.fromRouteClimbM != null) {
+      setClimbMInput((current: string) => current || String(picked.fromRouteClimbM));
+    }
+    if (picked.fromRouteSurface) setActivityType(picked.fromRouteSurface);
+    // Full geometry for the preview map. Best-effort: the attach below works from the id
+    // alone, so a failed preview fetch costs a thumbnail, not the route.
+    void apiRequest<{ trackPoints?: [number, number][]; distanceKm: number | null; elevationM: number | null }>(
+      `/routes/${picked.fromRouteId}`,
+    )
+      .then((route) => {
+        if (route.trackPoints?.length && route.distanceKm != null) {
+          setCopiedRoute({
+            points: route.trackPoints,
+            distanceKm: route.distanceKm,
+            elevationM: route.elevationM,
+          });
+        }
+      })
+      .catch(() => undefined);
+    // Once only — re-running on every render would fight the organizer's own edits.
+  }, [isEditing, pickedTrack]);
+
   function saveNewTeam() {
     if (!newTeamName.trim() || !profile) return;
     const team = createTeam(newTeamName, profile.id);
@@ -575,7 +650,17 @@ export function EventCreatePage() {
   async function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
-    if (copiedRoute) {
+    if (fromRouteId != null) {
+      // A route picked from the public library: attach the EXISTING row by id. The server's
+      // attachLibraryRouteToEvent links it, so the ride runs on the real route rather than on a
+      // second copy of the same line — and a later fix to the original reaches every ride using
+      // it. Sending its geometry back as new points would fork it instead.
+      if (copiedRoute) setEventRoute(id, copiedRoute);
+      await apiRequest(`/events/${id}/route`, {
+        method: "POST",
+        body: { routeId: fromRouteId }
+      });
+    } else if (copiedRoute) {
       // Instant, same-device feedback (and an offline fallback) — see eventRouteStore.ts.
       setEventRoute(id, copiedRoute);
       // Also persist to the server so every viewer sees the same route. Await this so
@@ -731,7 +816,11 @@ export function EventCreatePage() {
           area: area || undefined,
           description: description || undefined,
           requiresApproval,
-          showParticipants: ridersListVisible
+          showParticipants: ridersListVisible,
+          // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
+          // the imRiding state's doc comment above. Always sent, so an unticked box is an
+          // explicit false and the organizer stays off the start list.
+          joinAsRider: imRiding
         }
       });
       // The server's response is the authoritative state for this event — file it into both
@@ -739,17 +828,6 @@ export function EventCreatePage() {
       // offline reopen both see the real event (status included) without waiting for a
       // refetch.
       useEventsStore.getState().upsertRide(created);
-      // "Am I also riding?" — add the organizer to the real start list under the nickname
-      // they typed, same addParticipant call EventParticipantsPage.tsx uses. Best-effort and
-      // non-fatal: the event exists either way, and the organizer can always add themselves
-      // by hand afterward from Participants.
-      if (imRiding && riderNickname.trim()) {
-        try {
-          await addParticipant(created.id, { name: riderNickname.trim() });
-        } catch {
-          // Non-fatal — see comment above.
-        }
-      }
       await saveExtras(created.id);
       setLastDefaults({
         location,
@@ -1135,10 +1213,9 @@ export function EventCreatePage() {
               </div>
 
               {/* "Am I also riding?" — asked for directly. Create-only: re-asking on every edit
-                  save would risk adding a duplicate roster row each time. Checking it adds the
-                  organizer to the real start list right after the event is created, under
-                  whatever nickname they type here (defaults to their account nickname, since
-                  the name they ride under isn't necessarily their account name). */}
+                  save would risk adding a duplicate roster row each time. Checking it sends
+                  joinAsRider on the create request, so the server puts the organizer on the
+                  start list linked to their own account. */}
               {!isEditing && (
                 <div className={styles.field}>
                   <label className={styles.switchRow}>
@@ -1162,15 +1239,12 @@ export function EventCreatePage() {
                     </span>
                   </label>
                   {imRiding && (
-                    <input
-                      id="riderNickname"
-                      className={styles.input}
-                      style={{ marginTop: "var(--space-2)" }}
-                      value={riderNickname}
-                      onChange={(e) => setRiderNickname(e.target.value)}
-                      placeholder="Your nickname on the roster"
-                      required
-                    />
+                    <p className="muted" style={{ margin: "var(--space-2) 0 0" }}>
+                      {riderDisplayName
+                        ? `You'll appear on the start list as "${riderDisplayName}".`
+                        : "You'll appear on the start list under your account name."}{" "}
+                      <Link to="/account">Change it in your account.</Link>
+                    </p>
                   )}
                 </div>
               )}

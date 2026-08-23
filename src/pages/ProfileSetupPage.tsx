@@ -14,7 +14,7 @@
  */
 
 import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
 import { COUNTRIES, flagEmoji } from "../lib/countries";
@@ -22,6 +22,11 @@ import { COUNTRIES, flagEmoji } from "../lib/countries";
 export function ProfileSetupPage() {
   const { profile, updateProfile } = useAuth();
   const navigate = useNavigate();
+  // Where this rider was actually headed before setup interrupted them (RequireAuth in
+  // App.tsx puts it here). A /join/:code link is the case that matters: sending them home
+  // instead loses the invite.
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
 
   const [firstName, setFirstName] = useState(profile?.firstName ?? "");
   const [lastName, setLastName] = useState(profile?.lastName ?? "");
@@ -45,7 +50,7 @@ export function ProfileSetupPage() {
         nickname,
         ...(emergencyPhone ? { emergencyPhone } : {}),
       });
-      navigate("/", { replace: true });
+      navigate(from && from !== "/account/setup" ? from : "/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save. Try again.");
     } finally {

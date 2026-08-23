@@ -37,7 +37,12 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (requiresProfile && location.pathname !== "/account/setup") {
-    return <Navigate to="/account/setup" replace />;
+    // Carry the destination through the setup detour, the same way the sign-in redirect
+    // above does. Without it, a first-time rider opening a /join/:code link signed in,
+    // got bounced to setup, and was then dropped on the home screen — the code they were
+    // invited with gone, and no participant row ever created. They only ended up on the
+    // start list if they thought to open the link a second time.
+    return <Navigate to="/account/setup" replace state={{ from: location.pathname }} />;
   }
 
   return <AppShell>{children}</AppShell>;

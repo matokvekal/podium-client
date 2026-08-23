@@ -1,6 +1,6 @@
 /**
  * Participants — the start list, manual add, edit/delete, registration approval, event-day
- * check-in, and (once live) Pause/Resume + Stop, all in one page. Owner-only (same "not
+ * check-in, and (once live) Pause/Resume + Finish, all in one page. Owner-only (same "not
  * permitted" pattern EventDetailPage's own actions rely on, just enforced as a full-page gate
  * here since this page has nothing else on it for a non-owner to see).
  *
@@ -10,10 +10,11 @@
  *           participants module (elnino-server/src/modules/participants) via
  *           store/participantsStore.ts.
  * Actions:  add a participant by hand (name/phone/email, +bib/category for a race), edit or
- *           delete one, approve/reject a self-registered rider — all real, server-backed
- *           mutations now. Event-day check-in and "mark finished" stay a local-only overlay
- *           (participantsStore.ts's own doc comment) — the server has the DB columns for both
- *           but no write endpoint yet. While the event is live: Pause/Resume tracking and Stop
+ *           delete one, approve/reject a self-registered rider, and event-day check-in
+ *           (PATCH .../participants/:id/attendance) — all real, server-backed mutations now,
+ *           which is what lets EventDetailPage show the same arrival state from server data.
+ *           "Mark finished" is still a local-only overlay (participantsStore.ts's own doc
+ *           comment). While the event is live: Pause/Resume tracking and Finish
  *           (finish) — this page doubles as the restricted "Manage" view once live, not a
  *           separate screen, per the plan's "same slot, two lives" Start/LIVE design.
  *
@@ -178,7 +179,7 @@ export function EventParticipantsPage() {
 
   async function stopEvent() {
     if (!eventId) return;
-    if (!window.confirm("Stop this event? It finishes permanently and can't be reopened.")) return;
+    if (!window.confirm("Finish this event? It finishes permanently and can't be reopened.")) return;
     setPauseBusy(true);
     setActionError(null);
     try {
@@ -285,7 +286,7 @@ export function EventParticipantsPage() {
               title="Finish this event permanently"
             >
               <Square width={14} height={14} aria-hidden="true" style={{ marginRight: 6 }} />
-              Stop
+              Finish
             </button>
           </div>
         </div>
@@ -334,9 +335,15 @@ export function EventParticipantsPage() {
                     ? `${styles.checkBtn} ${styles.checkBtnActive}`
                     : styles.checkBtn
                 }
-                onClick={() =>
-                  eventId && setAttendance(eventId, p.id, p.attendanceStatus !== "present")
-                }
+                onClick={() => {
+                  if (!eventId) return;
+                  setActionError(null);
+                  setAttendance(eventId, p.id, p.attendanceStatus !== "present").catch((err) =>
+                    setActionError(
+                      err instanceof ApiError ? err.message : "Could not update arrival.",
+                    ),
+                  );
+                }}
                 aria-pressed={p.attendanceStatus === "present"}
                 aria-label={p.attendanceStatus === "present" ? "Mark not arrived" : "Mark arrived"}
                 title="Check in"

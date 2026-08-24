@@ -22,6 +22,8 @@ import { apiRequest } from "../lib/api-client";
 import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
+import { Avatar } from "./Avatar";
+import { useMyIdentity } from "./useMyIdentity";
 
 // The event detail page ("/events/:eventId", but not the "new"/"edit"/sub-route variants)
 // swaps the hamburger for a back arrow here, next to the wordmark — asked for directly ("back
@@ -57,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [serverReachable]);
   const { status } = useAuth();
+  const me = useMyIdentity();
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -115,7 +118,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label={status === "signed-in" ? "Account" : "Sign in"}
           onClick={() => (status === "signed-in" ? navigate("/account") : setDrawerOpen(true))}
         >
-          <User aria-hidden="true" />
+          {/* A signed-in rider sees their own picture here — their chosen avatar, else their
+              Google photo, else the initial placeholder every other avatar in the app uses.
+              Signed out there is nobody to show, so the generic icon stays. */}
+          {me.signedIn ? (
+            <Avatar
+              className="identity-avatar"
+              name={me.displayName}
+              identity={me.avatar}
+              localSelection={me.localAvatar}
+              seed={me.seed}
+            />
+          ) : (
+            <User aria-hidden="true" />
+          )}
         </button>
       </header>
 

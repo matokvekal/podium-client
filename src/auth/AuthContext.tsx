@@ -22,7 +22,9 @@ import {
   saveProfile,
   saveTokens,
 } from "../lib/auth-storage";
+import type { UserVisualAsset } from "../lib/user-identity";
 import { useEventsStore } from "../store/eventsStore";
+import { forgetUserIdentity, reconcileUserIdentity } from "../store/userIdentityStore";
 import { forgetGoogleSession } from "./google-signin";
 
 export interface Profile {
@@ -33,6 +35,17 @@ export interface Profile {
   nickname: string | null;
   emergencyPhone: string | null;
   requiresProfile: boolean;
+  /**
+   * This rider's own avatar and cover (lib/user-identity.ts). Optional because GET /users/me
+   * does not send them yet — and the client must not require them: a profile without these
+   * keys is a perfectly valid profile, and every surface falls back to what it shows today.
+   *
+   * Their PRESENCE (even as null) is also how the app detects that the server supports the
+   * feature at all — see serverSupportsVisualIdentity. Until then the account page persists a
+   * pick on this device only, and says so.
+   */
+  avatar?: UserVisualAsset | null;
+  cover?: UserVisualAsset | null;
 }
 
 interface AuthResponse {
@@ -72,6 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveProfile(me);
     setProfile(me);
     setStatus("signed-in");
+    // Once the server holds this rider's avatar/cover, the temporary on-device copy is
+    // redundant — server data wins and the local value is dropped. A no-op today, because
+    // /users/me sends neither field. See store/userIdentityStore.ts.
+    reconcileUserIdentity(me.id, me);
   }, []);
 
   // Cold start with a stored session: refresh who this is. A cached profile is already
@@ -149,6 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    // Read from storage rather than the `profile` state so this callback stays dependency-free
+    // and can never clear the WRONG rider's data from a stale closure.
+    const signedInId = getProfile<Profile>()?.id ?? null;
     // Best effort: revoking the session server-side is right, but a rider on a mountain
     // with no signal still gets signed out locally.
     await apiRequest("/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -158,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Drop this rider's My Rides (in-memory and the IndexedDB "mine" cache bucket) so a
     // shared device never briefly shows them to whoever signs in next.
     useEventsStore.getState().clearMyRides();
+    // Same reason: their on-device avatar/cover pick is personal data and goes with them.
+    if (signedInId != null) forgetUserIdentity(signedInId);
     setProfile(null);
     setStatus("signed-out");
   }, []);

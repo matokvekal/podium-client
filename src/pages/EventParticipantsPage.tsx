@@ -351,7 +351,13 @@ export function EventParticipantsPage() {
                 <Check width={16} height={16} aria-hidden="true" />
               </button>
 
-              <Avatar className={styles.avatar} name={p.name} avatarUrl={p.avatarUrl} seed={p.id} />
+              <Avatar
+                className={styles.avatar}
+                name={p.name}
+                avatarUrl={p.avatarUrl}
+                identity={p.avatar}
+                seed={p.id}
+              />
 
               <div className={styles.info}>
                 <div className={styles.name}>

@@ -46,6 +46,7 @@ import {
   figmaStatus,
   recordOpenedEvent,
 } from "./event-visuals";
+import { useOwnerCover } from "./useOwnerCover";
 
 /**
  * The placeholder for a stat the API genuinely cannot answer yet. One shared constant so every
@@ -100,7 +101,10 @@ export function EventCard({
   const climbM = extras.climbM ?? event.climbM ?? null;
 
   const when = dateParts(event.startsAt);
-  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
+  // The organizer's own cover when they have one, else this event's local cover, else the
+  // built-in scene — one chain, in lib/user-identity.ts. See useOwnerCover.
+  const ownerCover = useOwnerCover(event.ownerId, event.ownerCover);
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, ownerCover);
 
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();

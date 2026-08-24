@@ -60,6 +60,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
+import { useOwnerCover } from "../app/useOwnerCover";
 import { LiveTracking } from "../app/LiveTracking";
 
 import { useAuth } from "../auth/AuthContext";
@@ -859,6 +860,14 @@ export function EventDetailPage() {
     }
   }
 
+  // Hero cover. event.owner.cover is the organizer's own identity once the server carries it;
+  // until then this resolves to exactly what it shows today. Same chain as the list cards —
+  // see app/useOwnerCover.ts and lib/user-identity.ts.
+  //
+  // Must stay ABOVE the loading/error/no-event early returns below: it is a hook, so it has to
+  // run on every render. It tolerates a null event — there is simply no owner to resolve yet.
+  const ownerCoverOptions = useOwnerCover(event?.owner?.id ?? event?.ownerId, event?.owner?.cover);
+
   if (loading) {
     return (
       <div className="row">
@@ -926,7 +935,12 @@ export function EventDetailPage() {
   const organizerIsRealOwner = !extras.organizerGroup && !!event.owner?.name;
   const organizer = extras.organizerGroup ?? event.owner?.name ?? null;
   const organizerAvatarUrl = organizerIsRealOwner ? (event.owner?.avatarUrl ?? null) : null;
-  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
+  const organizerAvatar = organizerIsRealOwner ? (event.owner?.avatar ?? null) : null;
+  const coverBackground = eventCoverBackground(
+    event.id,
+    extras.coverImageDataUrl,
+    ownerCoverOptions,
+  );
   const riderCount = realRiderCount;
   const bucket = figmaStatus(displayStatus);
   const canEditNow = event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
@@ -1006,6 +1020,7 @@ export function EventDetailPage() {
                 className={styles.avatar}
                 name={organizer}
                 avatarUrl={organizerAvatarUrl}
+                identity={organizerAvatar}
                 seed={organizer}
               />
               Organized by {organizer}
@@ -1226,6 +1241,7 @@ export function EventDetailPage() {
               className={styles.organizerAvatar}
               name={organizer}
               avatarUrl={organizerAvatarUrl}
+              identity={organizerAvatar}
               seed={organizer}
             />
             <div className={styles.organizerText}>
@@ -1514,6 +1530,7 @@ export function EventDetailPage() {
                                 className={styles.realRiderAvatar}
                                 name={rider.name}
                                 avatarUrl={rider.avatarUrl}
+                                identity={rider.avatar}
                                 seed={String(rider.id)}
                               />
                               <div className={styles.realRiderMain}>

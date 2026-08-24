@@ -54,6 +54,7 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 import { haversineDistanceKm } from "../lib/geo";
 import type { LiveRider } from "../lib/live-types";
+import type { UserVisualAsset } from "../lib/user-identity";
 import {
   type CachedParticipant,
   type EventSummary,
@@ -131,6 +132,9 @@ interface RosterEntry {
   name: string | null;
   /** Real account's Google profile photo, or null for a manual/account-less rider. */
   avatarUrl: string | null;
+  /** Chosen visual identity, once the server carries it. Optional and absent today —
+   * this is filled straight from CachedParticipant, so it mirrors that field. */
+  avatar?: UserVisualAsset | null;
   bib: string | null;
 }
 
@@ -760,6 +764,7 @@ export function LiveEventPage() {
                       className={styles.riderAvatar}
                       name={r.name}
                       avatarUrl={r.avatarUrl}
+                      identity={r.avatar}
                       seed={String(r.id)}
                     />
                     <span className={styles.ridersModalName}>
@@ -906,6 +911,7 @@ export function LiveEventPage() {
                       className={styles.riderAvatar}
                       name={r.name}
                       avatarUrl={r.avatarUrl}
+                      identity={r.avatar}
                       seed={String(r.id)}
                     />
                     <span className={styles.riderInfo}>

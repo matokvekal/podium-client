@@ -2,13 +2,12 @@
 // look as a card" so the home row and the Other Rides list read as the same design system.
 
 import type { EventStatus } from "../lib/local-db";
-
-function hashSeed(seed: string | null | undefined): number {
-  const s = seed ?? "";
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (Math.imul(hash, 31) + s.charCodeAt(i)) | 0;
-  return Math.abs(hash);
-}
+import { stableHash as hashSeed } from "../lib/stable-hash";
+import {
+  type LocalVisualSelection,
+  resolveEventCover,
+  type UserVisualAsset,
+} from "../lib/user-identity";
 
 const STATUS_LABEL: Record<EventStatus, string> = {
   draft: "Draft",
@@ -113,14 +112,39 @@ export function generatedCoverUrl(seed: string | null | undefined): string {
   return `/event-covers/cover-${(hashSeed(seed) % GENERATED_COVER_COUNT) + 1}.svg`;
 }
 
+/** The owner's identity, for the cover chain. All optional — today's API sends none of it. */
+export interface EventCoverOptions {
+  ownerId?: number | null;
+  /** The owner's cover as the server sent it (EventSummary.ownerCover / EventDetail.owner.cover). */
+  ownerCover?: UserVisualAsset | null;
+  /** This device's temporary pick — only when the viewer IS the owner. */
+  localCover?: LocalVisualSelection | null;
+}
+
 export function eventCoverBackground(
   seed: string | null | undefined,
   coverImageDataUrl: string | null | undefined,
+  options?: EventCoverOptions,
 ): string {
-  // A real uploaded cover always wins; otherwise one of the built-in scenes above. Both get
-  // the same darkening scrim, so overlaid text stays readable whichever is showing.
-  const url = coverImageDataUrl ? coverImageDataUrl.replaceAll('"', "%22") : generatedCoverUrl(seed);
-  return `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), url("${url}")`;
+  // The full chain lives in lib/user-identity.ts so the cards, the hero and the account page
+  // cannot disagree about which picture wins. Called with two arguments — as every original
+  // call site does — it behaves exactly as before: this event's own uploaded cover, else one
+  // of the built-in scenes above.
+  const resolved = resolveEventCover({
+    ownerId: options?.ownerId ?? null,
+    ownerCover: options?.ownerCover,
+    localCover: options?.localCover,
+    legacyEventCoverDataUrl: coverImageDataUrl,
+  });
+  // Nothing in the chain answered — fall back to this event's own built-in scene, as today.
+  const url = (resolved.url ?? generatedCoverUrl(seed)).replaceAll('"', "%22");
+  // Everything gets the same darkening scrim so overlaid text stays readable whichever is
+  // showing, and a solid base colour underneath so a cover that fails to load (a rotted upload
+  // URL, a preset from a newer server) still reads as a deliberate block rather than a hole.
+  return (
+    `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), ` +
+    `url("${url}"), ${placeholderColorVar(seed)}`
+  );
 }
 
 export function initialOf(name: string | null | undefined): string {

@@ -15,6 +15,8 @@ import { Bike, LogOut, Map as MapIcon, Moon, QrCode, Sun, User, Users, X } from 
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { ColorTheme } from "../lib/color-theme";
+import { Avatar } from "./Avatar";
+import { useMyIdentity } from "./useMyIdentity";
 
 interface AppDrawerProps {
   open: boolean;
@@ -24,15 +26,13 @@ interface AppDrawerProps {
 }
 
 export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: AppDrawerProps) {
-  const { status, profile, signOut } = useAuth();
+  const { status, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const fullName = [profile?.firstName, profile?.lastName]
-    .map((part) => part?.trim() ?? "")
-    .filter(Boolean)
-    .join(" ");
-  const displayName =
-    status === "signed-in" ? profile?.nickname?.trim() || fullName || "Rider" : "Guest";
+  // Name and avatar both come from useMyIdentity so the drawer, the header and the account
+  // page always agree about who this is.
+  const me = useMyIdentity();
+  const displayName = me.displayName;
 
   function go(path: string) {
     onClose();
@@ -56,7 +56,17 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
 
         <div className="drawer__identity">
           <div className="drawer__avatar">
-            <User aria-hidden="true" />
+            {me.signedIn ? (
+              <Avatar
+                className="identity-avatar"
+                name={me.displayName}
+                identity={me.avatar}
+                localSelection={me.localAvatar}
+                seed={me.seed}
+              />
+            ) : (
+              <User aria-hidden="true" />
+            )}
           </div>
           <div>
             <div className="drawer__identity-name">{displayName}</div>

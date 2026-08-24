@@ -1,0 +1,151 @@
+/* Account — the identity editor.
+   Every preview here uses a fixed aspect-ratio box plus object-fit: cover, so one 256px avatar
+   file and one 1200x450 cover file are correct at every size they are drawn at. Nothing in
+   this file depends on an asset's real pixel dimensions. */
+
+.identityCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* --- the header preview: cover with the avatar overlapping its lower edge --- */
+
+.previewCover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 3;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-sunken);
+}
+
+.previewAvatar {
+  position: absolute;
+  left: var(--space-4);
+  bottom: calc(-1 * var(--space-5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-inverse);
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.previewMeta {
+  padding: calc(var(--space-5) + var(--space-2)) var(--space-4) var(--space-4);
+}
+
+.previewName {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+/* --- one editable slot (avatar or cover) --- */
+
+.slot {
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.slotHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.slotTitle {
+  font-weight: var(--weight-bold);
+}
+
+.slotSpec {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slotActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+/* --- the preset grid, grouped by category --- */
+
+.group {
+  margin-top: var(--space-3);
+}
+
+.groupLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+
+.gridCover {
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+}
+
+.swatch {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.swatch:hover {
+  border-color: var(--border-strong);
+}
+
+.swatch[data-active="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.swatchAvatar {
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+}
+
+.swatchCover {
+  aspect-ratio: 8 / 3;
+}
+
+/* The one rule that makes a single asset work at every size it is drawn. */
+.swatch img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hint {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.error {
+  margin-top: var(--space-3);
+}

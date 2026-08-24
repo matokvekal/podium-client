@@ -723,3 +723,27 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The signed-in rider's own avatar, inside the header button and the drawer identity block.
+   Both containers are already fixed-size circles (.app-header__avatar, .drawer__avatar), so
+   this only has to fill them — the picture itself is sized by object-fit: cover inside
+   app/Avatar.tsx, which is why one 256px preset file is correct at both sizes. */
+.identity-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: var(--text-inverse);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.app-header__avatar .identity-avatar {
+  font-size: var(--text-sm);
+}
+
+.drawer__avatar .identity-avatar {
+  font-size: var(--text-base);
+}

@@ -35,6 +35,7 @@ import type { LiveRider } from "./live-types";
 import type { AttendanceStatus, RegistrationStatus } from "./participant-types";
 import type { RiderLevel } from "./rider-level";
 import type { SurfaceType } from "./surface-types";
+import type { UserVisualAsset } from "./user-identity";
 
 export type EventStatus =
   | "draft"
@@ -66,6 +67,14 @@ export interface EventSummary {
   /** Owner's Google profile photo, or null for legacy/ownerless events and any owner who
    * hasn't signed in with Google. */
   ownerAvatarUrl: string | null;
+  /**
+   * The owner's persistent visual identity (lib/user-identity.ts), flat on the summary to match
+   * how ownerName/ownerAvatarUrl are already sent here. Optional because NO server sends them
+   * yet — a v1 cached row and every response from today's API simply omit them, and the cover
+   * chain falls through to the same picture it shows now.
+   */
+  ownerAvatar?: UserVisualAsset | null;
+  ownerCover?: UserVisualAsset | null;
   /**
    * Real server fields on the SUMMARY, not just the detail — the server's toEventSummary
    * (event.controller.ts) has been sending all four for a while; they simply were never typed
@@ -116,6 +125,10 @@ export interface EventOwner {
   name: string | null;
   /** Google profile photo, or null for an owner who never signed in with Google. */
   avatarUrl: string | null;
+  /** The owner's chosen avatar/cover, once the server can carry them. Optional and absent
+   * today; both fall through to the existing behaviour. See lib/user-identity.ts. */
+  avatar?: UserVisualAsset | null;
+  cover?: UserVisualAsset | null;
 }
 
 export interface EventDetail extends EventSummary {
@@ -143,6 +156,9 @@ export interface CachedParticipant {
   id: number;
   name: string | null;
   avatarUrl: string | null;
+  /** Optional, absent today. Cached verbatim with the rest of the row, so an offline roster
+   * keeps whatever identity the server last sent. See lib/user-identity.ts. */
+  avatar?: UserVisualAsset | null;
   bib: string | null;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;

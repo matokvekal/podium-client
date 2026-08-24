@@ -34,6 +34,7 @@ import {
   figmaStatus,
   recordOpenedEvent,
 } from "./event-visuals";
+import { useOwnerCover } from "./useOwnerCover";
 
 interface EventTileProps {
   event: EventSummary;
@@ -73,10 +74,18 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   // field is unknown.
   const organizer = extras.organizerGroup ?? event.ownerName ?? null;
   const organizerAvatarUrl = extras.organizerGroup ? null : event.ownerAvatarUrl;
+  // Same rule for the chosen identity: a club/team name is not an account, so it has no
+  // avatar of its own and must not borrow the owner's.
+  const organizerAvatar = extras.organizerGroup ? null : event.ownerAvatar;
   // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
-  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl);
+  const ownerCoverOptions = useOwnerCover(event.ownerId, event.ownerCover);
+  const coverBackground = eventCoverBackground(
+    event.id,
+    extras.coverImageDataUrl,
+    ownerCoverOptions,
+  );
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();
@@ -169,6 +178,7 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
               <Avatar
                 name={organizer}
                 avatarUrl={organizerAvatarUrl}
+                identity={organizerAvatar}
                 seed={event.ownerId != null ? String(event.ownerId) : event.id}
                 className={styles.organizerAvatar}
               />

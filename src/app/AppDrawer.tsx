@@ -1,6 +1,6 @@
 /**
  * Slide-out navigation drawer, opened from the hamburger button in AppShell's header.
- *
+ *test
  * Mirrors race-pwa's HeaderMain drawer pattern: an avatar row that says who (if anyone) is
  * signed in, then nav items, then either "Register / Login" or "Account" + "Sign out"
  * depending on that. Deliberately does not carry over race-pwa's theme/language/skin

@@ -23,6 +23,14 @@ jobs:
         run: npm ci
 
       - name: Build
+        # Vite inlines VITE_* at build time — nginx cannot fix a wrong value later. Without
+        # these, config.ts falls back to http://localhost:5000/api/v1 and the deployed app
+        # calls the visitor's own machine. "/api/v1" is relative on purpose: nginx serves the
+        # client and proxies /api/ to the server, so the app is same-origin and there is no
+        # CORS preflight (same reason the dev server proxies — see vite.config.ts).
+        env:
+          VITE_API_URL: /api/v1
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build
 
       - name: Deploy PWA

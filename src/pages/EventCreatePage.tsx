@@ -165,6 +165,10 @@ interface ExistingEvent {
   description: string | null;
   requiresApproval: boolean;
   showParticipants: boolean;
+  /** Real event columns (sql/010-event-profile.sql). Absent/null on an event created before
+   *  the client started sending them; the edit form then falls back to the device-local copy. */
+  activityType?: SurfaceType | null;
+  level?: RiderLevel | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -400,6 +404,10 @@ export function EventCreatePage() {
     let cancelled = false;
     setLoadingEvent(true);
     (async () => {
+      // Set true once the server answers for difficulty / activity type, so the device-local
+      // extras below don't overwrite a real server value with a stale one.
+      let serverHasLevel = false;
+      let serverHasActivity = false;
       const cached = await getCachedEvent(eventId);
       if (cached && !cancelled) {
         setName(cached.name);
@@ -437,6 +445,17 @@ export function EventCreatePage() {
           setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
         setRequiresApproval(found.requiresApproval);
         setRidersListVisible(found.showParticipants);
+        // Server value wins for difficulty / activity type — it is the same for every device
+        // now. The device-local extras below only fill a gap for an event created before the
+        // client sent these (or edited on a different device).
+        if (found.level) {
+          setLevel(found.level);
+          serverHasLevel = true;
+        }
+        if (found.activityType) {
+          setActivityType(found.activityType);
+          serverHasActivity = true;
+        }
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -447,8 +466,8 @@ export function EventCreatePage() {
       // the effect's dependency array, see comment below.
       const existingExtras = useEventExtrasStore.getState().byEvent[eventId];
       if (existingExtras && !cancelled) {
-        if (existingExtras.level) setLevel(existingExtras.level);
-        if (existingExtras.activityType)
+        if (!serverHasLevel && existingExtras.level) setLevel(existingExtras.level);
+        if (!serverHasActivity && existingExtras.activityType)
           setActivityType(existingExtras.activityType);
         if (existingExtras.teamId) setTeamId(existingExtras.teamId);
         else if (existingExtras.organizerGroup)
@@ -793,7 +812,11 @@ export function EventCreatePage() {
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
             requiresApproval,
-            showParticipants: ridersListVisible
+            showParticipants: ridersListVisible,
+            // Same as create: real event columns, updateEventSchema accepts them. Sent so an
+            // edited difficulty / activity type reaches every viewer, not just this device.
+            activityType,
+            ...(level ? { level } : {})
           }
         });
         await saveExtras(eventId);
@@ -828,6 +851,14 @@ export function EventCreatePage() {
           description: description || undefined,
           requiresApproval,
           showParticipants: ridersListVisible,
+          // Difficulty + activity type are REAL event columns (sql/010-event-profile.sql) and
+          // createEventSchema accepts them — the client just never sent them, so every rider
+          // fell back to a device-local copy in eventExtrasStore that only the creator's
+          // browser had (and that logout now wipes). Sent here so the card and detail show
+          // them for every viewer, on every device, after any relogin. `level` is omitted when
+          // the organizer cleared the picker.
+          activityType,
+          ...(level ? { level } : {}),
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.

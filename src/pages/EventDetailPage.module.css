@@ -983,6 +983,14 @@
   overflow-wrap: anywhere;
 }
 
+/* A placeholder / no-data tile (Est. Time "soon", Weather "No data") reads as de-emphasised,
+   same treatment as the list card's pending stats. */
+.statTile[data-pending] .statTileValue {
+  font-style: italic;
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
 .statTileLabel {
   font-size: 0.7rem;
   color: var(--text-muted);

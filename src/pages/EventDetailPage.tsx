@@ -91,7 +91,6 @@ import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
-import { useIsOrganizer } from "../store/userModeStore";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -274,27 +273,30 @@ const CANCELLABLE: EventStatus[] = ["draft", "published", "registration_open", "
 // the same profile.id === ownerId check EventTile.tsx already uses on the tile itself, so a
 // cached "my ride" doesn't look read-only for the instant before the real fetch resolves.
 function detailFromCachedSummary(summary: EventSummary, viewerId: number | null): EventDetail {
+  // A plain list row has only `ownerId`, but the object cached straight from a POST /events /
+  // status-transition response is a full EventDetail — it carries the real `owner`, `isOwner`
+  // and `myParticipant`. Keep those when present so a freshly created event opens looking like
+  // the owner's own event, not a stranger's, before the network refetch resolves.
+  const rich = summary as Partial<EventDetail>;
   return {
     ...summary,
-    requiresBib: false,
-    description: null,
-    finishedAt: null,
-    isOwner: viewerId != null && viewerId === summary.ownerId,
-    // A list summary has no owner object — only ownerId. Null, not a guess: the organizer row
-    // simply doesn't render until the real fetch resolves.
-    owner: null,
-    requiresApproval: false,
-    isPaused: false,
-    effectiveStatus: summary.status,
-    showParticipants: true,
-    showLiveLocations: true,
-    myParticipant: null,
+    requiresBib: rich.requiresBib ?? false,
+    description: rich.description ?? null,
+    finishedAt: rich.finishedAt ?? null,
+    isOwner: rich.isOwner ?? (viewerId != null && viewerId === summary.ownerId),
+    owner: rich.owner ?? null,
+    requiresApproval: rich.requiresApproval ?? false,
+    isPaused: rich.isPaused ?? false,
+    effectiveStatus: rich.effectiveStatus ?? summary.status,
+    showParticipants: rich.showParticipants ?? true,
+    showLiveLocations: rich.showLiveLocations ?? true,
+    myParticipant: rich.myParticipant ?? null,
     // A list summary carries no capacity — honest "not full, count unknown" until the real
     // GET /events/:eventId (which always sends all three) replaces this. The cap falls back to
     // the server's own default so "N / 50" doesn't flash a wrong ceiling.
-    participantCount: 0,
-    maxParticipants: FALLBACK_LIMITS.maxParticipantsPerEvent,
-    isFull: false,
+    participantCount: rich.participantCount ?? 0,
+    maxParticipants: rich.maxParticipants ?? FALLBACK_LIMITS.maxParticipantsPerEvent,
+    isFull: rich.isFull ?? false,
   };
 }
 
@@ -304,7 +306,6 @@ export function EventDetailPage() {
   const location = useLocation();
   const redirectMessage = (location.state as { message?: string } | null)?.message ?? null;
   const { profile } = useAuth();
-  const isOrganizer = useIsOrganizer();
   // Which rider these offline caches belong to. Every read is scoped to it, so a cached ride
   // can never be served to a different account — see lib/local-db.ts.
   const viewerId = viewerKey(profile?.id);
@@ -928,7 +929,11 @@ export function EventDetailPage() {
   // AND is currently in Organizer mode. In Rider mode the owner sees their own event exactly
   // as a rider would (no Edit / Start / Finish / gear menu / quick-edit) — server permissions
   // are unchanged, this only hides UI. See store/userModeStore.ts.
-  const showOrganizerUi = event.isOwner && isOrganizer;
+  // Owning an event is NOT hidden by the Rider/Organizer browse toggle: if the server says
+  // you own this ride (event.isOwner, from GET /events/:id), you always see it as yours and
+  // can manage it. The mode toggle only simplifies the GLOBAL surfaces (create/Find-Tracks
+  // entry points, the "Created" tab) — see store/userModeStore.ts.
+  const showOrganizerUi = event.isOwner;
   // Who gets the pencil: the organizer, on an event that is not finished. Non-owners never
   // see it, and a finished event is read-only for every rider's state (quickEditLocked above
   // closes the editor too, if the event finishes while it is open).
@@ -961,9 +966,11 @@ export function EventDetailPage() {
   const level = event.level ?? extras.level ?? null;
   // The organizer's own numbers (typed, or auto-filled from the route they picked) win over
   // the saved route's, because that is the figure they chose to publish for this ride. Null
-  // when neither exists — the tile is then simply not drawn.
-  const distanceKm = extras.distanceKm ?? results?.route?.distanceKm ?? null;
-  const climbM = extras.climbM ?? results?.route?.elevationM ?? null;
+  // when neither exists — the tile is then simply not drawn. Same fallback chain the card uses
+  // (EventCard.tsx): the organizer's own numbers (extras / event.distanceKm|climbM) first, the
+  // saved route's figures only as a last resort — so the hero shows exactly what the card does.
+  const distanceKm = extras.distanceKm ?? event.distanceKm ?? results?.route?.distanceKm ?? null;
+  const climbM = extras.climbM ?? event.climbM ?? results?.route?.elevationM ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
   // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
@@ -1087,54 +1094,60 @@ export function EventDetailPage() {
         {redirectMessage && <p className="banner">{redirectMessage}</p>}
 
         {/* --- stat strip -------------------------------------------------------------------
-            The reference design shows five tiles: Distance, Elevation, Est. Time, Avg. Speed,
-            Difficulty. Only three of those are real.
+            The SAME set the list card (EventCard.tsx) shows, from the SAME fields, so opening a
+            ride from its card never loses information: Distance, Elevation, Est. Time,
+            Difficulty, plus Weather here (the card has no room for it).
 
-            Est. Time and Avg. Speed are NOT rendered — in any form. No duration field exists on
-            an event or a route, and average speed of a ride that may not have happened yet is
-            not a thing the server tracks at all. Deriving either would mean inventing an
-            assumed pace and presenting it as this ride's data. They are absent rather than
-            "soon" because neither is a planned feature with a placeholder worth showing.
-
-            Every remaining tile renders only when its value is real, and the strip itself
-            disappears when none of them are. -------------------------------------------- */}
-        {(distanceKm != null || climbM != null || level != null) && (
-          <div className={styles.statStrip}>
-            {distanceKm != null && (
-              <div className={styles.statTile}>
-                <Ruler className={styles.statTileIcon} aria-hidden="true" />
-                <span className={styles.statTileValue}>{distanceKm} km</span>
-                <span className={styles.statTileLabel}>Distance</span>
-              </div>
-            )}
-            {climbM != null && (
-              <div className={styles.statTile}>
-                <Mountain className={styles.statTileIcon} aria-hidden="true" />
-                <span className={styles.statTileValue}>{climbM} m</span>
-                <span className={styles.statTileLabel}>Elevation</span>
-              </div>
-            )}
-            {level && (
-              <div className={styles.statTile}>
-                <span className={styles.levelBars} aria-hidden="true">
-                  {LEVELS.map((l, i) => (
-                    <span
-                      key={l.value}
-                      className={styles.levelBar}
-                      data-level={l.value}
-                      data-filled={i <= levelIndex}
-                      style={{ height: `${6 + i * 3}px` }}
-                    />
-                  ))}
-                </span>
-                <span className={styles.statTileValue}>
-                  {levelLabelFor(level, activityType)}
-                </span>
-                <span className={styles.statTileLabel}>{levelHeadingFor(activityType)}</span>
-              </div>
-            )}
+            A missing value shows "—" rather than dropping the tile — matching the card, and so
+            the layout doesn't jump as `results`/`forecast` resolve. Est. Time reads "soon":
+            there is still no duration field anywhere (event or route), so it is a placeholder,
+            not data. Weather is real Open-Meteo (lib/weather.ts) or "No data" — never invented.
+            -------------------------------------------------------------------------------- */}
+        <div className={styles.statStrip}>
+          <div className={styles.statTile}>
+            <Ruler className={styles.statTileIcon} aria-hidden="true" />
+            <span className={styles.statTileValue}>
+              {distanceKm != null ? `${distanceKm} km` : "—"}
+            </span>
+            <span className={styles.statTileLabel}>Distance</span>
           </div>
-        )}
+          <div className={styles.statTile}>
+            <Mountain className={styles.statTileIcon} aria-hidden="true" />
+            <span className={styles.statTileValue}>{climbM != null ? `${climbM} m` : "—"}</span>
+            <span className={styles.statTileLabel}>Elevation</span>
+          </div>
+          <div className={styles.statTile}>
+            {level ? (
+              <span className={styles.levelBars} aria-hidden="true">
+                {LEVELS.map((l, i) => (
+                  <span
+                    key={l.value}
+                    className={styles.levelBar}
+                    data-level={l.value}
+                    data-filled={i <= levelIndex}
+                    style={{ height: `${6 + i * 3}px` }}
+                  />
+                ))}
+              </span>
+            ) : null}
+            <span className={styles.statTileValue}>
+              {level ? levelLabelFor(level, activityType) : "—"}
+            </span>
+            <span className={styles.statTileLabel}>{levelHeadingFor(activityType)}</span>
+          </div>
+          <div className={styles.statTile} data-pending>
+            <span className={styles.statTileValue}>soon</span>
+            <span className={styles.statTileLabel}>Est. Time</span>
+          </div>
+          <div className={styles.statTile} data-pending={!forecast || undefined}>
+            <span className={styles.statTileValue}>
+              {forecast
+                ? `${Math.round((forecast.tempMinC + forecast.tempMaxC) / 2)}°${forecast.emoji ? ` ${forecast.emoji}` : ""}`
+                : "No data"}
+            </span>
+            <span className={styles.statTileLabel}>Weather</span>
+          </div>
+        </div>
 
         {/* --- chip row: surface / visibility / approval ------------------------------------
             The reference design's three chips. Status is NOT repeated here — the hero already

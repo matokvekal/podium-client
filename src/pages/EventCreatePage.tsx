@@ -124,7 +124,13 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { effectiveLimits } from "../lib/entitlements";
 import type { EventRoute } from "../lib/event-route";
-import { type EventSummary, getCachedEvent } from "../lib/local-db";
+import {
+  type EventDetail,
+  type EventSummary,
+  getCachedEvent,
+  putCachedEventDetail,
+  viewerKey,
+} from "../lib/local-db";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
 import {
   nextUpcomingSaturdayStart,
@@ -829,6 +835,10 @@ export function EventCreatePage() {
       // offline reopen both see the real event (status included) without waiting for a
       // refetch.
       useEventsStore.getState().upsertRide(created);
+      // The POST /events reply is a full EventDetail (owner, isOwner, myParticipant, capacity).
+      // Cache it as the detail too — not just the list summary — so opening the new event
+      // paints it immediately as the owner's own event, before any refetch.
+      void putCachedEventDetail(created.id, viewerKey(profile?.id), created as unknown as EventDetail);
       await saveExtras(created.id);
       setLastDefaults({
         location,

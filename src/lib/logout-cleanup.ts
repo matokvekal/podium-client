@@ -5,6 +5,8 @@
 // session flags). Nothing this app owns is stored un-prefixed, and nothing this app owns is
 // a cookie — the auth tokens live in localStorage (see lib/auth-storage.ts). So a prefix scan
 // is exhaustive AND safe: Google's cookies and any unrelated site storage are never touched.
+// The one prefixed key that is NOT user data — `elnino.color-theme`, a device Dark/Light
+// preference — is explicitly preserved (see PRESERVED_ON_LOGOUT).
 //
 // The IndexedDB ride cache (podium-db) is cleared through its own module (lib/local-db.ts) —
 // no second cleanup mechanism.
@@ -17,7 +19,16 @@ import { clearAllCaches } from "./local-db";
 /** Keys this app owns. A key is fair game to delete iff it starts with one of these. */
 export const OWNED_STORAGE_PREFIXES = ["podium.", "elnino."] as const;
 
+/**
+ * Owned keys that are a DEVICE/APP preference rather than authenticated-user data, so logout
+ * must not touch them. `elnino.color-theme` is the Dark/Light choice — the same for a
+ * signed-out visitor, contains nothing about any user, and resetting it on every logout would
+ * flashbang someone who set dark mode.
+ */
+const PRESERVED_ON_LOGOUT = new Set<string>(["elnino.color-theme"]);
+
 export function isOwnedStorageKey(key: string): boolean {
+  if (PRESERVED_ON_LOGOUT.has(key)) return false;
   return OWNED_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 

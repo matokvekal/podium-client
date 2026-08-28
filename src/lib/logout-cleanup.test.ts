@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import { isOwnedStorageKey, ownedStorageKeys } from "./logout-cleanup";
 
 describe("isOwnedStorageKey", () => {
-  it("owns every podium.* and elnino.* key", () => {
+  it("owns every user-specific podium.* and elnino.* key", () => {
     expect(isOwnedStorageKey("podium.accessToken")).toBe(true);
     expect(isOwnedStorageKey("podium.userMode")).toBe(true);
     expect(isOwnedStorageKey("podium.userIdentity")).toBe(true);
-    expect(isOwnedStorageKey("elnino.color-theme")).toBe(true);
     expect(isOwnedStorageKey("elnino.location-stopped.abc-123")).toBe(true);
     expect(isOwnedStorageKey("elnino.approval-seen.xyz")).toBe(true);
+  });
+
+  it("preserves elnino.color-theme — a device preference, not user data", () => {
+    expect(isOwnedStorageKey("elnino.color-theme")).toBe(false);
   });
 
   it("does not touch anything else", () => {
@@ -34,7 +37,6 @@ describe("ownedStorageKeys", () => {
     ];
     expect(ownedStorageKeys(all).sort()).toEqual(
       [
-        "elnino.color-theme",
         "podium.accessToken",
         "podium.eventGroups",
         "podium.profile",

@@ -780,7 +780,7 @@ export function EventCreatePage() {
     setError(null);
     try {
       if (isEditing && eventId) {
-        await apiRequest<ExistingEvent>(`/events/${eventId}`, {
+        const updated = await apiRequest<ExistingEvent>(`/events/${eventId}`, {
           method: "PATCH",
           // The frozen PATCH /events/:eventId contract only documents name/location/
           // description — visibility/startsAt are sent too since this form collects them and
@@ -797,6 +797,10 @@ export function EventCreatePage() {
           }
         });
         await saveExtras(eventId);
+        // Same id, mutated in place — never a new event. Merge the server's updated fields
+        // into the list caches so the card shows the new values without waiting for a refetch;
+        // EventDetailPage re-fetches GET /events/:id on arrival for the rest.
+        useEventsStore.getState().upsertRide(updated as unknown as EventSummary);
         navigate(`/events/${eventId}`);
         return;
       }

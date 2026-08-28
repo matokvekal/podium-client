@@ -111,14 +111,18 @@ export function App() {
       />
       {/* Same component as /events/new — EventCreatePage.tsx detects an :eventId param and
           switches to edit mode ("edit event take us to like the create so i change
-          anything"), loading and PATCHing that event instead of POSTing a new one. */}
+          anything"), loading and PATCHing that event instead of POSTing a new one.
+
+          NOT gated by RequireOrganizer: editing an event you already own is an OWNER action,
+          authorised server-side (PATCH /events/:eventId asserts ownership), not a browse-mode
+          concern — same reasoning as EventDetailPage's showOrganizerUi. The Edit button on the
+          detail page is shown to the owner in either mode, so this route must open for them.
+          RequireOrganizer stays on /events/new and /routes (starting something new). */}
       <Route
         path="/events/:eventId/edit"
         element={
           <RequireAuth>
-            <RequireOrganizer>
-              <EventCreatePage />
-            </RequireOrganizer>
+            <EventCreatePage />
           </RequireAuth>
         }
       />

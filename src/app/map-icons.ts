@@ -93,8 +93,9 @@ export function riderSquareIcon(
 }
 
 /** The viewer's own device position — a distinct blue "you are here" dot, never confused with
- * a rider square or the red SOS marker. Client-side only: this app displays positions, it
- * never transmits them (see AGENT.md). */
+ * a rider square or the red SOS marker. Shown while this rider is sharing location; that
+ * sharing now also transmits to the server (app/useLocationBroadcast.ts) — see
+ * ELNINO_CLIENT_AGENT_SOURCE_OF_TRUTH.md §14. */
 export function selfPositionIcon(): L.DivIcon {
   return L.divIcon({
     className: "podium-map-icon",

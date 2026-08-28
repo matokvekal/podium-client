@@ -127,18 +127,29 @@
   }
 }
 
+/* The spinning storm icon — dead-centre of the stage, i.e. the middle of the track. Its own
+   layer so the wordmark can be lifted to the top without dragging the icon with it. */
+.splash__logo-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .splash__mark {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Shifted up from dead-center — asked for directly ("more upper") — via flex-start plus a
-     top pad rather than a transform, since that pad is a % of .splash__stage's own responsive
-     width and so stays proportional at any screen size, same as the logo sizing below. */
+  /* Wordmark sits at the top as a header — asked for directly, repeatedly ("more up"). The
+     icon stays centred in the track via .splash__logo-wrap above, independent of this. */
   justify-content: flex-start;
-  padding-top: 12%;
-  gap: 6px;
+  padding-top: 0;
+  margin-top: -160px;
+  gap: 10px;
   text-align: center;
   animation: splash-mark-in 900ms ease-out 300ms both;
 }
@@ -149,7 +160,6 @@
      of overflowing a small phone's stage. */
   width: min(47vw, 192px);
   height: min(47vw, 192px);
-  margin-bottom: 4px;
   /* hue-rotate first so it only re-tints the source artwork, not the drop-shadow's own fixed
      blue — --logo-hue is a random value SplashScreen.tsx picks fresh per mount ("each time at
      different color"), falling back to 0 (the original blue) if unset. */
@@ -164,15 +174,56 @@
 }
 
 .splash__mark-name {
+  position: relative;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #eaf6ff;
+  /* Big — asked for directly, then "20% bigger". clamp() so it fills the top of the stage on
+     a phone without wrapping "El Niño Move" on the narrowest screens or blowing up on desktop. */
+  font-size: clamp(2.3rem, 9.6vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.05;
   letter-spacing: 0.01em;
+  /* The wordmark itself is a solid, always-visible colour. */
+  color: #eaf6ff;
+  text-shadow: 0 0 18px rgb(56 189 248 / 0.55);
+}
+
+/* Light Sweep / shimmer: an overlaid copy of the wordmark, clipped to the text, filled with a
+   mostly-transparent gradient carrying one narrow bright band tilted ~20° off vertical. Moving
+   its position walks that band across the letters left→right once, then it rests. The wordmark
+   underneath is untouched — always visible, never blinks/pulses/fades/recolours. CSS only. */
+.splash__mark-name::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background-image: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.9) 48%,
+    rgb(255 255 255 / 1) 50%,
+    rgb(255 255 255 / 0.9) 52%,
+    transparent 65%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
+  /* One soft white bloom so a lit letter reads as a reflection, not a hard edge. Kept gentle
+     — cinematic, not flashy. */
+  filter: drop-shadow(0 0 6px rgb(255 255 255 / 0.45));
+  animation: splash-name-sheen 4.5s ease-in-out 800ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__mark-name::after {
+    animation: none;
+  }
 }
 
 .splash__mark-tag {
-  font-size: 0.8rem;
+  font-size: clamp(0.8rem, 3.2vw, 0.95rem);
   color: #93c5fd;
 }
 
@@ -236,5 +287,18 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* With background-size 200%, 100% → -100% walks the bright band from just left of "E" to past
+   the final letter — left→right — over ~1.8s, then it holds off-screen for the rest of the
+   loop so the effect repeats slowly rather than ping-ponging. */
+@keyframes splash-name-sheen {
+  0% {
+    background-position: 100% 0;
+  }
+  40%,
+  100% {
+    background-position: -100% 0;
   }
 }

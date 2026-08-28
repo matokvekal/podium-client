@@ -31,7 +31,13 @@ function dedupeById(events: EventSummary[]): EventSummary[] {
 }
 
 interface EventsState {
+  /** Owned + joined, merged and deduped — the union. Kept as-is for every existing caller. */
   myRides: EventSummary[];
+  /** Ids from GET /events?filter=joined only — i.e. events this user PARTICIPATES in as a
+   *  rider, regardless of who owns them. Lets a page tell "I ride this" apart from "I created
+   *  this" without a second request. Empty until the first successful load (or on an offline
+   *  cold start, where only the merged `myRides` survives in cache). */
+  joinedRideIds: string[];
   myRidesLoading: boolean;
   otherRides: EventSummary[];
   otherLoading: boolean;
@@ -53,6 +59,7 @@ let otherRidesRequestId = 0;
 
 export const useEventsStore = create<EventsState>((set, get) => ({
   myRides: [],
+  joinedRideIds: [],
   myRidesLoading: false,
   otherRides: [],
   otherLoading: true,
@@ -60,7 +67,7 @@ export const useEventsStore = create<EventsState>((set, get) => ({
 
   async loadMyRides(authed) {
     if (!authed) {
-      set({ myRides: [] });
+      set({ myRides: [], joinedRideIds: [] });
       return;
     }
     const requestId = ++myRidesRequestId;
@@ -78,7 +85,7 @@ export const useEventsStore = create<EventsState>((set, get) => ({
       ]);
       if (requestId !== myRidesRequestId) return;
       const merged = dedupeById([...mine, ...joined]);
-      set({ myRides: merged });
+      set({ myRides: merged, joinedRideIds: joined.map((event) => event.id) });
       putCachedEvents("mine", merged);
     } catch {
       // Never blank My Rides because a request failed. Whatever the cache read above painted
@@ -138,7 +145,7 @@ export const useEventsStore = create<EventsState>((set, get) => ({
   },
 
   clearMyRides() {
-    set({ myRides: [] });
+    set({ myRides: [], joinedRideIds: [] });
     void clearCachedEvents("mine");
     // The v2 per-ride caches (detail, route, participants, live) go too — they are the ones
     // holding a rider's private ride content, not just its name in a list.

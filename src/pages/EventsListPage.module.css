@@ -43,6 +43,27 @@
   height: 16px;
 }
 
+/* Small count pill on a tab — "how many are in here" at a glance. */
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+
+.tabActive .tabCount {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
 .toolbar {
   display: flex;
   flex-direction: column;
@@ -402,4 +423,177 @@
 .list > *:nth-child(5),
 .cardList > *:nth-child(5) {
   animation-delay: calc(var(--stagger) * 4);
+}
+
+/* --- Find Rides: filter / sort bottom sheets + active-filter chips ---------------------- */
+
+.activeFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.activeFilterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.clearFiltersBtn {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.inlineLink {
+  padding: 0;
+  font: inherit;
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(101%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.sheetBody {
+  padding: var(--space-4);
+  gap: 16px;
+}
+
+.sheetGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheetGroupLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sheetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sheetChips .filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sortoption {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.sortoption[data-on="true"] {
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  font-weight: var(--weight-medium);
+}
+
+/* --- Pending invitations, shown at the top of My Rides (no separate Invited tab) --------- */
+
+.inviteBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.inviteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-3);
+  text-decoration: none;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+}
+
+.inviteBadge {
+  align-self: flex-start;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent-strong);
+  border-radius: 999px;
+}
+
+.inviteName {
+  font-weight: var(--weight-medium);
+  font-size: 0.95rem;
 }

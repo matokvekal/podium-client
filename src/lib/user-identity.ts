@@ -17,8 +17,13 @@
  * an automatic fallback must never displace an image somebody actually chose. A deterministic
  * default is a fallback, not a choice.
  *
- *   cover:   server upload → server preset → local upload → local preset
- *            → legacy per-event cover → deterministic owner default → caller's own fallback
+ *   cover:   custom per-event cover (`event.customCover`) → owner server upload → owner server
+ *            preset → owner local upload → owner local preset → deterministic owner default
+ *            → caller's own fallback
+ *
+ *   The per-event cover is FIRST: a cover uploaded for one specific event stays that event's
+ *   cover even after its organizer later chooses a profile cover. New events carry no per-event
+ *   cover, so they fall straight through to the organizer's identity, which is the point.
  *
  *   avatar:  server upload → server preset → local upload → local preset
  *            → provider photo (Google) → caller's own fallback (the initial placeholder)
@@ -201,11 +206,14 @@ export interface EventCoverInput {
  */
 export function resolveEventCover(input: EventCoverInput): ResolvedVisual {
   return (
-    fromServerAsset(input.ownerCover, "cover") ??
-    fromLocalSelection(input.localCover, "cover") ??
+    // A cover set FOR THIS EVENT wins outright: `event.customCover ?? organizer.profileCover`.
+    // An event that already carries its own uploaded cover keeps it even after its organizer
+    // later picks a profile cover — see the "old events keep their cover" rule.
     (input.legacyEventCoverDataUrl
       ? { url: input.legacyEventCoverDataUrl, origin: "legacy-event" as const, presetId: null }
       : null) ??
+    fromServerAsset(input.ownerCover, "cover") ??
+    fromLocalSelection(input.localCover, "cover") ??
     (OWNER_SEEDED_DEFAULT_COVER && input.ownerId != null
       ? fromDefaultPreset("cover", String(input.ownerId))
       : null) ??

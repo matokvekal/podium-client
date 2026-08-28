@@ -34,6 +34,7 @@ import {
   figmaStatus,
   recordOpenedEvent,
 } from "./event-visuals";
+import { useOwnerAvatar } from "./useOwnerAvatar";
 import { useOwnerCover } from "./useOwnerCover";
 
 interface EventTileProps {
@@ -73,10 +74,12 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   // say "Independent ride", which states something about the ride instead of admitting the
   // field is unknown.
   const organizer = extras.organizerGroup ?? event.ownerName ?? null;
-  const organizerAvatarUrl = extras.organizerGroup ? null : event.ownerAvatarUrl;
-  // Same rule for the chosen identity: a club/team name is not an account, so it has no
-  // avatar of its own and must not borrow the owner's.
-  const organizerAvatar = extras.organizerGroup ? null : event.ownerAvatar;
+  // A real account gets the full identity chain (including this device's local pick when the
+  // viewer is the owner); a club/team name is not an account and shows only its initial.
+  const ownerAvatarProps = useOwnerAvatar(event.ownerId, event.ownerAvatarUrl, event.ownerAvatar);
+  const organizerAvatarProps = extras.organizerGroup
+    ? { avatarUrl: null, identity: null, localSelection: null, seed: organizer }
+    : ownerAvatarProps;
   // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
   const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
   const climbM = extras.climbM ?? event.climbM ?? null;
@@ -177,9 +180,8 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
             <div className={styles.organizerRow}>
               <Avatar
                 name={organizer}
-                avatarUrl={organizerAvatarUrl}
-                identity={organizerAvatar}
-                seed={event.ownerId != null ? String(event.ownerId) : event.id}
+                {...organizerAvatarProps}
+                seed={organizerAvatarProps.seed ?? event.id}
                 className={styles.organizerAvatar}
               />
               Organized by {organizer}

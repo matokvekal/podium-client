@@ -42,6 +42,14 @@ export const config = {
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "",
 
   /**
+   * Origin for USER-FACING share links and QR codes (ShareEventSheet). Always the production
+   * site, even in local dev — a QR printed at a start line or a link sent to a rider has to
+   * open the real app, never http://localhost:5173. In-app navigation still uses relative
+   * paths and stays wherever the app is actually running.
+   */
+  shareBaseUrl: (import.meta.env.VITE_SHARE_BASE_URL || "https://el-nino.site").replace(/\/$/, ""),
+
+  /**
    * App version, from package.json via vite.config.ts. Shown on the login screen so a
    * screenshot from a rider is enough to tell which build they are on.
    */
@@ -61,4 +69,13 @@ export const config = {
 
   /** A rider with nothing newer than this is drawn as stale rather than current. */
   staleAfterMs: 90_000,
+
+  /**
+   * How often this device uploads a batch of its own GPS fixes to
+   * POST /events/:eventId/locations/batch while sharing location on the live page. 30 s keeps
+   * it well under the server's per-rider ingest limit (120 requests / 15 min, per
+   * plan/03-progress.md) with room for a catch-up burst after a dead zone, and matches the
+   * batching cadence the Android transmitter is documented to use.
+   */
+  locationBatchIntervalMs: 30_000,
 } as const;

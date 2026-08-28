@@ -149,6 +149,20 @@ export interface EventDetail extends EventSummary {
   showParticipants: boolean;
   showLiveLocations: boolean;
   myParticipant: MyParticipant | null;
+  /**
+   * Start-list capacity, all resolved server-side and always present on a real
+   * GET /events/:eventId response. `maxParticipants` is the event OWNER's entitlement;
+   * `participantCount` is approved + pending; `isFull` is `participantCount >= maxParticipants`.
+   * Client validation is UX only — the server 409s (EVENT_FULL) when a join hits the cap.
+   * detailFromCachedSummary supplies honest fallbacks until the real fetch resolves.
+   */
+  participantCount: number;
+  maxParticipants: number;
+  isFull: boolean;
+  /** Ride-groups count + the owner's per-event group entitlement. Optional: ride groups are a
+   * client-only concept today (store/eventGroupsStore.ts), so a response may omit these. */
+  groupCount?: number;
+  maxGroups?: number;
 }
 
 /** One GET /events/:eventId/participants row, as far as any UI here needs it. */

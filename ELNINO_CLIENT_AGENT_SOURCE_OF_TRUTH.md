@@ -463,9 +463,17 @@ Do not eagerly import Leaflet into the main bundle without a measured reason.
 
 ## 14. Live Page
 
-The web client displays GPS data; it does **not** transmit rider GPS in V1.
+The web client displays GPS data, and — as of the rider/organizer-mode work — **also
+transmits this rider's own GPS** while they are sharing location on the live page.
 
-Android is the GPS source.
+- Transmission reuses the frozen `POST /api/v1/events/:eventId/locations/batch` endpoint (the
+  same one the Android transmitter uses — **no new API**). See `src/app/useLocationBroadcast.ts`.
+- It is **opt-in** (the crosshair control), only runs for a participant on a **live** event,
+  stops on manual stop / event finished / leave / logout, and resumes on return-from-background
+  after re-checking the event is still live. Exactly one `watchPosition` watcher + one upload
+  interval at a time. Batches every `config.locationBatchIntervalMs` (30 s).
+- No SOS on the web client — every point is sent `emergency: false`.
+- The Android app is still the primary GPS source and must keep working unchanged.
 
 Client live responsibilities:
 - render route;
@@ -473,9 +481,8 @@ Client live responsibilities:
 - render permitted other riders;
 - show status/last-position information;
 - display emergency/SOS state visually;
-- obey server visibility/capability results.
-
-Do not create a web GPS transmitter unless product scope explicitly changes.
+- obey server visibility/capability results;
+- transmit this rider's own GPS while sharing, per the rules above.
 
 ---
 

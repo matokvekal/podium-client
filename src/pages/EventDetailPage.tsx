@@ -60,6 +60,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
+import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
 import { LiveTracking } from "../app/LiveTracking";
 
@@ -81,6 +82,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
+import { FALLBACK_LIMITS } from "../lib/plan-limits";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
@@ -89,6 +91,7 @@ import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
+import { useIsOrganizer } from "../store/userModeStore";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -286,6 +289,12 @@ function detailFromCachedSummary(summary: EventSummary, viewerId: number | null)
     showParticipants: true,
     showLiveLocations: true,
     myParticipant: null,
+    // A list summary carries no capacity — honest "not full, count unknown" until the real
+    // GET /events/:eventId (which always sends all three) replaces this. The cap falls back to
+    // the server's own default so "N / 50" doesn't flash a wrong ceiling.
+    participantCount: 0,
+    maxParticipants: FALLBACK_LIMITS.maxParticipantsPerEvent,
+    isFull: false,
   };
 }
 
@@ -295,6 +304,7 @@ export function EventDetailPage() {
   const location = useLocation();
   const redirectMessage = (location.state as { message?: string } | null)?.message ?? null;
   const { profile } = useAuth();
+  const isOrganizer = useIsOrganizer();
   // Which rider these offline caches belong to. Every read is scoped to it, so a cached ride
   // can never be served to a different account — see lib/local-db.ts.
   const viewerId = viewerKey(profile?.id);
@@ -804,8 +814,22 @@ export function EventDetailPage() {
         body: { eventCode: event.code },
       });
       await load();
+      // Now a participant — refresh My Rides so the joined-id set (eventsStore) includes this
+      // ride and it shows on the home screen's My Rides tab without a manual reload.
+      void useEventsStore.getState().loadMyRides(true);
     } catch (err) {
-      setRegisterError(err instanceof ApiError ? err.message : "Could not register. Try again.");
+      // The server is authoritative on capacity — a 409 carrying the EVENT_FULL token means the
+      // ride filled between paint and tap. Reload so isFull / participantCount (and the gated
+      // button above) catch up to the truth.
+      if (
+        err instanceof ApiError &&
+        (err.message.includes("EVENT_FULL") || err.code === "EVENT_FULL")
+      ) {
+        setRegisterError("This event is full.");
+        await load();
+      } else {
+        setRegisterError(err instanceof ApiError ? err.message : "Could not register. Try again.");
+      }
     } finally {
       setRegisterBusy(false);
     }
@@ -867,6 +891,13 @@ export function EventDetailPage() {
   // Must stay ABOVE the loading/error/no-event early returns below: it is a hook, so it has to
   // run on every render. It tolerates a null event — there is simply no owner to resolve yet.
   const ownerCoverOptions = useOwnerCover(event?.owner?.id ?? event?.ownerId, event?.owner?.cover);
+  // Same for the organizer's avatar — so an organizer viewing their own ride sees the picture
+  // they chose on the account page, not just their Google photo / initial.
+  const ownerAvatarProps = useOwnerAvatar(
+    event?.owner?.id ?? event?.ownerId,
+    event?.owner?.avatarUrl,
+    event?.owner?.avatar,
+  );
 
   if (loading) {
     return (
@@ -893,10 +924,15 @@ export function EventDetailPage() {
   // the cached summary is painted, before the real fetch (which always includes
   // effectiveStatus) resolves.
   const { displayStatus, isPastDue } = computeDisplayStatus(event);
+  // Every organizer/management control on this page hangs off this: the viewer owns the event
+  // AND is currently in Organizer mode. In Rider mode the owner sees their own event exactly
+  // as a rider would (no Edit / Start / Finish / gear menu / quick-edit) — server permissions
+  // are unchanged, this only hides UI. See store/userModeStore.ts.
+  const showOrganizerUi = event.isOwner && isOrganizer;
   // Who gets the pencil: the organizer, on an event that is not finished. Non-owners never
   // see it, and a finished event is read-only for every rider's state (quickEditLocked above
   // closes the editor too, if the event finishes while it is open).
-  const canQuickEdit = event.isOwner && displayStatus !== "finished";
+  const canQuickEdit = showOrganizerUi && displayStatus !== "finished";
 
   const routePoint = results?.route?.points[0] ?? null;
   // "not all events have team so each event can be ready if have name date /place" — asked
@@ -934,16 +970,28 @@ export function EventDetailPage() {
   // under), but the avatar only ever comes from a real account, never from a club string.
   const organizerIsRealOwner = !extras.organizerGroup && !!event.owner?.name;
   const organizer = extras.organizerGroup ?? event.owner?.name ?? null;
-  const organizerAvatarUrl = organizerIsRealOwner ? (event.owner?.avatarUrl ?? null) : null;
-  const organizerAvatar = organizerIsRealOwner ? (event.owner?.avatar ?? null) : null;
+  // A real account gets the full identity chain (chosen pick incl. this device's local one for
+  // the owner themselves); a club/team string is not an account, so it shows only its initial.
+  const organizerAvatarProps = organizerIsRealOwner
+    ? { ...ownerAvatarProps, seed: ownerAvatarProps.seed ?? organizer }
+    : { avatarUrl: null, identity: null, localSelection: null, seed: organizer };
   const coverBackground = eventCoverBackground(
     event.id,
     extras.coverImageDataUrl,
     ownerCoverOptions,
   );
   const riderCount = realRiderCount;
+  // Start-list capacity. event.participantCount is the authoritative "joined" count (approved +
+  // pending) from GET /events/:eventId; the roster-length poll is only a pre-fetch stand-in for
+  // the instant before that resolves (a cached-summary paint has participantCount 0). The cap
+  // is the event owner's entitlement, also server-resolved. All capacity math is UX only — the
+  // server enforces it and 409s (EVENT_FULL) on a join that would overflow.
+  const participantCount = event.participantCount || riderCount || 0;
+  const maxParticipants = event.maxParticipants || FALLBACK_LIMITS.maxParticipantsPerEvent;
+  const eventFull = event.isFull || participantCount >= maxParticipants;
   const bucket = figmaStatus(displayStatus);
-  const canEditNow = event.isOwner && displayStatus !== "live" && displayStatus !== "finished";
+  const canEditNow =
+    showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
   // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
   // hid the live map from the ride's own registered riders: show_live_locations defaults to
   // FALSE (plan/02-database-schema.md:195), so on a typical event nobody but the organizer
@@ -951,7 +999,11 @@ export function EventDetailPage() {
   // 07-api-contract.md:372, GET /events/:eventId/live only 403s when the flag is off *and the
   // caller is not a member*. So a rider who joined this ride always belongs on that page, and
   // the flag only decides whether a passing non-member viewer does too.
-  const canSeeLive = event.myParticipant != null || event.showLiveLocations;
+  // `|| event.isOwner`: the owner can always reach their own live map. In Organizer mode this
+  // is the "LIVE" button in the owner-actions row; in Rider mode that row is hidden, so the
+  // owner falls through to the same rider-style LIVE entry below (gated on `!showOrganizerUi`).
+  const canSeeLive =
+    event.myParticipant != null || event.showLiveLocations || event.isOwner;
 
   // Owner never registers for their own ride; a rider who already finished/cancelled events
   // can't join either — same guard the old bottom card and sign-in link used.
@@ -963,7 +1015,10 @@ export function EventDetailPage() {
       {/* --- hero: colored placeholder (no real cover-image field yet, same honest-fallback
           rule as EventCard/EventTile) with the date/status pinned to its corners and the
           name/organizer overlaid at the bottom. ------------------------------------------ */}
-      <div className={styles.hero} style={{ background: coverBackground }}>
+      <div
+        className={styles.hero}
+        style={{ background: coverBackground, backgroundSize: "cover", backgroundPosition: "center" }}
+      >
         {ActivityIcon && <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />}
         <div className={styles.heroScrim} />
 
@@ -997,7 +1052,7 @@ export function EventDetailPage() {
             >
               <Share2 aria-hidden="true" />
             </button>
-            {event.isOwner && (
+            {showOrganizerUi && (
               <button
                 type="button"
                 className={styles.heroIconBtn}
@@ -1016,13 +1071,7 @@ export function EventDetailPage() {
           <h1 className={styles.title}>{event.name}</h1>
           {organizer && (
             <div className={styles.organizerRow}>
-              <Avatar
-                className={styles.avatar}
-                name={organizer}
-                avatarUrl={organizerAvatarUrl}
-                identity={organizerAvatar}
-                seed={organizer}
-              />
+              <Avatar className={styles.avatar} name={organizer} {...organizerAvatarProps} />
               Organized by {organizer}
             </div>
           )}
@@ -1128,11 +1177,21 @@ export function EventDetailPage() {
               Paused
             </span>
           )}
+          {eventFull && (
+            <span
+              className={styles.chip}
+              data-kind="full"
+              title="This event has reached its participant limit"
+            >
+              Event Full
+            </span>
+          )}
         </div>
 
         {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
-            live in the "more" sheet opened from the hero's gear icon. ---------------------- */}
-        {event.isOwner && (
+            live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
+            in Rider mode the owner gets the rider LIVE entry below instead. ---------------- */}
+        {showOrganizerUi && (
           <div className={styles.ownerActions}>
             {confirming ? (
               <div className={styles.confirmBar}>
@@ -1209,7 +1268,7 @@ export function EventDetailPage() {
             serves both, with the owner-only extras kept inside it), so there is no separate
             second-class rider view to keep in sync. The full live map is never embedded here
             for anyone. */}
-        {displayStatus === "live" && !event.isOwner && canSeeLive && (
+        {displayStatus === "live" && !showOrganizerUi && canSeeLive && (
           <div className={styles.ownerActions}>
             <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
               LIVE
@@ -1220,7 +1279,7 @@ export function EventDetailPage() {
         {/* Only kept for the paused case now, where it explains why the markers on that map
             are standing still. The "live now" version of this card was redundant next to the
             button above. */}
-        {displayStatus === "live" && !event.isOwner && canSeeLive && event.isPaused && (
+        {displayStatus === "live" && !showOrganizerUi && canSeeLive && event.isPaused && (
           <LiveTracking eventId={event.id} isPaused={event.isPaused} />
         )}
 
@@ -1240,9 +1299,7 @@ export function EventDetailPage() {
             <Avatar
               className={styles.organizerAvatar}
               name={organizer}
-              avatarUrl={organizerAvatarUrl}
-              identity={organizerAvatar}
-              seed={organizer}
+              {...organizerAvatarProps}
             />
             <div className={styles.organizerText}>
               <span className={styles.organizerLabel}>Organized by</span>
@@ -1369,7 +1426,7 @@ export function EventDetailPage() {
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
-            {(event.startsAt || event.location || riderCount != null) && (
+            {(event.startsAt || event.location || event.participantCount != null) && (
               <div className={styles.infoStrip}>
                 {event.startsAt && (
                   <div className={styles.infoCell}>
@@ -1419,15 +1476,15 @@ export function EventDetailPage() {
                     )}
                   </div>
                 )}
-                {riderCount != null && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <Users width={13} height={13} aria-hidden="true" />
-                      Participants
-                    </span>
-                    <span className={styles.infoCellValue}>{riderCount}</span>
-                  </div>
-                )}
+                <div className={styles.infoCell}>
+                  <span className={styles.infoCellHead}>
+                    <Users width={13} height={13} aria-hidden="true" />
+                    Participants
+                  </span>
+                  <span className={styles.infoCellValue}>
+                    {participantCount} / {maxParticipants} participants
+                  </span>
+                </div>
               </div>
             )}
 
@@ -1515,10 +1572,10 @@ export function EventDetailPage() {
                           // participant names"). Riders see the plain list they always saw;
                           // the approve/reject controls themselves stay on the Participants
                           // page, this is read-only status.
-                          const approval = event.isOwner
+                          const approval = showOrganizerUi
                             ? approvalStatus(rider.registrationStatus)
                             : null;
-                          const arrival = event.isOwner
+                          const arrival = showOrganizerUi
                             ? arrivalStatus(rider.attendanceStatus)
                             : null;
                           // Undefined for a rider who joined after the pencil was opened —
@@ -1689,6 +1746,13 @@ export function EventDetailPage() {
                 </button>
               )}
             </>
+          ) : eventFull ? (
+            // Server validation still decides — this only stops a rider queuing for a join the
+            // server will 409 (EVENT_FULL). A rider already in is handled by the branch above
+            // and keeps their status + Leave.
+            <button type="button" className={styles.ctaBtn} disabled>
+              Event Full
+            </button>
           ) : (
             <button
               type="button"
@@ -1721,7 +1785,7 @@ export function EventDetailPage() {
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both
           more visible and consistent with every other action sheet in this app
           (CopyTrackSheet, ParticipantFormSheet, TracksPage's filter sheet). */}
-      {menuOpen && (
+      {menuOpen && showOrganizerUi && (
         <>
           <div
             className={styles.menuOverlay}

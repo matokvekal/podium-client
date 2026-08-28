@@ -44,8 +44,9 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import type { EventRoute } from "../lib/event-route";
 import { getCachedEvent } from "../lib/local-db";
+import { FALLBACK_LIMITS } from "../lib/plan-limits";
 import { toDatetimeLocalValue } from "../lib/quick-add-parser";
-import { MAX_GROUPS, useEventGroupsStore } from "../store/eventGroupsStore";
+import { useEventGroupsStore } from "../store/eventGroupsStore";
 import { useParticipantsStore } from "../store/participantsStore";
 import styles from "./EventGroupsPage.module.css";
 
@@ -56,6 +57,13 @@ interface EventInfo {
   name: string;
   type: "RIDE" | "RACE";
   isOwner: boolean;
+  /** The event owner's per-event ride-groups cap, resolved server-side. Optional — ride
+   * groups are still a client-only concept, so GET /events/:eventId may omit it; the page
+   * then falls back to this rider's own entitlement, then to FALLBACK_LIMITS. */
+  maxGroups?: number;
+  /** Server-side group count, if it ever sends one. Today the count comes from the local
+   * groups list length instead. */
+  groupCount?: number;
 }
 
 const EMPTY_FORM: ParticipantFormValues = {
@@ -167,6 +175,22 @@ export function EventGroupsPage() {
   const clampedIndex = Math.min(groupIndex, Math.max(groups.length - 1, 0));
   const currentGroup = groups[clampedIndex] ?? null;
 
+  // The ride-groups cap is per-user/server now, not a hard-coded constant. Prefer the event
+  // owner's entitlement (GET /events/:eventId), then this rider's own entitlement, then the
+  // offline fallback. Client-side this only disables the button — the server enforces it.
+  const maxGroups =
+    event?.maxGroups ??
+    profile?.entitlements?.maxGroupsPerEvent ??
+    FALLBACK_LIMITS.maxGroupsPerEvent;
+  const groupCount = groups.length;
+  const atGroupLimit = groupCount >= maxGroups;
+
+  function addGroupAtLimit() {
+    setActionError(
+      `You've reached the ${maxGroups} ride groups this event allows. Remove one to add another.`,
+    );
+  }
+
   const participants = (eventId && participantsByEvent[eventId]) || [];
   const ridersInGroup = useMemo(
     () => (currentGroup ? participants.filter((p) => p.groupId === currentGroup.id) : []),
@@ -244,6 +268,9 @@ export function EventGroupsPage() {
           <p className="muted" style={{ margin: 0 }}>
             {event.name}
           </p>
+          <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+            {groupCount} / {maxGroups} groups
+          </p>
         </div>
         <Link className="button button--quiet" to={`/events/${event.id}/participants`}>
           Participants
@@ -259,13 +286,16 @@ export function EventGroupsPage() {
       {groups.length === 0 ? (
         <div className="card stack">
           <p className="muted" style={{ margin: 0 }}>
-            No groups yet — the whole event rides one route. Add up to {MAX_GROUPS} (e.g. "Elite" /
+            No groups yet — the whole event rides one route. Add up to {maxGroups} (e.g. "Elite" /
             "Masters") if this club/team splits into more than one at the same event.
           </p>
           <button
             type="button"
             className="button"
-            onClick={() => eventId && addGroup(eventId, "Group 1")}
+            disabled={atGroupLimit}
+            onClick={() =>
+              eventId && (atGroupLimit ? addGroupAtLimit() : addGroup(eventId, "Group 1", maxGroups))
+            }
           >
             <Plus width={15} height={15} aria-hidden="true" style={{ marginRight: 6 }} />
             Add group
@@ -311,10 +341,14 @@ export function EventGroupsPage() {
             <button
               type="button"
               className="button button--quiet"
-              disabled={groups.length >= MAX_GROUPS}
+              disabled={atGroupLimit}
               onClick={() => {
                 if (!eventId) return;
-                addGroup(eventId, `Group ${groups.length + 1}`);
+                if (atGroupLimit) {
+                  addGroupAtLimit();
+                  return;
+                }
+                addGroup(eventId, `Group ${groups.length + 1}`, maxGroups);
                 setGroupIndex(groups.length);
               }}
             >

@@ -145,7 +145,10 @@ export function EventCard({
         {/* Cover art: the organizer's uploaded image when this device has one, otherwise one of
             the ten built-in abstract scenes, picked deterministically from the event id (see
             event-visuals.ts's generatedCoverUrl). */}
-        <div className={styles.thumb} style={{ background: coverBackground }} />
+        <div
+          className={styles.thumb}
+          style={{ background: coverBackground, backgroundSize: "cover", backgroundPosition: "center" }}
+        />
 
         <div className={styles.headMain}>
           <div className={styles.titleRow}>

@@ -117,21 +117,12 @@ import {
   Trash2,
   Users
 } from "lucide-react";
-import {
-  type FormEvent,
-  type ChangeEvent,
-  type KeyboardEvent,
-  lazy,
-  Suspense,
-  useEffect,
-  useRef,
-  useState
-} from "react";
+import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
-import { resizeCoverFileToDataUrl } from "../lib/cover-image";
+import { effectiveLimits } from "../lib/entitlements";
 import type { EventRoute } from "../lib/event-route";
 import { type EventSummary, getCachedEvent } from "../lib/local-db";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
@@ -228,11 +219,6 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "running", label: "Running" },
   { value: "hiking", label: "Hiking" }
 ];
-
-const COVER_PRESETS = {
-  fast: { maxWidth: 1280, maxHeight: 720, quality: 0.72, maxBytes: 320 * 1024 },
-  sharp: { maxWidth: 1600, maxHeight: 900, quality: 0.84, maxBytes: 450 * 1024 }
-} as const;
 
 const NEW_TEAM_OPTION = "__new__";
 
@@ -331,12 +317,10 @@ export function EventCreatePage() {
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
   const [area, setArea] = useState(lastDefaults?.area ?? "");
   const [description, setDescription] = useState("");
-  const [coverImageDataUrl, setCoverImageDataUrl] = useState<string | null>(
-    null
-  );
-  const [coverPreset, setCoverPreset] = useState<"fast" | "sharp">("sharp");
-  const [coverBusy, setCoverBusy] = useState(false);
-  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  // Create: stays null → the event falls back to the organizer's own profile cover (see
+  // app/useOwnerCover.ts). Edit: an event that already has a custom cover keeps it (the effect
+  // below re-hydrates this and handleSubmit re-persists it) — the upload UI is just disabled.
+  const [coverImageDataUrl, setCoverImageDataUrl] = useState<string | null>(null);
   // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
   // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
   // on every edit save risked adding a duplicate roster row each time.
@@ -393,6 +377,13 @@ export function EventCreatePage() {
   >([]);
 
   const [loadingEvent, setLoadingEvent] = useState(isEditing);
+
+  // Create mode only: this rider's fresh weekly-ride usage + limit, straight from the server.
+  // The cached `profile` can be stale (it's only refreshed on cold start / profile edit), and
+  // "how many rides have I made this week" changes every time they create one. Falls back to
+  // profile.usage / effectiveLimits(profile) when the fetch fails — see ridesUsed/ridesMax
+  // below. Client-side this only disables Save; the server 409s (PLAN_LIMIT) on the real cap.
+  const [weekRides, setWeekRides] = useState<{ used: number; max: number } | null>(null);
 
   // Edit mode — load the existing event + its client-only extras and prefill every field,
   // "edit event take us to like the create so i change anything." Route/track is
@@ -479,6 +470,31 @@ export function EventCreatePage() {
     // so including it doesn't change when this effect actually re-runs.
   }, [eventId, navigate]);
 
+  // Create mode: pull fresh entitlements + usage so "rides used this week" is current, not
+  // whatever the cached profile last held. Best-effort — a failed fetch just leaves weekRides
+  // null and the render falls back to profile.usage / effectiveLimits(profile).
+  useEffect(() => {
+    if (isEditing) return;
+    let cancelled = false;
+    apiRequest<{
+      entitlements?: { maxEventsPerWeek: number };
+      usage?: { eventsThisWeek: number };
+    }>("/users/me")
+      .then((me) => {
+        if (cancelled || !me.entitlements || !me.usage) return;
+        setWeekRides({
+          used: me.usage.eventsThisWeek,
+          max: me.entitlements.maxEventsPerWeek,
+        });
+      })
+      .catch(() => {
+        // Offline / server error — the fallback in ridesUsed/ridesMax covers it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing]);
+
   // Default to the organizer's own team once it's loaded — asked for directly ("if i alredy
   // have my team it bee as default"). Only when nothing was already picked (no ?team= param,
   // nothing chosen by hand yet) and there's exactly one candidate — with more than one, a
@@ -504,6 +520,16 @@ export function EventCreatePage() {
     (readinessCount / readinessFields.length) * 100
   );
   const armed = readinessPct === 100;
+
+  // "Rides used this week" — the fresh server fetch wins; the cached profile is the fallback,
+  // then the offline defaults. Only gates create mode (editing an existing ride never counts
+  // against the weekly create limit). The message frames it as a rolling window because the
+  // server's `eventsThisWeek` is "created in the last 7 days".
+  const ridesUsed = weekRides?.used ?? profile?.usage?.eventsThisWeek ?? 0;
+  const ridesMax = weekRides?.max ?? effectiveLimits(profile).maxEventsPerWeek;
+  const hasRidesUsage = weekRides != null || profile?.usage != null;
+  const ridesLimitReached = !isEditing && hasRidesUsage && ridesUsed >= ridesMax;
+  const weeklyLimitMessage = `You've reached your ${ridesMax} rides this week — it frees up 7 days after your earliest one.`;
 
   // Auto-fills Distance/Climb from a picked/uploaded route's own numbers — only while the
   // organizer hasn't typed something in by hand (`*Edited`), same "never clobber a hand-typed
@@ -702,39 +728,6 @@ export function EventCreatePage() {
     }
   }
 
-  async function handleCoverPick(changeEvent: ChangeEvent<HTMLInputElement>) {
-    const file = changeEvent.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Cover file must be an image.");
-      return;
-    }
-
-    setCoverBusy(true);
-    setError(null);
-    try {
-      const resized = await resizeCoverFileToDataUrl(
-        file,
-        COVER_PRESETS[coverPreset]
-      );
-      setCoverImageDataUrl(resized);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not process this cover image."
-      );
-    } finally {
-      setCoverBusy(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
-    }
-  }
-
-  function clearCover() {
-    setCoverImageDataUrl(null);
-    if (coverInputRef.current) coverInputRef.current.value = "";
-  }
-
   // Enter in any single-line field (name, location, team name, …) would otherwise submit the
   // form natively and jump the page — asked to require an explicit button click instead.
   // Textarea is exempt: Enter there is just a newline, never a submit trigger to begin with.
@@ -749,6 +742,14 @@ export function EventCreatePage() {
 
   async function submit(formEvent: FormEvent) {
     formEvent.preventDefault();
+
+    // Weekly create limit (create mode only) — UX gate mirroring the server, which is the real
+    // authority and returns a 409 (PLAN_LIMIT) if this is somehow bypassed. Return early so the
+    // create request is never even attempted once the rider is at their cap.
+    if (ridesLimitReached) {
+      setError(weeklyLimitMessage);
+      return;
+    }
 
     // Mandatory on create: name, map/route, and date — asked for directly. Edit mode only
     // ever requires a name, same as before: route is never prefilled back in edit (see the
@@ -854,8 +855,18 @@ export function EventCreatePage() {
         state: { createdEventId: created.id, createdEventName: name }
       });
     } catch (err) {
+      // A 409 naming the weekly plan limit (PLAN_LIMIT / a "week" token) → show the same
+      // friendly message the pre-submit gate uses, not the raw server string.
+      const weekLimit409 =
+        err instanceof ApiError &&
+        err.status === 409 &&
+        /PLAN_LIMIT|week/i.test(`${err.code ?? ""} ${err.message}`);
       setError(
-        err instanceof ApiError ? err.message : "Could not save. Try again."
+        weekLimit409
+          ? weeklyLimitMessage
+          : err instanceof ApiError
+            ? err.message
+            : "Could not save. Try again."
       );
       setCreateSuccess(false);
     } finally {
@@ -918,6 +929,24 @@ export function EventCreatePage() {
           </div>
         </header>
 
+        {!isEditing && hasRidesUsage && (
+          <p
+            className={styles.hint}
+            role="status"
+            style={{ margin: "0 0 var(--space-2)" }}
+            data-at-limit={ridesLimitReached}
+          >
+            {ridesUsed} / {ridesMax} rides used this week
+          </p>
+        )}
+
+        {ridesLimitReached && (
+          <div className={styles.errorBanner} role="alert">
+            <AlertTriangle aria-hidden="true" />
+            <p>{weeklyLimitMessage}</p>
+          </div>
+        )}
+
         <div className={styles.readiness}>
           <div className={styles.readinessTrack}>
             <div
@@ -925,88 +954,6 @@ export function EventCreatePage() {
               data-armed={armed}
               style={{ width: `${readinessPct}%` }}
             />
-          </div>
-
-          <div
-            className={styles.field}
-            style={{ marginBottom: "var(--space-4)" }}
-          >
-            <span className={styles.fieldLabel}>
-              <ImagePlus aria-hidden="true" />
-              Cover image (optional)
-            </span>
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleCoverPick}
-              style={{ display: "none" }}
-            />
-            <div className={styles.coverRow}>
-              <button
-                type="button"
-                className={styles.trackBtn}
-                onClick={() => coverInputRef.current?.click()}
-                disabled={coverBusy}
-              >
-                <span className={styles.trackBtnLabel}>
-                  <ImagePlus
-                    aria-hidden="true"
-                    size={18}
-                    className={styles.trackBtnIcon}
-                  />
-                  {coverBusy
-                    ? "Processing cover image…"
-                    : coverImageDataUrl
-                      ? "Replace cover image"
-                      : "Upload cover image"}
-                </span>
-              </button>
-              {coverImageDataUrl && (
-                <button
-                  type="button"
-                  className={styles.trackRemove}
-                  onClick={clearCover}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-            <div className={styles.coverPresetRow}>
-              <button
-                type="button"
-                className={styles.coverPresetBtn}
-                data-active={coverPreset === "fast"}
-                onClick={() => setCoverPreset("fast")}
-              >
-                Fast
-              </button>
-              <button
-                type="button"
-                className={styles.coverPresetBtn}
-                data-active={coverPreset === "sharp"}
-                onClick={() => setCoverPreset("sharp")}
-              >
-                Sharp
-              </button>
-              <span className={styles.coverPresetHint}>
-                {coverPreset === "fast"
-                  ? "Smaller file, quicker processing"
-                  : "Better detail, larger local file"}
-              </span>
-            </div>
-            {coverImageDataUrl && (
-              <div className={styles.coverPreviewWrap}>
-                <img
-                  src={coverImageDataUrl}
-                  alt="Selected event cover preview"
-                  className={styles.coverPreview}
-                />
-              </div>
-            )}
-            <p className={styles.hint}>
-              Saved locally on this device for now. Server/CDN sync comes later.
-            </p>
           </div>
         </div>
 
@@ -1495,13 +1442,39 @@ export function EventCreatePage() {
             </div>
           </div>
 
+          {/* Event cover — disabled for now. The event automatically uses the organizer's own
+              profile cover photo (see app/useOwnerCover.ts / eventCoverBackground), so there is
+              nothing to upload here yet. Kept visible, greyed out, so the slot is familiar when
+              custom covers ship. */}
+          <div className={styles.field} aria-disabled="true">
+            <span className={styles.fieldLabel}>
+              <ImagePlus aria-hidden="true" />
+              Event cover
+            </span>
+            <button type="button" className={styles.trackBtn} disabled>
+              <span className={styles.trackBtnLabel}>
+                <ImagePlus aria-hidden="true" size={18} className={styles.trackBtnIcon} />
+                Upload cover image — coming soon
+              </span>
+            </button>
+            <p className={styles.hint}>
+              Your profile cover photo is used automatically. Custom event covers coming soon.
+            </p>
+          </div>
+
           <button
             className={styles.launchBtn}
             type="submit"
-            disabled={busy || createSuccess}
+            disabled={busy || createSuccess || ridesLimitReached}
           >
             <Bike aria-hidden="true" />
-            {createSuccess ? "Saved" : busy ? "Saving…" : "Save event"}
+            {createSuccess
+              ? "Saved"
+              : busy
+                ? "Saving…"
+                : ridesLimitReached
+                  ? "Weekly ride limit reached"
+                  : "Save event"}
           </button>
         </form>
 

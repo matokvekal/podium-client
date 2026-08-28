@@ -23,8 +23,10 @@
 
 import { type ChangeEvent, useRef, useState } from "react";
 import { Avatar } from "../app/Avatar";
+import { UserModeToggle } from "../app/UserModeToggle";
 import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
+import { effectiveLimits } from "../lib/entitlements";
 import {
   ACCEPTED_IMAGE_ACCEPT,
   AVATAR_SPEC,
@@ -63,9 +65,47 @@ export function AccountPage() {
   const cover = resolveUserCover({ avatar: me.avatar, cover: me.cover }, me.localCover, me.seed);
   const serverSupports = serverSupportsVisualIdentity(profile);
 
+  // Plan limits + usage, straight from GET /users/me (see lib/entitlements.ts). Read-only here
+  // — the server is the authority; this is just so a rider can see where they stand.
+  const limits = effectiveLimits(profile);
+  const usage = profile?.usage ?? null;
+
   return (
     <section className="stack">
       <h1>Account</h1>
+
+      <div className="card stack">
+        <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
+          Mode
+        </p>
+        <p className="muted" style={{ margin: 0 }}>
+          Rider mode keeps things simple. Organizer mode adds the tools to create and manage
+          events. You can switch any time.
+        </p>
+        <UserModeToggle />
+      </div>
+
+      <div className="card stack">
+        <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
+          Your plan
+        </p>
+        <p className="muted" style={{ margin: 0 }}>
+          {usage
+            ? `${usage.eventsThisWeek} / ${limits.maxEventsPerWeek} rides created this week`
+            : `${limits.maxEventsPerWeek} rides per week`}
+        </p>
+        <p className="muted" style={{ margin: 0 }}>
+          Up to {limits.maxParticipantsPerEvent} riders per event
+        </p>
+        <p className="muted" style={{ margin: 0 }}>
+          Up to {limits.maxGroupsPerEvent} ride groups per event
+        </p>
+        {usage && (
+          <p className="muted" style={{ margin: 0 }}>
+            {usage.teamsOwned} team{usage.teamsOwned === 1 ? "" : "s"} owned
+          </p>
+        )}
+      </div>
 
       <div className={`card ${styles.identityCard}`}>
         <div

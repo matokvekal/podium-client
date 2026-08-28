@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
 import { COUNTRIES, flagEmoji } from "../lib/countries";
+import { useUserModeStore } from "../store/userModeStore";
 
 export function ProfileSetupPage() {
   const { profile, updateProfile } = useAuth();
@@ -36,6 +37,10 @@ export function ProfileSetupPage() {
   // column on users — see BUGS.md / the country-filter feature. Required in the UI now so
   // the field, its validation and the picker are all in place for when that lands.
   const [country, setCountry] = useState("");
+  // Client-only UI preference (store/userModeStore.ts) — NOT part of the profile sent to the
+  // server. Unchecked by default: a new user is a rider unless they say otherwise.
+  const [organizes, setOrganizes] = useState(false);
+  const setUserMode = useUserModeStore((state) => state.setMode);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -50,6 +55,7 @@ export function ProfileSetupPage() {
         nickname,
         ...(emergencyPhone ? { emergencyPhone } : {}),
       });
+      setUserMode(organizes ? "organizer" : "rider");
       navigate(from && from !== "/account/setup" ? from : "/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save. Try again.");
@@ -128,6 +134,22 @@ export function ProfileSetupPage() {
           ))}
         </select>
         <p className="muted">Used to show you rides near you first. You can change this later.</p>
+
+        <label className="row" style={{ gap: "var(--space-2)", alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            checked={organizes}
+            onChange={(event) => setOrganizes(event.target.checked)}
+          />
+          <span>
+            I also organize events
+            <br />
+            <span className="muted">
+              Adds the tools to create and manage rides. You can switch this off any time in the
+              menu.
+            </span>
+          </span>
+        </label>
 
         <button className="button" type="submit" disabled={busy || !country}>
           Save and continue

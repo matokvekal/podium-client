@@ -28,6 +28,7 @@ import { Camera, ScanQrCode, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import styles from "./JoinPage.module.css";
 
@@ -225,8 +226,9 @@ export function JoinPage() {
         body: { eventCode: code.trim().toUpperCase(), ...(bib ? { bib } : {}) },
       });
       // Actually joined now — this belongs in My Rides (GET /events?filter=joined), not the
-      // Invited list anymore.
+      // Invited list anymore. Refresh My Rides so the joined-id set picks it up immediately.
       removeInvite(result.eventId);
+      void useEventsStore.getState().loadMyRides(true);
       navigate(`/events/${result.eventId}`);
     } catch (err) {
       setError(

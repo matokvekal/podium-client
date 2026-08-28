@@ -28,6 +28,7 @@ import {
   ROUTE_TYPE_LABEL,
   ROUTE_TYPE_TO_SURFACE,
 } from "../lib/track-types";
+import { useIsOrganizer } from "../store/userModeStore";
 import styles from "./TrackCard.module.css";
 
 const RouteMap = lazy(() => import("./RouteMap"));
@@ -44,6 +45,9 @@ export function TrackCard({ track, favorite, onToggleFavorite }: TrackCardProps)
   // "mixed" route has no event equivalent, so the create form is left to ask.
   const surface = track.routeType ? ROUTE_TYPE_TO_SURFACE[track.routeType] : undefined;
   const preview = track.previewPoints?.length ? track.previewPoints : null;
+  // Planning a ride from a track is an organizer action — hidden in Rider mode (and the whole
+  // Find Tracks screen is unreachable then anyway; this is belt-and-braces).
+  const isOrganizer = useIsOrganizer();
 
   return (
     <div className={styles.card}>
@@ -110,20 +114,22 @@ export function TrackCard({ track, favorite, onToggleFavorite }: TrackCardProps)
       {/* The handoff. `routeId` is what the create page attaches with — the server's
           POST /events/:eventId/route accepts { routeId } and links this very row, so the new
           ride runs on the real route rather than a copy of its geometry. */}
-      <Link
-        className={styles.planBtn}
-        to="/events/new"
-        state={{
-          fromRouteId: track.id,
-          fromRouteName: track.name,
-          fromRoutePlace: track.placeName,
-          fromRouteDistanceKm: track.distanceKm,
-          fromRouteClimbM: track.elevationM,
-          fromRouteSurface: surface ?? null,
-        }}
-      >
-        Plan a ride with this track
-      </Link>
+      {isOrganizer && (
+        <Link
+          className={styles.planBtn}
+          to="/events/new"
+          state={{
+            fromRouteId: track.id,
+            fromRouteName: track.name,
+            fromRoutePlace: track.placeName,
+            fromRouteDistanceKm: track.distanceKm,
+            fromRouteClimbM: track.elevationM,
+            fromRouteSurface: surface ?? null,
+          }}
+        >
+          Plan a ride with this track
+        </Link>
+      )}
     </div>
   );
 }

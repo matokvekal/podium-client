@@ -74,35 +74,42 @@ describe("resolveUserAvatar", () => {
 describe("resolveEventCover", () => {
   const legacy = "data:image/jpeg;base64,legacy";
 
-  it("prefers the owner's server upload", () => {
-    const r = resolveEventCover({
-      ownerId: 7,
-      ownerCover: { url: "https://cdn/c.webp" },
-      legacyEventCoverDataUrl: legacy,
-    });
-    expect(r.origin).toBe("server-upload");
+  it("a custom per-event cover wins outright, even over the owner's own chosen identity", () => {
+    // event.customCover ?? organizer.profileCover — the event's own cover comes first, so an
+    // old event that already carries an uploaded cover keeps it after its organizer later
+    // picks a profile cover.
+    expect(
+      resolveEventCover({
+        ownerId: 7,
+        ownerCover: { url: "https://cdn/c.webp" },
+        legacyEventCoverDataUrl: legacy,
+      }).origin,
+    ).toBe("legacy-event");
+    expect(
+      resolveEventCover({
+        ownerId: 7,
+        ownerCover: { presetId: "cover-forest-01" },
+        legacyEventCoverDataUrl: legacy,
+      }).origin,
+    ).toBe("legacy-event");
+    expect(
+      resolveEventCover({
+        ownerId: 7,
+        localCover: local({ presetId: "cover-night-01" }),
+        legacyEventCoverDataUrl: legacy,
+      }).origin,
+    ).toBe("legacy-event");
   });
 
-  it("prefers the owner's server preset over the legacy event cover", () => {
-    const r = resolveEventCover({
-      ownerId: 7,
-      ownerCover: { presetId: "cover-forest-01" },
-      legacyEventCoverDataUrl: legacy,
-    });
-    expect(r.origin).toBe("server-preset");
-    expect(r.presetId).toBe("cover-forest-01");
+  it("falls to the owner's chosen cover for an event with no custom cover of its own", () => {
+    expect(
+      resolveEventCover({ ownerId: 7, ownerCover: { url: "https://cdn/c.webp" } }).origin,
+    ).toBe("server-upload");
+    expect(
+      resolveEventCover({ ownerId: 7, localCover: local({ presetId: "cover-night-01" }) }).origin,
+    ).toBe("local-preset");
   });
 
-  it("prefers an explicit local owner pick over the legacy event cover", () => {
-    const r = resolveEventCover({
-      ownerId: 7,
-      localCover: local({ presetId: "cover-night-01" }),
-      legacyEventCoverDataUrl: legacy,
-    });
-    expect(r.origin).toBe("local-preset");
-  });
-
-  // The specific regression the agreed ordering exists to prevent.
   it("keeps the legacy event cover when the owner has chosen NOTHING", () => {
     const r = resolveEventCover({ ownerId: 7, legacyEventCoverDataUrl: legacy });
     expect(r).toEqual({ url: legacy, origin: "legacy-event", presetId: null });

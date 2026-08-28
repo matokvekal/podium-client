@@ -944,6 +944,9 @@
 .chip[data-kind="paused"] {
   --chip-hue: var(--status-pending);
 }
+.chip[data-kind="full"] {
+  --chip-hue: var(--status-danger);
+}
 
 /* --- stat strip -------------------------------------------------------------------------- */
 

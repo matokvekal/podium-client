@@ -1,7 +1,7 @@
 /**
  * Splash screen
  *
- * Shown once per cold start, for three seconds (asked for directly), layered over the real
+ * Shown once per cold start, for four seconds (asked for directly), layered over the real
  * app while it mounts underneath — it does not delay anything; routing and auth are already
  * loading in parallel behind it.
  *
@@ -18,12 +18,16 @@
  * asked for directly: shifted higher in the stage rather than dead-center, sized 200% bigger
  * (3x) than its original 64px, and re-tinted to a random hue on every mount rather than always
  * the same blue — see splash-screen.css's .splash__mark/.splash__mark-logo for the how/why.
+ *
+ * Layout, also asked for directly: the "El Niño Move" wordmark sits at the very top of the
+ * stage, in a large font, with the spinning logo below it — so the name reads first and stays
+ * visible alongside the animation, rather than being tucked under the logo.
  */
 
 import { type CSSProperties, useEffect, useState } from "react";
 import "./splash-screen.css";
 
-const VISIBLE_MS = 3000;
+const VISIBLE_MS = 4000;
 const FADE_MS = 300;
 
 // Riders bunch up on a real ride — a few small groups strung out along the route, not one
@@ -102,7 +106,9 @@ export function SplashScreen() {
           />
         ))}
 
-        <div className="splash__mark">
+        {/* The storm icon stays dead-centre in the track, spinning — independent of the
+            wordmark, which sits up top as a header. */}
+        <div className="splash__logo-wrap">
           <img
             className="splash__mark-logo"
             src="/logo.png"
@@ -112,7 +118,13 @@ export function SplashScreen() {
             height={192}
             style={{ "--logo-hue": `${logoHue}deg` } as CSSProperties}
           />
-          <span className="splash__mark-name">El Niño Move</span>
+        </div>
+
+        <div className="splash__mark">
+          {/* data-text feeds the ::after that carries the moving light — see splash-screen.css */}
+          <span className="splash__mark-name" data-text="El Niño Move">
+            El Niño Move
+          </span>
           <span className="splash__mark-tag">Every rider, watched over.</span>
         </div>
       </div>

@@ -14,6 +14,7 @@
 import { Check, Copy, Share2, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { config } from "../lib/config";
 import styles from "./ShareEventSheet.module.css";
 
 interface ShareEventSheetProps {
@@ -26,7 +27,9 @@ export function ShareEventSheet({ eventName, eventCode, onClose }: ShareEventShe
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const joinUrl = `${window.location.origin}/join/${encodeURIComponent(eventCode)}`;
+  // Always the production origin (config.shareBaseUrl) — a shared link / printed QR must open
+  // the real app, never a localhost dev server.
+  const joinUrl = `${config.shareBaseUrl}/join/${encodeURIComponent(eventCode)}`;
 
   useEffect(() => {
     let cancelled = false;

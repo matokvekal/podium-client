@@ -21,6 +21,7 @@ import { ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TracksPage } from "./pages/TracksPage";
+import { useUserModeStore } from "./store/userModeStore";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status, requiresProfile } = useAuth();
@@ -46,6 +47,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   return <AppShell>{children}</AppShell>;
+}
+
+/**
+ * Organizer-only screens (create / edit an event, the track planner). In Rider mode these
+ * have no entry point in the UI at all — this guard is only for a stale bookmark or a typed
+ * URL, sending it back home instead of onto an organizer screen. The components and routes
+ * themselves are untouched; switching to Organizer mode restores access with no reload.
+ */
+function RequireOrganizer({ children }: { children: ReactNode }) {
+  const mode = useUserModeStore((state) => state.mode);
+  if (mode === "rider") return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 /**
@@ -90,7 +103,9 @@ export function App() {
         path="/events/new"
         element={
           <RequireAuth>
-            <EventCreatePage />
+            <RequireOrganizer>
+              <EventCreatePage />
+            </RequireOrganizer>
           </RequireAuth>
         }
       />
@@ -101,7 +116,9 @@ export function App() {
         path="/events/:eventId/edit"
         element={
           <RequireAuth>
-            <EventCreatePage />
+            <RequireOrganizer>
+              <EventCreatePage />
+            </RequireOrganizer>
           </RequireAuth>
         }
       />
@@ -179,9 +196,11 @@ export function App() {
       <Route
         path="/routes"
         element={
-          <OpenHome>
-            <TracksPage />
-          </OpenHome>
+          <RequireOrganizer>
+            <OpenHome>
+              <TracksPage />
+            </OpenHome>
+          </RequireOrganizer>
         }
       />
       <Route

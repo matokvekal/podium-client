@@ -46,6 +46,24 @@ export interface Profile {
    */
   avatar?: UserVisualAsset | null;
   cover?: UserVisualAsset | null;
+  /**
+   * Per-user plan limits, resolved server-side and sent on every real GET /users/me response.
+   * The client only renders/UX-gates against these — the server enforces the real limits. See
+   * lib/entitlements.ts. Optional because a cached v1 profile / an offline cold start lacks
+   * them, in which case lib/entitlements.ts falls back to FALLBACK_LIMITS.
+   */
+  entitlements?: {
+    maxEventsPerWeek: number;
+    maxParticipantsPerEvent: number;
+    maxGroupsPerEvent: number;
+  };
+  /** This rider's own recent usage against the limits above — `eventsThisWeek` counts events
+   *  they created in the last 7 days. Same "present on a real response, absent on a cached v1
+   *  profile" rule as `entitlements`. */
+  usage?: {
+    eventsThisWeek: number;
+    teamsOwned: number;
+  };
 }
 
 interface AuthResponse {

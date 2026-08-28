@@ -11,10 +11,22 @@
  * a sign-in, and only when actually attempted.
  */
 
-import { Bike, LogOut, Map as MapIcon, Moon, QrCode, Sun, User, Users, X } from "lucide-react";
+import {
+  Bike,
+  LogOut,
+  Map as MapIcon,
+  Megaphone,
+  Moon,
+  QrCode,
+  Sun,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { ColorTheme } from "../lib/color-theme";
+import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
 import { Avatar } from "./Avatar";
 import { useMyIdentity } from "./useMyIdentity";
 
@@ -27,6 +39,8 @@ interface AppDrawerProps {
 
 export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: AppDrawerProps) {
   const { status, signOut } = useAuth();
+  const isOrganizer = useIsOrganizer();
+  const setUserMode = useUserModeStore((state) => state.setMode);
   const navigate = useNavigate();
 
   // Name and avatar both come from useMyIdentity so the drawer, the header and the account
@@ -81,10 +95,12 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             <Bike aria-hidden="true" />
             My Rides
           </NavLink>
-          <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
-            <MapIcon aria-hidden="true" />
-            Find Tracks
-          </NavLink>
+          {isOrganizer && (
+            <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
+              <MapIcon aria-hidden="true" />
+              Find Tracks
+            </NavLink>
+          )}
           {status === "signed-in" && (
             <NavLink to="/teams" className="drawer__nav-item" onClick={onClose}>
               <Users aria-hidden="true" />
@@ -95,21 +111,29 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             <QrCode aria-hidden="true" />
             Join with a code
           </NavLink>
-        </nav>
 
-        <fieldset className="drawer__theme">
-          <legend className="drawer__theme-title">View</legend>
+          {/* Mode + View live in the menu list, no bordered panels — asked for directly. */}
+          <label className="drawer__nav-item drawer__nav-item--toggle">
+            <Megaphone aria-hidden="true" />
+            I also organize events
+            <input
+              type="checkbox"
+              className="drawer__nav-check"
+              checked={isOrganizer}
+              onChange={(event) => setUserMode(event.target.checked ? "organizer" : "rider")}
+            />
+          </label>
+
           <button
             type="button"
-            className="drawer__theme-toggle"
+            className="drawer__nav-item"
             onClick={onToggleColorTheme}
             aria-label={colorTheme === "day" ? "Switch to dark mode" : "Switch to day mode"}
-            title={colorTheme === "day" ? "Switch to dark mode" : "Switch to day mode"}
           >
             {colorTheme === "day" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
-            <span>{colorTheme === "day" ? "Switch to dark" : "Switch to day"}</span>
+            {colorTheme === "day" ? "Switch to dark" : "Switch to day"}
           </button>
-        </fieldset>
+        </nav>
 
         <div className="drawer__footer">
           {status === "signed-in" ? (

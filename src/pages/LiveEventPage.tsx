@@ -27,6 +27,12 @@
  * NOT included: neither feature exists anywhere in this codebase (no chat/notification system,
  * client or server), and this app doesn't ship non-functional buttons — see AGENT.md. "Ride
  * info" is real: it links to EventDetailPage.tsx.
+ *
+ * Location sharing: the crosshair control on the map now actually TRANSMITS this rider's GPS
+ * to the server (app/useLocationBroadcast.ts → the frozen POST /events/:eventId/locations/batch
+ * endpoint), for a participant on a live event. This is a deliberate scope change from the
+ * earlier "the web client only displays positions" rule — see
+ * ELNINO_CLIENT_AGENT_SOURCE_OF_TRUTH.md §14. Still opt-in, still one watcher, no SOS.
  */
 
 import {
@@ -49,6 +55,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { placeholderColorVar } from "../app/event-visuals";
+import { useLocationBroadcast } from "../app/useLocationBroadcast";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
@@ -57,6 +64,7 @@ import type { LiveRider } from "../lib/live-types";
 import type { UserVisualAsset } from "../lib/user-identity";
 import {
   type CachedParticipant,
+  type EventStatus,
   type EventSummary,
   getCachedEvent,
   getCachedEventDetail,
@@ -103,6 +111,11 @@ interface LiveEventInfo {
   showLiveLocations: boolean;
   startsAt: string | null;
   myParticipant: { id: number } | null;
+  /** Stored + server-computed status. `effectiveStatus` is the one to trust (it already folds
+   *  in "past its end time" — see EventDetailPage's computeDisplayStatus); `status` is the
+   *  fallback while only a cached summary is painted. Drives location transmission. */
+  status: EventStatus;
+  effectiveStatus: EventStatus;
 }
 
 // Same "paint the cache instantly, let the real fetch replace it" pattern as
@@ -120,7 +133,9 @@ function liveInfoFromCachedSummary(
     isPaused: false,
     showLiveLocations: true,
     startsAt: summary.startsAt,
-    myParticipant: null
+    myParticipant: null,
+    status: summary.status,
+    effectiveStatus: summary.status
   };
 }
 
@@ -174,13 +189,7 @@ export function LiveEventPage() {
   const [roster, setRoster] = useState<RosterEntry[] | null>(null);
   const [rosterNote, setRosterNote] = useState<string | null>(null);
 
-  const [sharingLocation, setSharingLocation] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [selfPosition, setSelfPosition] = useState<[number, number] | null>(
-    null
-  );
-  const [geoError, setGeoError] = useState<string | null>(null);
-  const watchIdRef = useRef<number | null>(null);
 
   const [forecast, setForecast] = useState<DayForecast | null>(null);
 
@@ -329,6 +338,49 @@ export function LiveEventPage() {
 
   const isOwner = event?.isOwner ?? false;
 
+  // --- location transmission ---------------------------------------------------------------
+  // Opt-in: the crosshair button on the map calls broadcast.start(); nothing transmits until
+  // then. Trust effectiveStatus (folds in "past its end time") over the stored status.
+  const effectiveStatus = event ? (event.effectiveStatus ?? event.status) : null;
+  const eventIsLive = effectiveStatus === "live";
+  const eventIsFinished = effectiveStatus === "finished" || effectiveStatus === "cancelled";
+  const broadcast = useLocationBroadcast({
+    eventId,
+    participantId: event?.myParticipant?.id ?? null,
+    eventIsLive,
+    eventIsFinished
+  });
+  const selfPosition = broadcast.selfPosition;
+  const sharing = broadcast.status === "sharing" || broadcast.status === "requesting";
+  const geoError =
+    broadcast.status === "denied"
+      ? "Location is off for this site. Turn it on in your browser settings, then try again."
+      : broadcast.status === "unsupported"
+        ? "This device does not support location sharing."
+        : null;
+
+  // A finished ride left open in the background can quietly go stale here — the live poll only
+  // returns riders/paused, not status. Re-pull the event on return to the foreground so the
+  // transmission conditions above stay honest (and the header stops saying "Live").
+  useEffect(() => {
+    if (!eventId) return;
+    const refetch = () => {
+      if (document.visibilityState === "hidden") return;
+      apiRequest<LiveEventInfo>(`/events/${eventId}`)
+        .then((found) => {
+          setEvent(found);
+          setPaused(found.isPaused);
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener("focus", refetch);
+    document.addEventListener("visibilitychange", refetch);
+    return () => {
+      window.removeEventListener("focus", refetch);
+      document.removeEventListener("visibilitychange", refetch);
+    };
+  }, [eventId]);
+
   // A rider opening this page used to land on an empty map: the poll below skips entirely for
   // a non-owner with nothing selected, so until they found the Riders tab and ticked names by
   // hand, the live view showed nothing while the organizer's showed everyone. Riders are meant
@@ -428,35 +480,6 @@ export function LiveEventPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, event, isOwner, selectedRiderIds, viewerId, reconnectNonce]);
-
-  // "Share my location" — opt-in only, so opening the live page never triggers a surprise
-  // permission prompt. Never transmitted anywhere (AGENT.md: "This app displays positions; it
-  // never sends them"); real rider tracking is the separate Android app.
-  useEffect(() => {
-    if (!sharingLocation) {
-      setSelfPosition(null);
-      return;
-    }
-    if (!("geolocation" in navigator)) {
-      setGeoError("This device does not support location sharing.");
-      setSharingLocation(false);
-      return;
-    }
-    setGeoError(null);
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setSelfPosition([pos.coords.latitude, pos.coords.longitude]),
-      () => {
-        setGeoError("Location permission was denied.");
-        setSharingLocation(false);
-      },
-      { enableHighAccuracy: true, maximumAge: 10_000 }
-    );
-    watchIdRef.current = id;
-    return () => {
-      navigator.geolocation.clearWatch(id);
-      watchIdRef.current = null;
-    };
-  }, [sharingLocation]);
 
   function toggleRider(id: number) {
     setSelectedRiderIds((ids) => {
@@ -667,18 +690,27 @@ export function LiveEventPage() {
               <EyeOff width={16} height={16} aria-hidden="true" />
             )}
           </button>
+          {/* Share my location — now actually transmits, via the frozen locations/batch
+              endpoint (app/useLocationBroadcast.ts). Owner or rider, as long as they're a
+              participant on a live event. Disabled until we know the event is live and this
+              viewer is on it. */}
           <button
             type="button"
             className={styles.mapControlBtn}
-            onClick={() => setSharingLocation((v) => !v)}
-            aria-pressed={sharingLocation}
-            aria-label={
-              sharingLocation ? "Sharing my location" : "Share my location"
+            onClick={() => (sharing ? broadcast.stop() : broadcast.start())}
+            disabled={
+              !sharing && (!eventIsLive || eventIsFinished || event?.myParticipant == null)
             }
+            aria-pressed={broadcast.status === "sharing"}
+            aria-label={sharing ? "Stop sharing my location" : "Share my location"}
             title={
-              sharingLocation ? "Sharing my location" : "Share my location"
+              broadcast.status === "requesting"
+                ? "Starting location sharing…"
+                : sharing
+                  ? "Sharing my location — tap to stop"
+                  : "Share my location"
             }
-            data-active={sharingLocation || undefined}
+            data-active={sharing || undefined}
           >
             <Crosshair width={16} height={16} aria-hidden="true" />
           </button>
@@ -817,16 +849,18 @@ export function LiveEventPage() {
         </div>
         <div className={styles.statCell}>
           <span className={styles.statLabel}>Weather</span>
-          <span className={styles.statValue}>
-            {forecast
-              ? `${Math.round((forecast.tempMinC + forecast.tempMaxC) / 2)}°`
-              : "—"}
-            {forecast && (
+          {forecast ? (
+            <span className={styles.statValue}>
+              {`${Math.round((forecast.tempMinC + forecast.tempMaxC) / 2)}°`}
               <span aria-hidden="true" style={{ marginLeft: 4 }}>
                 {forecast.emoji}
               </span>
-            )}
-          </span>
+            </span>
+          ) : (
+            // No real forecast for this point/date (out of Open-Meteo's range, offline, or
+            // blocked). Say so plainly — never a fabricated temperature.
+            <span className={styles.statValueEmpty}>No data</span>
+          )}
         </div>
       </div>
 

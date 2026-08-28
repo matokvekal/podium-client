@@ -346,6 +346,14 @@
   white-space: nowrap;
 }
 
+/* No real value to show — kept small and secondary rather than a fabricated number. */
+.statValueEmpty {
+  font-size: 0.7rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* --- Riders / Groups tabs --------------------------------------------------------------- */
 
 .tabsRow {

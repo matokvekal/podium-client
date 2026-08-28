@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { EventRoute } from "../lib/event-route";
+import { FALLBACK_LIMITS } from "../lib/plan-limits";
 
 export interface EventGroup {
   id: string;
@@ -22,7 +23,10 @@ export interface EventGroup {
 
 interface EventGroupsState {
   byEvent: Record<string, EventGroup[]>;
-  addGroup(eventId: string, name: string): void;
+  /** `maxGroups` is the real, server-derived cap the calling page computed (event.maxGroups ??
+   * the user's entitlement ?? FALLBACK). Optional here only so existing callers keep working;
+   * when omitted this falls back to MAX_GROUPS, an internal floor guard, NOT the real gate. */
+  addGroup(eventId: string, name: string, maxGroups?: number): void;
   renameGroup(eventId: string, id: string, name: string): void;
   setGroupStartsAt(eventId: string, id: string, startsAt: string | null): void;
   removeGroup(eventId: string, id: string): void;
@@ -30,7 +34,11 @@ interface EventGroupsState {
   clearGroupTrack(eventId: string, id: string): void;
 }
 
-const MAX_GROUPS = 4;
+// Internal floor guard only — the real per-event cap is now per-user and lives on the server
+// (event.maxGroups) / the profile entitlement, computed by the page and passed into addGroup.
+// Kept exported so existing imports don't break; sourced from the shared offline fallback so a
+// stale client and the server still agree on the default.
+const MAX_GROUPS = FALLBACK_LIMITS.maxGroupsPerEvent;
 
 let localId = 0;
 
@@ -48,10 +56,10 @@ export const useEventGroupsStore = create<EventGroupsState>()(
     (set) => ({
       byEvent: {},
 
-      addGroup(eventId, name) {
+      addGroup(eventId, name, maxGroups = MAX_GROUPS) {
         set((state) => {
           const existing = state.byEvent[eventId] ?? [];
-          if (existing.length >= MAX_GROUPS) return state;
+          if (existing.length >= maxGroups) return state;
           const group: EventGroup = {
             id: `group-${++localId}`,
             name: name.trim() || `Group ${existing.length + 1}`,

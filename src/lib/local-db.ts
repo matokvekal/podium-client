@@ -520,3 +520,21 @@ export async function clearUserScopedCache(): Promise<void> {
     // Best effort — a failed cache clear must never break sign-out.
   }
 }
+
+/**
+ * Full-logout nuke: empty EVERY object store in podium-db — the v1 `events` list cache
+ * (both the "mine" and "guest" buckets) and the four v2 user-scoped ride caches. Clears the
+ * contents rather than deleting the database, so the open connection stays valid and there is
+ * no `deleteDatabase` "blocked" edge case. Best effort, like everything else here.
+ */
+export async function clearAllCaches(): Promise<void> {
+  try {
+    const db = await getDb();
+    const names = Array.from(db.objectStoreNames);
+    if (names.length === 0) return;
+    const tx = db.transaction(names, "readwrite");
+    await Promise.all([...names.map((name) => tx.objectStore(name).clear()), tx.done]);
+  } catch {
+    // IndexedDB unavailable, disabled, or a transaction failure — sign-out proceeds regardless.
+  }
+}

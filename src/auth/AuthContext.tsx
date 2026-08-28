@@ -22,9 +22,10 @@ import {
   saveProfile,
   saveTokens,
 } from "../lib/auth-storage";
+import { clearLocalUserData } from "../lib/logout-cleanup";
 import type { UserVisualAsset } from "../lib/user-identity";
 import { useEventsStore } from "../store/eventsStore";
-import { forgetUserIdentity, reconcileUserIdentity } from "../store/userIdentityStore";
+import { reconcileUserIdentity } from "../store/userIdentityStore";
 import { forgetGoogleSession } from "./google-signin";
 
 export interface Profile {
@@ -131,10 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [loadProfile]);
 
-  // The API client fires this when a refresh is refused — the session is gone for good.
+  // The API client fires this when a refresh is refused — the session is gone for good. Same
+  // full local reset as an explicit sign-out: the session is dead either way, so no user data
+  // should be left for whoever logs in next. Tokens were already cleared by the API client.
   useEffect(() => {
     function onExpired() {
       clearProfile();
+      useEventsStore.getState().clearMyRides();
+      void clearLocalUserData()
+        .catch(() => undefined)
+        .finally(() => {
+          if (typeof window !== "undefined") window.location.replace("/login");
+        });
       setProfile(null);
       setStatus("signed-out");
     }
@@ -184,22 +193,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    // Read from storage rather than the `profile` state so this callback stays dependency-free
-    // and can never clear the WRONG rider's data from a stale closure.
-    const signedInId = getProfile<Profile>()?.id ?? null;
-    // Best effort: revoking the session server-side is right, but a rider on a mountain
-    // with no signal still gets signed out locally.
+    // Full local reset — see lib/logout-cleanup.ts. Every step is best-effort and independently
+    // guarded: the user ends up logged out even if one storage clear throws.
+
+    // 1. Revoke the session server-side. A rider on a mountain with no signal still gets
+    //    signed out locally.
     await apiRequest("/auth/logout", { method: "POST" }).catch(() => undefined);
+
+    // 2-3. Live geolocation watchers, poll loops and timers all belong to mounted components;
+    //      the hard navigation in step 9 unmounts everything and their effect cleanups run.
+
+    // 4. Auth / session state.
     clearTokens();
     clearProfile();
     forgetGoogleSession();
-    // Drop this rider's My Rides (in-memory and the IndexedDB "mine" cache bucket) so a
-    // shared device never briefly shows them to whoever signs in next.
+    // In-memory My Rides too, so nothing flashes before the reload.
     useEventsStore.getState().clearMyRides();
-    // Same reason: their on-device avatar/cover pick is personal data and goes with them.
-    if (signedInId != null) forgetUserIdentity(signedInId);
+
+    // 5-7. Persisted Zustand stores, the IndexedDB ride cache, and the transient session flags
+    //      — only keys this app owns (podium.* / elnino.*).
+    await clearLocalUserData().catch(() => undefined);
+
+    // 8. Cookies: this app stores nothing in cookies (tokens are in localStorage); Google's
+    //    own cookies are deliberately left untouched.
+
     setProfile(null);
     setStatus("signed-out");
+
+    // 9. Hard navigation to the start screen. Discards ALL in-memory state (Zustand stores,
+    //    timers, watchers, subscriptions) so the next login — same tab or not — starts clean.
+    if (typeof window !== "undefined") window.location.replace("/login");
   }, []);
 
   const value = useMemo<AuthContextValue>(

@@ -26,7 +26,8 @@
  * still requires all three fields in the POST body, so they're still sent, just hardcoded.
  * Re-introduce the Kind/Display-style/bib fieldsets (see git history) once races come back.
  *
- * Activity type (Road/MTB/Gravel/Running/Hiking, matching Find Tracks' SurfaceType) is
+ * Activity type (Road/MTB/Gravel/Running — "Hiking" is hidden from the picker for now,
+ * matching Find Tracks' SurfaceType) is
  * client-side only — deliberately NOT sent in the POST body. `07-api-contract.md` Part 1 is
  * frozen (the Android app is live against it) and has no field for this; the server has no
  * column to store it in yet either. See plan/server-tasks.md Part C for what real support
@@ -169,6 +170,10 @@ interface ExistingEvent {
    *  the client started sending them; the edit form then falls back to the device-local copy. */
   activityType?: SurfaceType | null;
   level?: RiderLevel | null;
+  /** EFFECTIVE elevation gain (m) the server persists — the organizer's manual/imported value,
+   *  else the attached route's climb. Prefills the Climb field in edit mode. See
+   *  sql/021-events-elevation-gain.sql. */
+  elevationGain?: number | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -226,8 +231,9 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "road", label: "Road" },
   { value: "mtb", label: "MTB" },
   { value: "gravel", label: "Gravel" },
-  { value: "running", label: "Running" },
-  { value: "hiking", label: "Hiking" }
+  { value: "running", label: "Running" }
+  // "hiking" intentionally hidden from the create/edit picker for now; the
+  // SurfaceType and display mappings keep it so existing events still render.
 ];
 
 const NEW_TEAM_OPTION = "__new__";
@@ -347,7 +353,13 @@ export function EventCreatePage() {
   // nickname box that used to sit here is gone rather than kept as decoration — it fed only the
   // manual-add call, and `joinAsRider` carries no name field. Changing that name is an account
   // edit, which is what riderDisplayName below points at.
-  const [imRiding, setImRiding] = useState(false);
+  //
+  // Default CHECKED: the creator is assumed to be riding their own event, so a participant row
+  // (and therefore event.myParticipant.id) exists by default — which is what LIVE location
+  // sharing needs (LiveEventPage.tsx). Explicitly unticking it sends joinAsRider: false and the
+  // organizer stays organizer-only, with no participant row. Nothing here forces every owner
+  // into event_participants server-side — that stays gated on joinAsRider (event.service.ts).
+  const [imRiding, setImRiding] = useState(true);
 
   // Edit-mode only, for the Danger Zone below — "ride that i create and didnt start i can
   // delete," asked for directly. Not read anywhere else; the live/finished check right after
@@ -408,6 +420,7 @@ export function EventCreatePage() {
       // extras below don't overwrite a real server value with a stale one.
       let serverHasLevel = false;
       let serverHasActivity = false;
+      let serverHasElevation = false;
       const cached = await getCachedEvent(eventId);
       if (cached && !cancelled) {
         setName(cached.name);
@@ -456,6 +469,15 @@ export function EventCreatePage() {
           setActivityType(found.activityType);
           serverHasActivity = true;
         }
+        // Server-persisted effective elevation wins — it survives logout/login and is the
+        // same on every device. Marked "edited" so re-picking a route (or a stale local
+        // extras value below) never silently overwrites what the organizer saved. Replacing
+        // the GPX explicitly is still allowed to repopulate it — see handleUploadRoute.
+        if (found.elevationGain != null) {
+          setClimbMInput(String(found.elevationGain));
+          setClimbEdited(true);
+          serverHasElevation = true;
+        }
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -476,7 +498,7 @@ export function EventCreatePage() {
           setDistanceKmInput(String(existingExtras.distanceKm));
           setDistanceEdited(true);
         }
-        if (existingExtras.climbM != null) {
+        if (!serverHasElevation && existingExtras.climbM != null) {
           setClimbMInput(String(existingExtras.climbM));
           setClimbEdited(true);
         }
@@ -630,6 +652,14 @@ export function EventCreatePage() {
     setUploadedRestStops(uploaded.restStops);
     setInvalidRoute(false);
     applyRouteDistanceClimb(uploaded.route);
+    // Uploading (or replacing) a GPX is an explicit action: if the new file carries its own
+    // elevation, take that number even over a value the organizer typed earlier, and clear the
+    // "edited" latch so they can still override it before Save. A file with no elevation data
+    // leaves whatever was there — never wiped, never invented.
+    if (uploaded.route.elevationM != null) {
+      setClimbMInput(String(uploaded.route.elevationM));
+      setClimbEdited(false);
+    }
   }
 
   function handleDescriptionChange(value: string) {
@@ -701,6 +731,19 @@ export function EventCreatePage() {
   async function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
+
+    // The organizer's hand-typed distance/climb win over whatever the route file carried —
+    // a GPX often has no elevation at all (elevationM null), and the Climb field is exactly
+    // the fallback for that. Computed here so the same numbers go BOTH to the server route
+    // (below, so every viewer and a post-logout reload still see them) and to the local
+    // extras store (further down, for instant same-device display).
+    const parsedDistanceNum = distanceKm.trim() ? Number(distanceKm) : null;
+    const parsedClimbNum = climbM.trim() ? Number(climbM) : null;
+    const typedDistance =
+      parsedDistanceNum != null && !Number.isNaN(parsedDistanceNum) ? parsedDistanceNum : null;
+    const typedClimb =
+      parsedClimbNum != null && !Number.isNaN(parsedClimbNum) ? parsedClimbNum : null;
+
     if (fromRouteId != null) {
       // A route picked from the public library: attach the EXISTING row by id. The server's
       // attachLibraryRouteToEvent links it, so the ride runs on the real route rather than on a
@@ -725,20 +768,12 @@ export function EventCreatePage() {
         method: "POST",
         body: {
           points,
-          distanceKm: copiedRoute.distanceKm,
-          elevationM: copiedRoute.elevationM
+          distanceKm: typedDistance ?? copiedRoute.distanceKm,
+          elevationM: typedClimb ?? copiedRoute.elevationM
         }
       });
     }
-    const parsedDistance = distanceKm.trim() ? Number(distanceKm) : null;
-    const parsedClimb = climbM.trim() ? Number(climbM) : null;
-    setEventDistanceClimb(
-      id,
-      parsedDistance != null && !Number.isNaN(parsedDistance)
-        ? parsedDistance
-        : null,
-      parsedClimb != null && !Number.isNaN(parsedClimb) ? parsedClimb : null
-    );
+    setEventDistanceClimb(id, typedDistance, typedClimb);
     setEventCoverImage(id, coverImageDataUrl);
 
     if (teamId === NEW_TEAM_OPTION && newTeamName.trim() && profile) {
@@ -795,6 +830,14 @@ export function EventCreatePage() {
       return;
     }
 
+    // The Climb field's value, parsed — the ONE effective elevation gain the organizer is
+    // publishing for this ride (auto-filled from a GPX import, then freely editable). Sent on
+    // the create/edit request itself so the server persists it as the authoritative value
+    // (events.elevation_gain_m); `null` when the field is empty — never a fabricated number.
+    const parsedClimb = climbM.trim() ? Number(climbM) : Number.NaN;
+    const elevationGainM =
+      Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
+
     setBusy(true);
     setError(null);
     try {
@@ -816,7 +859,11 @@ export function EventCreatePage() {
             // Same as create: real event columns, updateEventSchema accepts them. Sent so an
             // edited difficulty / activity type reaches every viewer, not just this device.
             activityType,
-            ...(level ? { level } : {})
+            ...(level ? { level } : {}),
+            // The organizer's effective elevation gain — authoritative, server-persisted,
+            // survives logout/login and shows the same on every device. `null` clears it
+            // (falls back to the attached route's climb).
+            elevationGainM
           }
         });
         await saveExtras(eventId);
@@ -859,6 +906,10 @@ export function EventCreatePage() {
           // the organizer cleared the picker.
           activityType,
           ...(level ? { level } : {}),
+          // The initial effective elevation gain — from the imported GPX, or typed by hand, or
+          // null when neither. Server persists it as events.elevation_gain_m; every viewer and
+          // a post-logout reload then see this exact number.
+          elevationGainM,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.

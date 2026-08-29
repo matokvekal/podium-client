@@ -6,7 +6,8 @@
  *           the merged list AND the joined-only id set). Everyone: GET /events/public
  *           (unauthenticated) for "Find Rides". See App.tsx > OpenHome.
  * Actions:  open a ride; create or join one (both require signing in first); My Rides
- *           Past/Current/Upcoming chips + See All (search/sort/favourites); Find Rides
+ *           Past/Current/Upcoming multi-select chips (none selected = all) + See All
+ *           (search/sort/favourites); Find Rides
  *           client-side Filter + Sort (lib/find-rides-filter.ts).
  * State:    the active tab; My Rides chip filter + See-All controls; Find Rides criteria
  * Calls:    GET /events, GET /events/public
@@ -235,18 +236,34 @@ export function EventsListPage() {
     return { live, upcoming, past };
   }, [myRides]);
 
-  // The chip row's current view. Purely a client-side lens over myRides — every chip shows
-  // real rides that are already loaded, so switching one never triggers a fetch or a spinner.
-  const [myFilter, setMyFilter] = useState<MyRidesFilter>("upcoming");
+  // The chip row's active buckets. Multi-select, checkbox-style: an EMPTY selection means
+  // "show everything" (the view you land on), and tapping chips narrows to just the picked
+  // buckets — tap Past to see only past, then add Upcoming to see both. Purely a client-side
+  // lens over myRides — every chip shows rides that are already loaded, so toggling one never
+  // triggers a fetch or a spinner.
+  const [myFilters, setMyFilters] = useState<MyRidesFilter[]>([]);
+  function toggleMyFilter(value: MyRidesFilter) {
+    setMyFilters((current) =>
+      current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value],
+    );
+  }
 
   // One flat, ordered list for the home view — the reference design shows a single stream of
-  // cards, not the separate Live/Upcoming/Past sections this used to render.
+  // cards, not the separate Live/Upcoming/Past sections this used to render. Order is always
+  // live → upcoming → past; the chip selection only decides which of those blocks appear.
   const homeList = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const ordered =
-      myFilter === "current" ? live : myFilter === "past" ? past : upcoming;
+    const show = (bucket: MyRidesFilter) =>
+      myFilters.length === 0 || myFilters.includes(bucket);
+    const ordered = [
+      ...(show("current") ? live : []),
+      ...(show("upcoming") ? upcoming : []),
+      ...(show("past") ? past : []),
+    ];
     return ordered.slice(0, HOME_ROW_LIMIT);
-  }, [myRidesByBucket, myFilter]);
+  }, [myRidesByBucket, myFilters]);
 
   // See-All list: search + favourites filter first, then bucketed the same way as the home
   // row, with the chosen sort applied inside each bucket (Live is small enough that its own
@@ -611,9 +628,9 @@ export function EventsListPage() {
                       key={f.value}
                       type="button"
                       className={styles.filterChip}
-                      data-on={myFilter === f.value}
-                      aria-pressed={myFilter === f.value}
-                      onClick={() => setMyFilter(f.value)}
+                      data-on={myFilters.includes(f.value)}
+                      aria-pressed={myFilters.includes(f.value)}
+                      onClick={() => toggleMyFilter(f.value)}
                     >
                       {f.label}
                     </button>
@@ -635,11 +652,15 @@ export function EventsListPage() {
 
               {homeList.length === 0 ? (
                 <p className={styles.noResults}>
-                  {myFilter === "current"
-                    ? "No rides happening right now."
-                    : myFilter === "past"
-                      ? "No past rides yet."
-                      : "No upcoming rides."}
+                  {myFilters.length === 0
+                    ? "No rides yet."
+                    : myFilters.length === 1 && myFilters[0] === "current"
+                      ? "No rides happening right now."
+                      : myFilters.length === 1 && myFilters[0] === "past"
+                        ? "No past rides yet."
+                        : myFilters.length === 1 && myFilters[0] === "upcoming"
+                          ? "No upcoming rides."
+                          : "No rides match the selected filters."}
                 </p>
               ) : (
                 <div className={styles.homeList}>

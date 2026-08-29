@@ -964,13 +964,15 @@ export function EventDetailPage() {
   // Only the "real owner" branch has a photo to show — a club/team name is not an account,
   // so there is no server avatar for it.
   const level = event.level ?? extras.level ?? null;
-  // The organizer's own numbers (typed, or auto-filled from the route they picked) win over
-  // the saved route's, because that is the figure they chose to publish for this ride. Null
-  // when neither exists — the tile is then simply not drawn. Same fallback chain the card uses
-  // (EventCard.tsx): the organizer's own numbers (extras / event.distanceKm|climbM) first, the
-  // saved route's figures only as a last resort — so the hero shows exactly what the card does.
-  const distanceKm = extras.distanceKm ?? event.distanceKm ?? results?.route?.distanceKm ?? null;
-  const climbM = extras.climbM ?? event.climbM ?? results?.route?.elevationM ?? null;
+  // The server-persisted effective values first — GET /events/:id sends distanceKm and
+  // elevationGain (the organizer's manual/imported climb, else the route's). This is the same
+  // number the list card shows and the Edit form prefills, so all three agree. The device-
+  // local copy (extras) and the separately-fetched route are only fallbacks for the instant
+  // before the detail resolves / an older server. Null when none exists — the tile isn't drawn.
+  const distanceKm =
+    event.distanceKm ?? extras.distanceKm ?? results?.route?.distanceKm ?? null;
+  const climbM =
+    event.elevationGain ?? extras.climbM ?? event.climbM ?? results?.route?.elevationM ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
   // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
@@ -1009,8 +1011,12 @@ export function EventDetailPage() {
   // `|| event.isOwner`: the owner can always reach their own live map. In Organizer mode this
   // is the "LIVE" button in the owner-actions row; in Rider mode that row is hidden, so the
   // owner falls through to the same rider-style LIVE entry below (gated on `!showOrganizerUi`).
-  const canSeeLive =
-    event.myParticipant != null || event.showLiveLocations || event.isOwner;
+  //
+  // TEMPORARY: live tracking is creator-only for now. Regular riders (members / non-members)
+  // should not see any way into the live page yet — we'll re-enable the rider view later.
+  // Restore the line below to `event.myParticipant != null || event.showLiveLocations || event.isOwner`
+  // when the rider live experience is ready.
+  const canSeeLive = event.isOwner;
 
   // Owner never registers for their own ride; a rider who already finished/cancelled events
   // can't join either — same guard the old bottom card and sign-in link used.

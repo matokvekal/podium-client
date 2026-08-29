@@ -17,7 +17,8 @@ import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
-import { COUNTRIES, flagEmoji } from "../lib/countries";
+import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import { useCountryStore } from "../store/countryStore";
 import { useUserModeStore } from "../store/userModeStore";
 
 export function ProfileSetupPage() {
@@ -34,9 +35,18 @@ export function ProfileSetupPage() {
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergencyPhone ?? "");
   // TEMPORARY: kept out of the updateProfile() call below until the server has a `country`
-  // column on users — see BUGS.md / the country-filter feature. Required in the UI now so
-  // the field, its validation and the picker are all in place for when that lands.
-  const [country, setCountry] = useState("");
+  // column on users — see BUGS.md / the country-filter feature. Saved on the device instead
+  // (store/countryStore.ts) so the field, its validation and the picker are all in place for
+  // when that lands.
+  //
+  // The starting value follows a strict priority (computed once, on mount):
+  //   1. a country the rider already saved      — a real choice, never overridden
+  //   2. the device/browser locale region       — e.g. he-IL -> Israel, en-US -> United States
+  //   3. Israel                                  — the app fallback for an unknown locale
+  const savedCountry = useCountryStore((state) => state.code);
+  const saveCountry = useCountryStore((state) => state.setCountry);
+  const [defaultCountry] = useState(() => savedCountry ?? detectDefaultCountryCode());
+  const [country, setCountry] = useState(defaultCountry);
   // Client-only UI preference (store/userModeStore.ts) — NOT part of the profile sent to the
   // server. Unchecked by default: a new user is a rider unless they say otherwise.
   const [organizes, setOrganizes] = useState(false);
@@ -55,6 +65,8 @@ export function ProfileSetupPage() {
         nickname,
         ...(emergencyPhone ? { emergencyPhone } : {}),
       });
+      // Device-local until the server has a country column — see the note by the useState above.
+      saveCountry(country);
       setUserMode(organizes ? "organizer" : "rider");
       navigate(from && from !== "/account/setup" ? from : "/", { replace: true });
     } catch (err) {
@@ -124,10 +136,7 @@ export function ProfileSetupPage() {
           autoComplete="country"
           required
         >
-          <option value="" disabled>
-            Select your country
-          </option>
-          {COUNTRIES.map((c) => (
+          {orderedCountries(defaultCountry).map((c) => (
             <option key={c.code} value={c.code}>
               {flagEmoji(c.code)} {c.name}
             </option>

@@ -10,12 +10,18 @@
 // where that column contains "rest", "break", or "stop" marks a rest point. No header row at
 // all falls back to "column 0 = lat, column 1 = lon."
 
+import { elevationGainFromSeries } from "./elevation";
+
 export interface ParsedTrack {
   points: [number, number][];
   /** Indices into `points` that are rider-marked rest/break stops — first and last point are
    * always implicitly start/finish, never listed here even if also flagged as a stop. */
   restStopIndices: number[];
   distanceKm: number;
+  /** Total climb in metres, computed from per-point elevation when the file carries it
+   * (GPX <ele>, or a CSV elevation/altitude column). null when the file has no elevation data
+   * — never a guess. See lib/elevation.ts. */
+  elevationGainM: number | null;
 }
 
 function toRad(deg: number): number {
@@ -55,6 +61,9 @@ export function parseTrackCsv(text: string): ParsedTrack | null {
   const typeCol = header.findIndex(
     (h) => h.includes("type") || h.includes("marker") || h.includes("stop"),
   );
+  const eleCol = header.findIndex(
+    (h) => h === "ele" || h.startsWith("elev") || h === "alt" || h.startsWith("altitude"),
+  );
   const hasHeader = latCol >= 0 && lonCol >= 0;
 
   const dataLines = hasHeader ? lines.slice(1) : lines;
@@ -63,6 +72,7 @@ export function parseTrackCsv(text: string): ParsedTrack | null {
 
   const points: [number, number][] = [];
   const restStopIndices: number[] = [];
+  const elevations: (number | null)[] = [];
 
   for (const line of dataLines) {
     const cols = line.split(",").map((c) => c.trim());
@@ -75,9 +85,16 @@ export function parseTrackCsv(text: string): ParsedTrack | null {
       restStopIndices.push(points.length);
     }
     points.push([lat, lon]);
+    const ele = hasHeader && eleCol >= 0 ? Number.parseFloat(cols[eleCol] ?? "") : Number.NaN;
+    elevations.push(Number.isFinite(ele) ? ele : null);
   }
 
   if (points.length < 2) return null;
 
-  return { points, restStopIndices, distanceKm: Math.round(haversineKm(points) * 10) / 10 };
+  return {
+    points,
+    restStopIndices,
+    distanceKm: Math.round(haversineKm(points) * 10) / 10,
+    elevationGainM: elevationGainFromSeries(elevations),
+  };
 }

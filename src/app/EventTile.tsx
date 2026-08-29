@@ -80,9 +80,10 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   const organizerAvatarProps = extras.organizerGroup
     ? { avatarUrl: null, identity: null, localSelection: null, seed: organizer }
     : ownerAvatarProps;
-  // Same real-over-mock preference as EventCard.tsx's See-All row — see its comment.
-  const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
-  const climbM = extras.climbM ?? event.climbM ?? null;
+  // Server list value first (GET /events sends distanceKm / elevationGain now), the device-
+  // local copy second — same chain as EventCard.tsx.
+  const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
+  const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const ownerCoverOptions = useOwnerCover(event.ownerId, event.ownerCover);
   const coverBackground = eventCoverBackground(
     event.id,

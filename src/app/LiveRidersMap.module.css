@@ -4,7 +4,8 @@
      now) sizes that container to most of the viewport, since the map is the whole point of
      that page, not a panel inside a longer scroll like the old inline usage was. */
   height: 100%;
-  border-radius: var(--radius-md);
+  /* Full-bleed on the live screen — no rounded corners, it runs edge to edge. */
+  border-radius: 0;
   overflow: hidden;
   background: var(--surface-sunken);
   /* Isolates Leaflet's internal panes into their own stacking context — see

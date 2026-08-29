@@ -141,7 +141,9 @@ export function CopyTrackSheet({
         route: {
           points: parsed.points,
           distanceKm: parsed.distanceKm,
-          elevationM: null,
+          // From the file's own <ele> / elevation column when it has one, else null — the
+          // organizer can still type a value in on the create/edit form. Never invented.
+          elevationM: parsed.elevationGainM,
         },
         restStops: parsed.restStopIndices.map((i) => parsed.points[i]),
         fileName: file.name,

@@ -95,11 +95,19 @@ export interface EventSummary {
    */
   favorite?: boolean;
   /**
-   * Client-only, same as `favorite` — no server column exists for either yet (see
-   * plan/server-tasks.md). Only ever set on mock data; a real event from the API just won't
-   * have these until a route is attached server-side.
+   * Route + roster summary, sent by GET /events and GET /events/public (server's
+   * toEventSummary) so a card shows Distance / Elevation / Riders without opening the event or
+   * its route. `distanceKm` is the attached route's; `elevationGain` is the EFFECTIVE climb
+   * (the organizer's manual/imported value, else the route's). Optional: a cached v1 row or a
+   * response from an older server omits them, and the card falls back to the device-local copy
+   * (store/eventExtrasStore.ts) then to a dash — never a fabricated number.
    */
-  distanceKm?: number;
+  distanceKm?: number | null;
+  elevationGain?: number | null;
+  /** Approved + pending riders (rejected / left excluded), from the list response. */
+  participantCount?: number | null;
+  /** @deprecated device-local mirror of climb (store/eventExtrasStore.ts) — read
+   *  `elevationGain` first. Kept so an older cached row still resolves. */
   climbM?: number;
 }
 

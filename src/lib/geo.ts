@@ -33,6 +33,64 @@ export function cumulativeDistanceKm(points: readonly [number, number][]): numbe
   return result;
 }
 
+/**
+ * Nearest point ON the route polyline to `target` — a real perpendicular projection onto the
+ * closest segment, NOT "the nearest vertex" and NOT a straight line from the start. Used to
+ * split the route into "already travelled" and "still ahead" for the live progress overlay.
+ *
+ * Returns the index of the segment's START vertex and the projected [lat, lng] on that
+ * segment, so the caller can build:
+ *   travelled = [...points.slice(0, index + 1), point]
+ *   ahead     = [point, ...points.slice(index + 1)]
+ *
+ * The projection maths run in a local equirectangular approximation (longitude scaled by
+ * cos(lat)) — accurate at the scale of one route segment, which is all it is used for.
+ */
+export function nearestPointOnRoute(
+  points: readonly [number, number][],
+  target: [number, number],
+): { index: number; point: [number, number] } {
+  if (points.length === 0) return { index: -1, point: target };
+  if (points.length === 1) return { index: 0, point: points[0] };
+
+  const latScale = Math.cos(toRadians(target[0]));
+  const tx = target[1] * latScale;
+  const ty = target[0];
+
+  let bestIndex = 0;
+  let bestPoint: [number, number] = points[0];
+  let bestDistSq = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const ax = points[i][1] * latScale;
+    const ay = points[i][0];
+    const bx = points[i + 1][1] * latScale;
+    const by = points[i + 1][0];
+
+    const abx = bx - ax;
+    const aby = by - ay;
+    const lenSq = abx * abx + aby * aby;
+    const t = lenSq > 0 ? Math.max(0, Math.min(1, ((tx - ax) * abx + (ty - ay) * aby) / lenSq)) : 0;
+
+    // Interpolate the real lat/lng directly (linear over one short segment is fine).
+    const lat = points[i][0] + t * (points[i + 1][0] - points[i][0]);
+    const lng = points[i][1] + t * (points[i + 1][1] - points[i][1]);
+
+    const px = lng * latScale;
+    const dx = tx - px;
+    const dy = ty - lat;
+    const distSq = dx * dx + dy * dy;
+
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      bestIndex = i;
+      bestPoint = [lat, lng];
+    }
+  }
+
+  return { index: bestIndex, point: bestPoint };
+}
+
 /** Index of the route point nearest to `targetKm` along the cumulative-distance array — the
  * "how far into the route has this rider gotten" lookup, via a since-`cumulative` is
  * monotonically non-decreasing. Returns the last index if `targetKm` is past the route's end

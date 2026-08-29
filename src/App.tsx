@@ -77,6 +77,22 @@ function OpenHome({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
 }
 
+/**
+ * Same open-access gate as OpenHome, but WITHOUT the AppShell chrome — the live map is a
+ * full-screen, map-first screen that owns the whole viewport (no app header/footer to tap by
+ * accident mid-ride). Its only way out is its own in-screen Back control. See
+ * pages/LiveEventPage.tsx.
+ */
+function OpenFullBleed({ children }: { children: ReactNode }) {
+  const { status, requiresProfile } = useAuth();
+
+  if (status === "signed-in" && requiresProfile) {
+    return <Navigate to="/account/setup" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <Routes>
@@ -159,9 +175,9 @@ export function App() {
       <Route
         path="/events/live/:eventId"
         element={
-          <OpenHome>
+          <OpenFullBleed>
             <LiveEventPage />
-          </OpenHome>
+          </OpenFullBleed>
         }
       />
       {/* Ride groups (Elite/Masters etc.) — owner-only, same reasoning as Participants above.

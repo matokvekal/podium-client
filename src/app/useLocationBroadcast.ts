@@ -24,6 +24,7 @@ import { config } from "../lib/config";
 import {
   appendPoint,
   type GpsPoint,
+  isLocationManuallyStopped,
   locationStoppedKey,
   MAX_BUFFERED_POINTS,
   shouldTransmitLocation,
@@ -51,13 +52,7 @@ interface Result {
 
 const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 10_000 };
 
-function isStopped(eventId: string): boolean {
-  try {
-    return window.sessionStorage.getItem(locationStoppedKey(eventId)) === "1";
-  } catch {
-    return false;
-  }
-}
+const isStopped = isLocationManuallyStopped;
 
 function setStopped(eventId: string, stopped: boolean): void {
   try {

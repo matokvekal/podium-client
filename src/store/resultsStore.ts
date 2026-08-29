@@ -33,7 +33,31 @@ import { create } from "zustand";
 import { ApiError, apiRequest } from "../lib/api-client";
 import type { EventRoute } from "../lib/event-route";
 import { getCachedRoute, putCachedRoute } from "../lib/local-db";
+import { useEventExtrasStore } from "./eventExtrasStore";
 import { getEventRoute } from "./eventRouteStore";
+
+/**
+ * Mirror the server route's distance/climb into the device-local extras store, which is what
+ * the ride CARDS read (EventCard.tsx) — the list endpoint carries no route stats, and the
+ * extras copy is wiped on logout, so without this a card shows "—" for distance/elevation
+ * after any re-login even though the ride's route on the server still has them. Only fills a
+ * field the server actually has a number for; never nulls one the organizer may have typed
+ * locally.
+ */
+function mirrorRouteStatsToExtras(
+  eventId: string,
+  route: Pick<EventRoute, "distanceKm" | "elevationM"> | null,
+): void {
+  if (!route) return;
+  if (route.distanceKm == null && route.elevationM == null) return;
+  const store = useEventExtrasStore.getState();
+  const current = store.byEvent[eventId];
+  store.setDistanceClimb(
+    eventId,
+    route.distanceKm ?? current?.distanceKm ?? null,
+    route.elevationM ?? current?.climbM ?? null,
+  );
+}
 
 /** What GET /events/:eventId/route actually sends — see routes.schemas.ts server-side. */
 type ServerRoute = Pick<EventRoute, "points" | "distanceKm" | "elevationM">;
@@ -97,6 +121,7 @@ export const useResultsStore = create<ResultsState>((set) => ({
       const route = serverRoute ?? null;
       await putCachedRoute(eventId, userId, route);
       if (thisRequest !== requestId) return;
+      mirrorRouteStatsToExtras(eventId, route);
       set({ results: { route }, loading: false, stale: false, lastSyncedAt: Date.now() });
     } catch (err) {
       if (thisRequest !== requestId) return;

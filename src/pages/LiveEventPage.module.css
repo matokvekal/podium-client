@@ -1,413 +1,403 @@
 /*
- * Live map page — redesigned to match a reference screenshot supplied directly: a real header
- * row, an elapsed-time/elevation overlay on the map, a stats strip, and Riders/Groups tabs
- * below instead of a bottom-sheet drawer. Uses the app's normal light/dark tokens (tokens.css).
- * The previous version is kept at src/_backup-cockpit-design/LiveEventPage.{tsx,module.css}.bak.
+ * Full-screen, map-first live screen. Rendered outside the AppShell (App.tsx), so this owns
+ * the entire viewport. A small number of large, one-tap controls float over the map; the
+ * riders list is a half-screen bottom sheet. Nothing here scrolls the page — the map is fixed
+ * and only the sheet body scrolls.
  */
 
-.wrap {
+.screen {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  /* Anchor for every absolutely-positioned overlay below. */
+  isolation: isolate;
+}
+
+.centeredState {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: var(--space-3);
+  padding: var(--space-4);
+  text-align: center;
+  background: var(--surface);
 }
 
-/* --- header --------------------------------------------------------------------------- */
+/* --- top bar ------------------------------------------------------------------------- */
 
-.header {
+.topBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
+  padding-left: calc(env(safe-area-inset-left, 0px) + 12px);
+  padding-right: calc(env(safe-area-inset-right, 0px) + 12px);
+  background: linear-gradient(rgba(10, 14, 22, 0.55), rgba(10, 14, 22, 0));
+  pointer-events: none;
 }
 
-.backBtn,
-.headerIconBtn {
+.topBar > * {
+  pointer-events: auto;
+}
+
+.backBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  color: var(--text);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  width: 48px;
+  height: 48px;
+  color: #1c2733;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
   border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   text-decoration: none;
 }
 
-.backBtn svg,
-.headerIconBtn svg {
-  width: 18px;
-  height: 18px;
+.backBtn svg {
+  width: 22px;
+  height: 22px;
 }
 
-.headerText {
-  flex: 1;
-  min-width: 0;
-}
-
-.headerTopRow {
+.topInfo {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
+  padding: 6px 12px;
+  background: rgba(15, 20, 30, 0.62);
+  backdrop-filter: blur(4px);
+  border-radius: 999px;
+  color: #fff;
 }
 
 .livePill {
   flex-shrink: 0;
   padding: 2px 9px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: var(--weight-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--status-live-strong);
-  background: color-mix(in srgb, var(--status-live) 18%, transparent);
+  color: #04150f;
+  background: var(--status-live);
   border-radius: 999px;
 }
 
 .livePill[data-paused] {
-  color: var(--status-pending);
-  background: color-mix(in srgb, var(--status-pending) 18%, transparent);
+  color: #fff;
+  background: #d9822b;
 }
 
-.headerTitle {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: var(--weight-bold);
+.topTitle {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.headerSub {
-  margin: 2px 0 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-/* --- map ------------------------------------------------------------------------------ */
-
-.mapArea {
-  position: relative;
-  height: min(56vh, 520px);
-  min-height: 320px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.elapsedBadge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 20;
-  padding: 6px 12px;
-  background: rgba(15, 20, 30, 0.72);
-  backdrop-filter: blur(3px);
-  border-radius: var(--radius-sm);
-  color: #fff;
-}
-
-.elapsedTime {
-  font-size: 1rem;
-  font-weight: var(--weight-bold);
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}
-
-.elapsedLabel {
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.elevationBadge {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  font-size: 0.78rem;
-  font-weight: var(--weight-medium);
-  color: #fff;
-  background: rgba(15, 20, 30, 0.55);
-  backdrop-filter: blur(3px);
-  border-radius: 999px;
-}
-
-.pausedBanner {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--status-pending);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: var(--weight-medium);
-  box-shadow: var(--shadow-sm);
-}
-
-.mapControls {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mapControlBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  /* Fixed dark icon on a fixed light circle — not var(--text)/var(--surface), which flip in
-     dark mode. These float over the map (always light tiles regardless of app theme), and a
-     theme-linked icon color went near-white-on-near-white in dark mode: a visible circle with
-     no visible icon inside it ("just circle no logo, so we don't know what are they for"). */
-  color: #1c2733;
-  background: rgba(255, 255, 255, 0.9);
-  border: none;
-  border-radius: 50%;
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-}
-
-.mapControlBtn:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.mapControlBtn[data-active] {
-  background: var(--status-live);
-  color: #04150f;
-}
-
-/* Always mounted (not conditionally rendered) so the transform below can actually animate a
-   slide in/out — asked for directly: "modal slide from left 40%." Off-screen by default;
-   pointer-events stays off until open so it can't intercept map clicks while hidden. */
-.ridersModal {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  width: min(40%, 320px);
-  min-width: 220px;
-  background: rgba(15, 20, 30, 0.92);
-  backdrop-filter: blur(6px);
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
-  transform: translateX(-100%);
-  pointer-events: none;
-  transition: transform 220ms ease;
-}
-
-.ridersModal[data-open] {
-  transform: translateX(0);
-  pointer-events: auto;
-}
-
-.ridersModalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.ridersModalTitle {
-  margin: 0;
   font-size: 0.92rem;
   font-weight: var(--weight-bold);
 }
 
-.ridersModalActions {
+.offlineChip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
-}
-
-.ridersModalUncheckAll {
-  padding: 4px 10px;
+  padding: 5px 10px;
   font-size: 0.72rem;
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.14);
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.ridersModalClose {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  font-weight: var(--weight-bold);
   color: #fff;
-  background: rgba(255, 255, 255, 0.14);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
+  background: rgba(180, 60, 60, 0.92);
+  border-radius: 999px;
 }
 
-.ridersModalList {
-  flex: 1;
+/* --- glance strip ------------------------------------------------------------------- */
+
+.glance {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  gap: 2px;
+  padding: 6px 4px;
+  background: rgba(15, 20, 30, 0.62);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-md);
+  color: #fff;
+}
+
+.glanceCell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  overflow-y: auto;
+  align-items: center;
+  gap: 1px;
+  padding: 0 14px;
 }
 
-.ridersModalNote {
-  margin: 8px;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.65);
+.glanceCell + .glanceCell {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.ridersModalRow {
+.glanceValue {
+  font-size: 1rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.glanceLabel {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* --- paused + geo error ----------------------------------------------------------- */
+
+.pausedBanner {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 18;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.ridersModalRow[data-selected] {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.ridersModalRow[data-disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ridersModalName {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.86rem;
-  font-weight: var(--weight-medium);
-}
-
-/* --- stats strip ------------------------------------------------------------------------ */
-
-.statsRow {
-  display: flex;
-  padding: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #d9822b;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: var(--weight-bold);
   box-shadow: var(--shadow-sm);
 }
 
-.statCell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+.geoError {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 18;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(15, 20, 30, 0.9);
+  color: #fff;
+  font-size: 0.8rem;
   text-align: center;
 }
 
-.statLabel {
-  font-size: 0.65rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+/* --- control stack --------------------------------------------------------------- */
+
+.controls {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 19;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.statValue {
-  font-size: 0.95rem;
+.control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 60px;
+  height: 60px;
+  /* Fixed dark-on-light — these float over dark-filtered map tiles in every app theme. */
+  color: #1c2733;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+}
+
+.control svg {
+  width: 24px;
+  height: 24px;
+}
+
+.control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.control[data-active] {
+  color: #04150f;
+  background: var(--status-live);
+}
+
+.controlLabel {
+  font-size: 0.6rem;
   font-weight: var(--weight-bold);
-  color: var(--text);
-  white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-/* No real value to show — kept small and secondary rather than a fabricated number. */
-.statValueEmpty {
-  font-size: 0.7rem;
-  font-weight: var(--weight-medium);
-  color: var(--text-muted);
-  white-space: nowrap;
+/* --- bottom sheet -------------------------------------------------------------- */
+
+.sheetBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  animation: liveFade 160ms ease;
 }
 
-/* --- Riders / Groups tabs --------------------------------------------------------------- */
+@keyframes liveFade {
+  from {
+    opacity: 0;
+  }
+}
 
-.tabsRow {
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  height: 55dvh;
+  max-height: 620px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(100%);
+  transition: transform 240ms ease;
+  /* Off-screen when closed — can't intercept a map tap even mid-transition. */
+  pointer-events: none;
+}
+
+.sheet[data-open] {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sheet[data-dragging] {
+  transition: none;
+}
+
+.sheetGrab {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  justify-content: center;
+  padding: 10px 0 6px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheetHandle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
-.tab,
-.tabActive {
-  padding: 8px 2px;
-  font-size: 0.9rem;
-  font-weight: var(--weight-medium);
+.sheetTabs {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.sheetTab,
+.sheetTabActive {
+  padding: 6px 2px;
+  font-size: 0.92rem;
+  font-weight: var(--weight-bold);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
 }
 
-.tab {
+.sheetTab {
   color: var(--text-muted);
 }
 
-.tabActive {
+.sheetTabActive {
   color: var(--status-live-strong);
   border-bottom-color: var(--status-live-strong);
 }
 
-.tabIconBtn {
-  margin-left: auto;
+.sheetClose {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
   color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.sheetBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  overflow-y: auto;
+}
+
+.sheetActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.showOthersToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.linkBtn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: var(--weight-bold);
+  color: var(--status-live-strong);
   background: none;
   border: none;
   cursor: pointer;
 }
 
-.tabIconBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.panelBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* --- rider list ------------------------------------------------------------------------- */
+/* --- rider rows (same data as before) --------------------------------------------- */
 
 .riderList {
   display: flex;
@@ -420,7 +410,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -443,12 +433,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   color: #fff;
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .riderCheckbox[data-checked="true"] {
@@ -511,7 +501,7 @@
 .leaderBadge {
   flex-shrink: 0;
   padding: 1px 7px;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: var(--weight-bold);
   color: var(--status-live-strong);
   background: color-mix(in srgb, var(--status-live) 18%, transparent);
@@ -519,7 +509,7 @@
 }
 
 .riderSub {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -541,13 +531,13 @@
 }
 
 .riderStatsUnit {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: var(--weight-normal);
   color: var(--text-muted);
 }
 
 .riderGapValue {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 
@@ -555,13 +545,27 @@
   color: var(--status-live-strong);
 }
 
-/* --- groups tab ------------------------------------------------------------------------- */
+.shareEventRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: var(--space-2);
+  padding: 12px;
+  font-size: 0.86rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
 
 .groupRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -579,17 +583,11 @@
   border-radius: 50%;
 }
 
-/* --- bottom bar ------------------------------------------------------------------------- */
-
-.rideInfoBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  font-size: 0.95rem;
-  font-weight: var(--weight-bold);
-  color: #04150f;
-  background: var(--status-live);
-  border-radius: 999px;
-  text-decoration: none;
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    transition: none;
+  }
+  .sheetBackdrop {
+    animation: none;
+  }
 }

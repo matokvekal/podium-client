@@ -125,7 +125,7 @@ export function SplashScreen() {
           <span className="splash__mark-name" data-text="El Niño Move">
             El Niño Move
           </span>
-          <span className="splash__mark-tag">Every rider, watched over.</span>
+          <span className="splash__mark-tag">Ride together</span>
         </div>
       </div>
     </div>

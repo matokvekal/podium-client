@@ -64,3 +64,17 @@ export function appendPoint(buffer: GpsPoint[], point: GpsPoint): GpsPoint[] {
 export function locationStoppedKey(eventId: string): string {
   return `elnino.location-stopped.${eventId}`;
 }
+
+/**
+ * Did the user explicitly stop sharing for this event in this session? The live page reads
+ * this before it AUTO-starts the broadcast on entry, so a manual stop is not immediately
+ * undone by the auto-start effect re-running. Single source of truth for the flag —
+ * useLocationBroadcast writes it (setStopped) and reads the same key.
+ */
+export function isLocationManuallyStopped(eventId: string): boolean {
+  try {
+    return window.sessionStorage.getItem(locationStoppedKey(eventId)) === "1";
+  } catch {
+    return false;
+  }
+}

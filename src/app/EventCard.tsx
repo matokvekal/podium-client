@@ -14,21 +14,21 @@
  * WHERE THE DATA COMES FROM, and what is deliberately blank:
  *
  *   real, server        name, status, visibility, startsAt, location, activityType, level,
- *                       organizerGroup (the last four are on the summary — see EventSummary's
- *                       doc comment for why they used to be missing)
- *   real, this device   distance / elevation / cover image, from store/eventExtrasStore.ts,
- *                       which only exists on the device that created the ride. Server values
- *                       win where both exist; nothing is invented when neither does.
+ *                       organizerGroup, plus distance / elevation / rider count — the last
+ *                       three now come from GET /events (server's toEventSummary), so a fresh
+ *                       login populates them with no Event Detail visit.
+ *   real, this device   cover image, and a fallback copy of distance / elevation from
+ *                       store/eventExtrasStore.ts (only on the ride's creator device). Server
+ *                       values win; nothing is invented when neither exists.
  *   client-only         the favourite heart (lib/local-db.ts's toggleFavorite — no server
  *                       column for it)
- *   NOT AVAILABLE       est. time, participants "n / capacity", and "Approval Required" on a
- *                       list card. The list endpoint returns no duration, no participant count,
- *                       no capacity and no requiresApproval, and there is no way to derive any
- *                       of them from what it does return. They render as "soon" rather than
+ *   NOT AVAILABLE       est. time, the participant CAPACITY ("/ 50"), and "Approval Required"
+ *                       on a list card. The list endpoint returns no duration, no capacity and
+ *                       no requiresApproval. They render as "soon" / are omitted rather than
  *                       being computed, guessed, or silently dropped — see NOT_YET below.
  */
 
-import { CalendarDays, Heart, MapPin, Mountain, Ruler, Timer, UsersRound } from "lucide-react";
+import { Clock, Heart, MapPin, Mountain, Ruler, Timer, UsersRound } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -57,7 +57,6 @@ const NOT_YET = "soon";
 
 const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const dayTimeFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
 function dateParts(iso: string | null): { month: string; day: string; weekday: string } | null {
   if (!iso) return null;
@@ -97,8 +96,13 @@ export function EventCard({
   const activityType = event.activityType ?? extras.activityType ?? null;
   const TypeIcon = activityType ? SURFACE_TYPE_ICON[activityType] : null;
 
-  const distanceKm = extras.distanceKm ?? event.distanceKm ?? null;
-  const climbM = extras.climbM ?? event.climbM ?? null;
+  // Server list value is the source of truth now — GET /events sends distanceKm / elevationGain
+  // (server's toEventSummary), so a fresh login shows these immediately with no Event Detail
+  // visit. The device-local copy (extras, only on the ride's creator device) is a fallback for
+  // an older server / cached row; a dash when neither has it — never a guessed number.
+  const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
+  const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
+  const riderCount = event.participantCount ?? null;
 
   const when = dateParts(event.startsAt);
   // The organizer's own cover when they have one, else this event's local cover, else the
@@ -240,8 +244,10 @@ export function EventCard({
       <div className={styles.footer}>
         {event.startsAt && (
           <span className={styles.footerItem}>
-            <CalendarDays className={styles.footerIcon} aria-hidden="true" />
-            {dayTimeFormat.format(new Date(event.startsAt))}, {formatLocalTime(event.startsAt)}
+            {/* Date is already the big block top-left of the card — the footer only needs the
+                time of day, not a second copy of the date. */}
+            <Clock className={styles.footerIcon} aria-hidden="true" />
+            {formatLocalTime(event.startsAt)}
           </span>
         )}
         {event.location && (
@@ -256,12 +262,15 @@ export function EventCard({
             {event.location}
           </button>
         )}
-        {/* Participants "n / capacity": the list endpoint returns neither a count nor a
-            capacity, and there is no capacity column server-side at all. One count would cost a
-            participants call per card. */}
-        <span className={styles.footerItem} data-pending="true">
+        {/* Rider count — approved + pending, from GET /events (server's toEventSummary). The
+            capacity ("/ 50") is still detail-only, so the card shows just the count. Falls
+            back to "soon" only for an older server / cached row that omits it. */}
+        <span
+          className={styles.footerItem}
+          data-pending={riderCount == null || undefined}
+        >
           <UsersRound className={styles.footerIcon} aria-hidden="true" />
-          {NOT_YET}
+          {riderCount != null ? riderCount : NOT_YET}
         </span>
       </div>
     </Link>

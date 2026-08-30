@@ -47,6 +47,28 @@ export function LoginPage() {
   const [challengeId, setChallengeId] = useState<number | null>(null);
   const [code, setCode] = useState("");
 
+  // Terms & Conditions must be accepted before any sign-in method is offered. Remembered per
+  // device so a returning rider is not asked to re-tick it every visit; a fresh device (or
+  // cleared storage) starts unticked. Private-mode / disabled storage just means it is not
+  // remembered — never a crash.
+  const [acceptedTerms, setAcceptedTerms] = useState(() => {
+    try {
+      return localStorage.getItem("elnino.termsAccepted") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [termsNudge, setTermsNudge] = useState(false);
+  useEffect(() => {
+    try {
+      if (acceptedTerms) localStorage.setItem("elnino.termsAccepted", "1");
+      else localStorage.removeItem("elnino.termsAccepted");
+    } catch {
+      /* storage unavailable — acceptance just isn't remembered */
+    }
+    if (acceptedTerms) setTermsNudge(false);
+  }, [acceptedTerms]);
+
   useEffect(() => {
     apiRequest<AuthConfig>("/auth/config", { anonymous: true })
       .then((authConfig) => setProviders(authConfig.providers))
@@ -68,9 +90,18 @@ export function LoginPage() {
   const smsLoginVisible = false;
 
   useEffect(() => {
-    if (!providers.includes("GOOGLE") || !googleButtonRef.current) return;
+    const slot = googleButtonRef.current;
+    if (!providers.includes("GOOGLE") || !slot) return;
 
-    renderGoogleButton(googleButtonRef.current, (idToken) => {
+    // Google's real button is only mounted once the Terms box is ticked — before that the
+    // slot stays empty and a disabled placeholder is shown instead. Clear it again if the
+    // rider un-ticks the box.
+    if (!acceptedTerms) {
+      slot.innerHTML = "";
+      return;
+    }
+
+    renderGoogleButton(slot, (idToken) => {
       setBusy(true);
       setError(null);
       signInWithGoogle(idToken)
@@ -79,7 +110,7 @@ export function LoginPage() {
     }).catch(() => {
       setError("Google sign-in is unavailable right now.");
     });
-  }, [providers, signInWithGoogle]);
+  }, [providers, signInWithGoogle, acceptedTerms]);
 
   if (status === "signed-in") {
     const from = (location.state as { from?: string } | null)?.from;
@@ -148,13 +179,50 @@ export function LoginPage() {
             Find a ride
           </Link>
 
+          {/* Terms gate — a real, required checkbox (not just fine print), because signing in
+              here is also how a new rider registers. No sign-in method is usable until it is
+              ticked; once ticked it is remembered on this device (see acceptedTerms above). */}
+          {(providers.includes("GOOGLE") || (smsLoginVisible && providers.includes("SMS"))) && (
+            <>
+              <label className={styles.terms}>
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(event) => setAcceptedTerms(event.target.checked)}
+                />
+                <span>
+                  I have read and agree to the{" "}
+                  <Link to="/terms" target="_blank" rel="noopener noreferrer">
+                    Terms &amp; Conditions
+                  </Link>
+                  .
+                </span>
+              </label>
+              {termsNudge && !acceptedTerms && (
+                <p className={styles.termsNudge} role="alert">
+                  Please accept the Terms &amp; Conditions to continue.
+                </p>
+              )}
+            </>
+          )}
+
           {/* A standard email/password login is planned as a second option later — see the
               `Provider` union above, which already has "EMAIL". The button itself is
               Google's own, rendered by their script — it is not restyled, only placed. */}
           {providers.includes("GOOGLE") && (
             <>
               <p className={styles.hint}>Already a member?</p>
-              <div className={styles.googleSlot} ref={googleButtonRef} />
+              {acceptedTerms ? (
+                <div className={styles.googleSlot} ref={googleButtonRef} />
+              ) : (
+                <button
+                  type="button"
+                  className={styles.googlePlaceholder}
+                  onClick={() => setTermsNudge(true)}
+                >
+                  Continue with Google
+                </button>
+              )}
             </>
           )}
 
@@ -182,7 +250,7 @@ export function LoginPage() {
                   <button
                     className={styles.submit}
                     type="submit"
-                    disabled={busy || phone.length < 8}
+                    disabled={busy || !acceptedTerms || phone.length < 8}
                   >
                     Send me a code
                   </button>
@@ -204,7 +272,7 @@ export function LoginPage() {
                   <button
                     className={styles.submit}
                     type="submit"
-                    disabled={busy || code.length !== 6}
+                    disabled={busy || !acceptedTerms || code.length !== 6}
                   >
                     Sign in
                   </button>

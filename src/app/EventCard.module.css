@@ -22,6 +22,11 @@
   --chip-private: #7c3aed;
   --chip-public: #2563eb;
 
+  /* My Rides border signal: fluorescent blue = an upcoming ride, pink = a past one. Declared
+     here (and re-lit for dark below) so the glow colour tracks the theme like the chips do. */
+  --edge-upcoming: #1ec8ff;
+  --edge-history: var(--status-danger);
+
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -53,6 +58,7 @@
     --chip-hiking: #2dd4bf;
     --chip-private: #a78bfa;
     --chip-public: #60a5fa;
+    --edge-upcoming: #4ddbff;
   }
 }
 
@@ -64,6 +70,33 @@
   --chip-hiking: #2dd4bf;
   --chip-private: #a78bfa;
   --chip-public: #60a5fa;
+  --edge-upcoming: #4ddbff;
+}
+
+/* My Rides is two ordered streams: upcoming (soonest first, so the top card is the next
+   ride) and history (newest first). The border hue is the signal — fluorescent blue for
+   upcoming, a pink glow for past. A live ride keeps its green edge and stays first. Placed
+   before :hover and [data-new] so those still win when they apply. */
+.card[data-status="upcoming"] {
+  border-color: var(--edge-upcoming);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--edge-upcoming),
+    0 0 14px color-mix(in srgb, var(--edge-upcoming) 45%, transparent);
+}
+
+.card[data-status="live"] {
+  border-color: var(--status-live);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 16px color-mix(in srgb, var(--status-live) 45%, transparent);
+}
+
+.card[data-status="finished"] {
+  border-color: var(--edge-history);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 12px color-mix(in srgb, var(--edge-history) 40%, transparent);
 }
 
 .card:hover {

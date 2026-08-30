@@ -20,6 +20,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
+import { TermsPage } from "./pages/TermsPage";
 import { TracksPage } from "./pages/TracksPage";
 import { useUserModeStore } from "./store/userModeStore";
 
@@ -97,6 +98,10 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Terms & Conditions — a standalone legal document, no shell, open to everyone. Linked
+          from the sign-in screen's "I agree" checkbox (LoginPage.tsx). */}
+      <Route path="/terms" element={<TermsPage />} />
 
       <Route
         path="/account/setup"

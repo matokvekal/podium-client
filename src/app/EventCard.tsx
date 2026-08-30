@@ -37,8 +37,8 @@ import { wazeUrl } from "../lib/nav-links";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalTime } from "../lib/time";
-import { useEventsStore } from "../store/eventsStore";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
+import { useEventsStore } from "../store/eventsStore";
 import styles from "./EventCard.module.css";
 import {
   eventCoverBackground,
@@ -128,6 +128,7 @@ export function EventCard({
     <Link
       to={`/events/${event.id}`}
       className={styles.card}
+      data-status={status}
       data-new={isNew || justOpened || undefined}
       onClick={() => recordOpenedEvent(event.id)}
     >
@@ -151,7 +152,11 @@ export function EventCard({
             event-visuals.ts's generatedCoverUrl). */}
         <div
           className={styles.thumb}
-          style={{ background: coverBackground, backgroundSize: "cover", backgroundPosition: "center" }}
+          style={{
+            background: coverBackground,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
         />
 
         <div className={styles.headMain}>
@@ -265,10 +270,7 @@ export function EventCard({
         {/* Rider count — approved + pending, from GET /events (server's toEventSummary). The
             capacity ("/ 50") is still detail-only, so the card shows just the count. Falls
             back to "soon" only for an older server / cached row that omits it. */}
-        <span
-          className={styles.footerItem}
-          data-pending={riderCount == null || undefined}
-        >
+        <span className={styles.footerItem} data-pending={riderCount == null || undefined}>
           <UsersRound className={styles.footerIcon} aria-hidden="true" />
           {riderCount != null ? riderCount : NOT_YET}
         </span>

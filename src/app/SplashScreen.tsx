@@ -1,60 +1,40 @@
 /**
  * Splash screen
  *
- * Shown once per cold start, for four seconds (asked for directly), layered over the real
- * app while it mounts underneath — it does not delay anything; routing and auth are already
- * loading in parallel behind it.
+ * Shown once per cold start, layered over the real app while it mounts underneath — it does
+ * not delay anything; routing and auth are already loading in parallel behind it.
  *
- * Purely presentational: a dark, glowing road route — straight streets meeting at angled
- * junctions, like a real map, not a smooth circle — with a scatter of small rider dots, one
- * of them blinking red like a radar ping. It is a wordless pitch for what this app is for —
- * a group riding together, watched over, with trouble visible the instant it happens. The
- * red-and-blinking language for "needs help" is the same one the real SOS marker on the live
- * map uses (see AGENT.md); reused here on purpose, not a coincidence.
+ * It is a five-second clip of a group riding a mountain road (public/splash.mp4, cut from
+ * Images/video1.mp4) with the wordmark and the spinning storm mark over it. Same wordless
+ * pitch the old drawn version made — a group riding together — but with real riders. The
+ * previous drawn splash (glowing road route, rider dots, blinking SOS ping) is kept verbatim
+ * at src/_backup-pre-video-splash/ so it can come back.
  *
- * The mark itself (public/logo.png — a swirl, picked from logos.png's set: "start at top like
- * a wheel and turn down like a tornado, blue shine fluorescent," asked for directly) spins for
- * as long as the splash is on screen, echoing the tornado shape rather than sitting still. Also
- * asked for directly: shifted higher in the stage rather than dead-center, sized 200% bigger
- * (3x) than its original 64px, and re-tinted to a random hue on every mount rather than always
- * the same blue — see splash-screen.css's .splash__mark/.splash__mark-logo for the how/why.
+ * The clip is muted, silent and 234 KB: muted+playsInline is what lets a browser autoplay it
+ * at all, and the whole point of a splash is that it is already on screen before anyone waits
+ * for it. public/splash-poster.jpg is its first frame, so something real is visible in the
+ * moment before the video decodes — and stays visible if autoplay is refused or the rider has
+ * asked for reduced motion, in which case the video never plays and the still is the splash.
  *
- * Layout, also asked for directly: the "El Niño Move" wordmark sits at the very top of the
- * stage, in a large font, with the spinning logo below it — so the name reads first and stays
- * visible alongside the animation, rather than being tucked under the logo.
+ * The mark (public/logo.png — a swirl, picked from logos.png's set: "start at top like a wheel
+ * and turn down like a tornado, blue shine fluorescent," asked for directly) spins for as long
+ * as the splash is on screen, which doubles as the loading spinner. Re-tinted to a random hue
+ * on every mount rather than always the same blue — see splash-screen.css's .splash__mark-logo.
  */
 
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import "./splash-screen.css";
 
-const VISIBLE_MS = 4000;
-const FADE_MS = 300;
-
-// Riders bunch up on a real ride — a few small groups strung out along the route, not one
-// rider every few metres. Three clusters near the road route (the SVG path below), 2-3
-// riders each. The one in trouble rides alone, apart from any group — that separation is
-// part of how it reads as "found": everyone else is together, this one isn't.
-const RIDERS: { id: string; x: number; y: number; sos?: boolean }[] = [
-  // Lead group, along the top straight
-  { id: "r1", x: 58, y: 9 },
-  { id: "r2", x: 65, y: 8 },
-  { id: "r3", x: 61, y: 12 },
-
-  // Chase pair, the right-hand straight
-  { id: "r4", x: 89, y: 36 },
-  { id: "r5", x: 91, y: 43 },
-
-  // Group at the back, lower left straight
-  { id: "r6", x: 19, y: 74 },
-  { id: "r7", x: 24, y: 79 },
-  { id: "r8", x: 15, y: 68 },
-
-  // Off on their own, lower right — the one that needs help
-  { id: "r9", x: 77, y: 68, sos: true },
-];
+// The clip is 4.92s and fades to black over its last half second; leaving at 4.9s hands that
+// fade straight over to the app's own. Change one and the other looks wrong.
+const VISIBLE_MS = 4900;
+// Matches the opacity transition in splash-screen.css. The element is removed when the fade
+// has actually finished, not part-way through it.
+const FADE_MS = 500;
 
 export function SplashScreen() {
   const [phase, setPhase] = useState<"visible" | "fading" | "done">("visible");
+  const videoRef = useRef<HTMLVideoElement>(null);
   // A fresh random tint each time the splash mounts ("each time at different color") — picked
   // once per mount, not re-rolled on rerender, and applied via the --logo-hue custom property
   // splash-screen.css's .splash__mark-logo reads (see that file for why it's a CSS var rather
@@ -70,63 +50,47 @@ export function SplashScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    // Autoplay is a request, not a guarantee: a browser can still refuse it, and a rider who
+    // asked for reduced motion should not be handed a moving picture. Either way the poster
+    // frame is already on screen, so there is nothing to fall back to — it simply stays.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    video.play().catch(() => {});
+  }, []);
+
   if (phase === "done") return null;
 
   return (
     <div className={phase === "fading" ? "splash splash--fading" : "splash"} aria-hidden="true">
-      <div className="splash__glow" />
-      <div className="splash__grid" />
+      <video
+        ref={videoRef}
+        className="splash__video"
+        src="/splash.mp4"
+        poster="/splash-poster.jpg"
+        muted
+        playsInline
+        preload="auto"
+        // Not autoPlay: the effect above starts it, so reduced-motion is honoured before the
+        // first frame moves rather than after.
+        tabIndex={-1}
+      />
 
-      <div className="splash__stage">
-        {/* A road route, not a circle: straight segments meeting at angled junctions, plus
-            three short spur roads branching off — reads as a real street map, not a loop
-            drawn with a compass. */}
-        <svg className="splash__track" viewBox="0 0 100 100" aria-hidden="true">
-          <path
-            className="splash__track-glow"
-            d="M50,12 L78,8 L94,30 L90,54 L74,58 L78,82 L52,96 L26,88 L8,64 L14,38 L30,14 Z
-               M78,8 L93,3 M8,64 L-5,58 M52,96 L57,101"
-          />
-          <path
-            className="splash__track-line"
-            d="M50,12 L78,8 L94,30 L90,54 L74,58 L78,82 L52,96 L26,88 L8,64 L14,38 L30,14 Z
-               M78,8 L93,3 M8,64 L-5,58 M52,96 L57,101"
-          />
-        </svg>
-
-        {RIDERS.map((rider, index) => (
-          <span
-            key={rider.id}
-            className={rider.sos ? "splash__dot splash__dot--sos" : "splash__dot"}
-            style={{
-              left: `${rider.x}%`,
-              top: `${rider.y}%`,
-              animationDelay: `${index * 0.2}s`,
-            }}
-          />
-        ))}
-
-        {/* The storm icon stays dead-centre in the track, spinning — independent of the
-            wordmark, which sits up top as a header. */}
-        <div className="splash__logo-wrap">
-          <img
-            className="splash__mark-logo"
-            src="/logo.png"
-            alt=""
-            aria-hidden="true"
-            width={192}
-            height={192}
-            style={{ "--logo-hue": `${logoHue}deg` } as CSSProperties}
-          />
-        </div>
-
-        <div className="splash__mark">
-          {/* data-text feeds the ::after that carries the moving light — see splash-screen.css */}
-          <span className="splash__mark-name" data-text="El Niño Move">
-            El Niño Move
-          </span>
-          <span className="splash__mark-tag">Ride together</span>
-        </div>
+      <div className="splash__mark">
+        <img
+          className="splash__mark-logo"
+          src="/logo.png"
+          alt=""
+          aria-hidden="true"
+          width={192}
+          height={192}
+          style={{ "--logo-hue": `${logoHue}deg` } as CSSProperties}
+        />
+        <span className="splash__mark-name" data-text="El Niño Move">
+          El Niño Move
+        </span>
+        <span className="splash__mark-tag">Find friends. Ride together.</span>
       </div>
     </div>
   );

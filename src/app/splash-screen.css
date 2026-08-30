@@ -1,12 +1,19 @@
 /* SplashScreen. Fixed dark palette on purpose — this is a brand moment, not a themed
- * screen, so it does not follow prefers-color-scheme the way the rest of the app does. */
+ * screen, so it does not follow prefers-color-scheme the way the rest of the app does.
+ *
+ * The stage is now the clip in public/splash.mp4 rather than a drawn scene; what is left
+ * here is the video layer and the mark/wordmark/tagline sitting over its top quarter. The
+ * clip is shown exactly as encoded — nothing is laid over it — so the text carries its own
+ * contrast; see .splash__mark::before and .splash__mark-name below. The drawn version's
+ * rules (glow, grid, road route, rider dots, SOS ping) are kept verbatim in
+ * src/_backup-pre-video-splash/splash-screen.css.bak. */
 
 .splash {
   position: fixed;
   inset: 0;
   z-index: 9999;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow: hidden;
   background: #050b16;
@@ -19,151 +26,76 @@
   pointer-events: none;
 }
 
-.splash__glow {
-  position: absolute;
-  inset: -20%;
-  background: radial-gradient(circle at 50% 45%, rgb(56 189 248 / 0.35), rgb(15 23 42 / 0) 60%);
-  filter: blur(40px);
-  animation: splash-breathe 5s ease-in-out infinite alternate;
-}
-
-.splash__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(0deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px),
-    repeating-linear-gradient(90deg, rgb(56 189 248 / 0.06) 0 1px, transparent 1px 40px);
-  mask-image: radial-gradient(circle at 50% 45%, black 0%, transparent 70%);
-}
-
-.splash__stage {
-  position: relative;
-  width: min(78vw, 320px);
-  aspect-ratio: 1 / 1;
-}
-
-.splash__track {
+/* The clip is portrait (432×674) and `cover` fills whatever shape the device actually is —
+ * cropping the sides on a tall phone, the top and bottom on a laptop. Anchored slightly
+ * above centre so the riders stay in frame rather than sliding off the bottom edge. */
+.splash__video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
-}
-
-.splash__track-glow,
-.splash__track-line {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.splash__track-glow {
-  stroke: #38bdf8;
-  stroke-width: 3.5;
-  opacity: 0.55;
-  filter: blur(3px);
-}
-
-.splash__track-line {
-  stroke: #7dd3fc;
-  stroke-width: 0.8;
-  stroke-dasharray: 2.2 2.6;
-  opacity: 0.9;
-}
-
-/* Riders: literally 3x3 px squares, in real pixels — not SVG units — so they read as small
- * marks on a map at any screen size. Square on purpose, to read as distinct from the round
- * SOS marker below rather than just "a dimmer red dot". */
-.splash__dot {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 1px;
-  background: #fb923c;
-  box-shadow: 0 0 4px rgb(251 146 60 / 0.9);
-  transform: translate(-50%, -50%);
-  animation: splash-pulse 2.4s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .splash__dot {
-    animation: none;
-    opacity: 0.9;
-  }
-}
-
-/* The SOS rider: same red-and-blinking language as the real live-map marker (see AGENT.md
- * > "SOS v1: red blinking marker only"). A small radar ping on top makes it read as "found",
- * not just "different colour". */
-.splash__dot--sos {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #f87171;
-  box-shadow: 0 0 6px rgb(248 113 113 / 0.95);
-  animation: splash-blink 1.1s steps(1, end) infinite;
-}
-
-.splash__dot--sos::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
-  border: 1px solid #f87171;
-  border-radius: 50%;
-  animation: splash-radar 1.6s ease-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .splash__dot--sos {
-    animation: none;
-    opacity: 1;
-  }
-  .splash__dot--sos::after {
-    display: none;
-  }
-}
-
-/* The spinning storm icon — dead-centre of the stage, i.e. the middle of the track. Its own
-   layer so the wordmark can be lifted to the top without dragging the icon with it. */
-.splash__logo-wrap {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: cover;
+  object-position: center 40%;
   pointer-events: none;
 }
 
+/* There is deliberately NO full-screen scrim. Dimming the whole clip to make white text
+ * readable cost the thing the splash is for — bright, open, outdoor footage — so the text
+ * carries its own contrast instead: dark gold lettering, which the sky is plenty bright for
+ * (measured 190-216 luma across the clip's top quarter, never below 110), plus the small
+ * local bloom on .splash__mark below. Nothing is laid over the video itself. */
+
 .splash__mark {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Wordmark sits at the top as a header — asked for directly, repeatedly ("more up"). The
-     icon stays centred in the track via .splash__logo-wrap above, independent of this. */
-  justify-content: flex-start;
-  padding-top: 0;
-  margin-top: -160px;
-  gap: 10px;
+  gap: 8px;
+  /* The top quarter of the screen — asked for directly. It is also the brightest, emptiest
+     part of the frame (open sky), which is what lets the dark lettering below work with no
+     dimming layer at all. */
+  margin-top: 4vh;
+  padding: 0 var(--space-4, 1rem);
   text-align: center;
-  animation: splash-mark-in 900ms ease-out 300ms both;
+  animation: splash-mark-in 900ms ease-out 200ms both;
 }
 
+/* The one piece of background treatment allowed near the video: a soft LIGHT bloom the size of the
+   wordmark, sitting behind the text only. It lifts the local background a little so the ink
+   lettering always has a bright ground — including in the one shot where a dark mountain
+   ridge rises into the top quarter — and reads as lens haze rather than as a panel. Light,
+   never dark: darkening here would be the same mistake as the old full-screen scrim. */
+.splash__mark::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 44%;
+  width: 128%;
+  height: 116%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.28) 42%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  pointer-events: none;
+}
+
+/* The spinning storm icon — this is also the loading spinner; there is no second one. */
 .splash__mark-logo {
-  /* 200% bigger (3x) the original 64px — asked for directly. Sized as min(vw, px) rather than
-     a flat 192px so it stays proportional to .splash__stage (itself min(78vw, 320px)) instead
-     of overflowing a small phone's stage. */
-  width: min(47vw, 192px);
-  height: min(47vw, 192px);
-  /* hue-rotate first so it only re-tints the source artwork, not the drop-shadow's own fixed
-     blue — --logo-hue is a random value SplashScreen.tsx picks fresh per mount ("each time at
-     different color"), falling back to 0 (the original blue) if unset. */
-  filter: hue-rotate(var(--logo-hue, 0deg)) drop-shadow(0 0 14px rgb(56 189 248 / 0.65));
+  /* Smaller than the drawn splash's 192px: there it was the whole picture, here it shares
+     the frame with real footage, and the whole block has to fit inside the top quarter. */
+  width: min(26vw, 104px);
+  height: min(26vw, 104px);
+  /* hue-rotate first so it only re-tints the source artwork, not the shadow — --logo-hue is
+     a random value SplashScreen.tsx picks fresh per mount ("each time at different color"),
+     falling back to 0 (the original blue) if unset. The shadow is dark rather than the old
+     blue glow: a glow reads as light on a dark screen and as haze on a bright one, where what
+     the mark actually needs is an edge. */
+  filter: hue-rotate(var(--logo-hue, 0deg)) drop-shadow(0 3px 8px rgba(4, 18, 32, 0.5));
   animation: splash-logo-spin 1.6s linear infinite;
 }
 
@@ -176,15 +108,34 @@
 .splash__mark-name {
   position: relative;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  /* Big — asked for directly, then "20% bigger". clamp() so it fills the top of the stage on
+  /* Big — asked for directly, then "20% bigger". clamp() so it fills the top of the frame on
      a phone without wrapping "El Niño Move" on the narrowest screens or blowing up on desktop. */
   font-size: clamp(2.3rem, 9.6vw, 3.4rem);
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: 0.01em;
-  /* The wordmark itself is a solid, always-visible colour. */
-  color: #eaf6ff;
-  text-shadow: 0 0 18px rgb(56 189 248 / 0.55);
+  /* Gold, and dark gold at that — not white, and not the bright amber the login screen uses
+     for its accents.
+
+     Why gold: the footage the letters sit on is pale blue sky over green fields, and gold is
+     the one accent that is opposite both, so it separates from the picture without a panel
+     behind it. It also ties this screen to the login screen, which already uses amber for its
+     mark and tagline. Green was the other candidate and was rejected: it lands on top of the
+     meadow's own colour a third of the way down the clip.
+
+     Why dark: brightness is exactly what was wrong before. Bright amber (#f5b942) measures
+     about the same luminance as this sky, so it would be light-on-light — the same
+     unreadability as white, just warmer. The gradient runs from a lit top edge into bronze so
+     it still reads as metal, while its mid tone stays dark enough to hold about 5:1 against
+     the sky, and better than that over the bloom behind it. */
+  color: transparent;
+  background-image: linear-gradient(180deg, #e3a92b 0%, #b9791a 42%, #8a5511 72%, #6b4008 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* drop-shadow rather than text-shadow: with the fill clipped to the glyphs, text-shadow
+     would be drawn from transparent text and show nothing. */
+  filter: drop-shadow(0 1px 0 rgba(255, 250, 235, 0.5))
+    drop-shadow(0 2px 4px rgba(12, 28, 45, 0.45)) drop-shadow(0 6px 18px rgba(12, 28, 45, 0.3));
 }
 
 /* Light Sweep / shimmer: an overlaid copy of the wordmark, clipped to the text, filled with a
@@ -199,9 +150,9 @@
   background-image: linear-gradient(
     110deg,
     transparent 35%,
-    rgb(255 255 255 / 0.9) 48%,
-    rgb(255 255 255 / 1) 50%,
-    rgb(255 255 255 / 0.9) 52%,
+    rgb(255 255 255 / 0.5) 48%,
+    rgb(255 255 255 / 0.72) 50%,
+    rgb(255 255 255 / 0.5) 52%,
     transparent 65%
   );
   background-size: 200% 100%;
@@ -212,7 +163,7 @@
   pointer-events: none;
   /* One soft white bloom so a lit letter reads as a reflection, not a hard edge. Kept gentle
      — cinematic, not flashy. */
-  filter: drop-shadow(0 0 6px rgb(255 255 255 / 0.45));
+  filter: drop-shadow(0 0 5px rgb(255 255 255 / 0.55));
   animation: splash-name-sheen 4.5s ease-in-out 800ms infinite;
 }
 
@@ -224,50 +175,9 @@
 
 .splash__mark-tag {
   font-size: clamp(0.8rem, 3.2vw, 0.95rem);
-  color: #93c5fd;
-}
-
-@keyframes splash-breathe {
-  from {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-
-@keyframes splash-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes splash-blink {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0.25;
-  }
-}
-
-@keyframes splash-radar {
-  from {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(6);
-    opacity: 0;
-  }
+  font-weight: 600;
+  color: #14405f;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
 }
 
 @keyframes splash-logo-spin {

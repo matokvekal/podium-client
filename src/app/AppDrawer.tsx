@@ -61,7 +61,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
         <div className="drawer__header">
           <div className="drawer__brand">
             <div className="drawer__brand-name">El Niño Move</div>
-            <div className="drawer__brand-tag">Every rider, watched over.</div>
+            <div className="drawer__brand-tag">Find friends. Ride together.</div>
           </div>
           <button type="button" className="drawer__close" onClick={onClose} aria-label="Close menu">
             <X aria-hidden="true" />
@@ -114,8 +114,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
 
           {/* Mode + View live in the menu list, no bordered panels — asked for directly. */}
           <label className="drawer__nav-item drawer__nav-item--toggle">
-            <Megaphone aria-hidden="true" />
-            I also organize events
+            <Megaphone aria-hidden="true" />I also organize events
             <input
               type="checkbox"
               className="drawer__nav-check"

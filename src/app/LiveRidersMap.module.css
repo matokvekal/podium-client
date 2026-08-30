@@ -22,9 +22,10 @@
   filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.7);
 }
 
-/* Applied via L.circleMarker's `className` option — blinking red for an SOS rider, same
-   red-and-blinking language as splash-screen.css's .splash__dot--sos and AGENT.md's "SOS v1:
-   red blinking marker only". */
+/* Applied via L.circleMarker's `className` option — blinking red for an SOS rider, the
+   red-and-blinking language of AGENT.md's "SOS v1: red blinking marker only". (The drawn
+   splash screen used to echo it in .splash__dot--sos; that splash is now a video clip, and
+   the rule lives on only in src/_backup-pre-video-splash/splash-screen.css.bak.) */
 :global(.live-rider-sos) {
   animation: live-rider-blink 1.1s steps(1, end) infinite;
 }

@@ -21,6 +21,7 @@
   --chip-hiking: #0f766e;
   --chip-private: #7c3aed;
   --chip-public: #2563eb;
+  --chip-accessible: #0369a1;
 
   /* My Rides border signal: fluorescent blue = an upcoming ride, pink = a past one. Declared
      here (and re-lit for dark below) so the glow colour tracks the theme like the chips do. */
@@ -58,6 +59,7 @@
     --chip-hiking: #2dd4bf;
     --chip-private: #a78bfa;
     --chip-public: #60a5fa;
+    --chip-accessible: #38bdf8;
     --edge-upcoming: #4ddbff;
   }
 }
@@ -70,6 +72,7 @@
   --chip-hiking: #2dd4bf;
   --chip-private: #a78bfa;
   --chip-public: #60a5fa;
+  --chip-accessible: #38bdf8;
   --edge-upcoming: #4ddbff;
 }
 
@@ -311,6 +314,9 @@
 }
 .chip[data-kind="public"] {
   --chip-hue: var(--chip-public);
+}
+.chip[data-kind="accessible"] {
+  --chip-hue: var(--chip-accessible);
 }
 
 .chip {

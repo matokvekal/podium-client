@@ -28,19 +28,19 @@ import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
 import { effectiveLimits } from "../lib/entitlements";
 import {
-  ACCEPTED_IMAGE_ACCEPT,
-  AVATAR_SPEC,
-  COVER_SPEC,
-  type ImageSpec,
-  ImageProcessingError,
-  processIdentityImage,
-} from "../lib/image-processing";
-import {
   AVATAR_DIMENSIONS,
   COVER_DIMENSIONS,
   type IdentityAssetType,
   presetsByCategory,
 } from "../lib/identity-presets";
+import {
+  ACCEPTED_IMAGE_ACCEPT,
+  AVATAR_SPEC,
+  COVER_SPEC,
+  ImageProcessingError,
+  type ImageSpec,
+  processIdentityImage,
+} from "../lib/image-processing";
 import {
   resolveUserAvatar,
   resolveUserCover,
@@ -61,7 +61,11 @@ export function AccountPage() {
   const me = useMyIdentity();
   const [busy, setBusy] = useState(false);
 
-  const avatar = resolveUserAvatar({ avatar: me.avatar }, me.localAvatar, me.seed);
+  const avatar = resolveUserAvatar(
+    { avatar: me.avatar, avatarUrl: me.avatarUrl },
+    me.localAvatar,
+    me.seed,
+  );
   const cover = resolveUserCover({ avatar: me.avatar, cover: me.cover }, me.localCover, me.seed);
   const serverSupports = serverSupportsVisualIdentity(profile);
 
@@ -79,8 +83,8 @@ export function AccountPage() {
           Mode
         </p>
         <p className="muted" style={{ margin: 0 }}>
-          Rider mode keeps things simple. Organizer mode adds the tools to create and manage
-          events. You can switch any time.
+          Rider mode keeps things simple. Organizer mode adds the tools to create and manage events.
+          You can switch any time.
         </p>
         <UserModeToggle />
       </div>
@@ -115,6 +119,7 @@ export function AccountPage() {
           <Avatar
             className={styles.previewAvatar}
             name={me.displayName}
+            avatarUrl={me.avatarUrl}
             identity={me.avatar}
             localSelection={me.localAvatar}
             seed={me.seed}

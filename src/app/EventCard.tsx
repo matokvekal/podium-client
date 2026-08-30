@@ -28,12 +28,23 @@
  *                       being computed, guessed, or silently dropped — see NOT_YET below.
  */
 
-import { Clock, Heart, MapPin, Mountain, Ruler, Timer, UsersRound } from "lucide-react";
+import {
+  Accessibility,
+  Clock,
+  Coffee,
+  Heart,
+  MapPin,
+  Mountain,
+  Ruler,
+  Timer,
+  UsersRound,
+} from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
+import { formatDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalTime } from "../lib/time";
@@ -103,6 +114,10 @@ export function EventCard({
   const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
   const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const riderCount = event.participantCount ?? null;
+  // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
+  // slot that read a hard-coded "soon" until now.
+  const durationText = formatDuration(event.durationMin);
+  const restStops = event.restStops ?? null;
 
   const when = dateParts(event.startsAt);
   // The organizer's own cover when they have one, else this event's local cover, else the
@@ -193,6 +208,16 @@ export function EventCard({
             <span className={styles.chip} data-kind={event.visibility}>
               {event.visibility === "private" ? "Private" : "Public"}
             </span>
+            {event.isAccessible && (
+              <span
+                className={styles.chip}
+                data-kind="accessible"
+                title="The organizer marked this ride suitable for riders who need assistance"
+              >
+                <Accessibility width={12} height={12} aria-hidden="true" />
+                Accessible
+              </span>
+            )}
             {/* "Approval Required" belongs here in the design, but requiresApproval is only on
                 the DETAIL response — the list endpoint does not send it, so a card cannot know.
                 Left out entirely rather than defaulted: rendering "Approval Required" (or its
@@ -212,12 +237,11 @@ export function EventCard({
           <span className={styles.statValue}>{climbM != null ? `${climbM} m` : "—"}</span>
           <span className={styles.statLabel}>Elevation</span>
         </div>
-        {/* Est. time: no duration field exists anywhere — not on the event, not on the route.
-            Deriving one from distance would need an assumed speed, which is exactly the kind of
-            invented number this app does not ship. */}
-        <div className={styles.stat} data-pending="true">
+        {/* Est. time: the organizer's own estimate (events.duration_min, sql/022), never
+            derived from distance. "soon" only while the organizer left it blank. */}
+        <div className={styles.stat} data-pending={durationText ? undefined : "true"}>
           <Timer className={styles.statIcon} aria-hidden="true" />
-          <span className={styles.statValue}>{NOT_YET}</span>
+          <span className={styles.statValue}>{durationText || NOT_YET}</span>
           <span className={styles.statLabel}>Est. Time</span>
         </div>
         <div className={styles.stat}>
@@ -274,6 +298,15 @@ export function EventCard({
           <UsersRound className={styles.footerIcon} aria-hidden="true" />
           {riderCount != null ? riderCount : NOT_YET}
         </span>
+        {restStops != null && (
+          <span
+            className={styles.footerItem}
+            title={`${restStops} rest ${restStops === 1 ? "stop" : "stops"}`}
+          >
+            <Coffee className={styles.footerIcon} aria-hidden="true" />
+            {restStops === 0 ? "No stops" : `${restStops} ${restStops === 1 ? "stop" : "stops"}`}
+          </span>
+        )}
       </div>
     </Link>
   );

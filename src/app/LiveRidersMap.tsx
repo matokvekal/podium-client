@@ -61,6 +61,9 @@ interface LiveRidersMapProps {
   onToggleRider: (id: number) => void;
   /** One-shot recenter request from the parent (Center control / initial framing). */
   recenter: RecenterCommand;
+  /** "dark" applies the Waze-like tile filter; "day" leaves the tiles as the ride page shows
+   * them. The parent owns the toggle + persistence. Defaults to "day". */
+  mapTheme?: "day" | "dark";
 }
 
 export default function LiveRidersMap({
@@ -72,11 +75,16 @@ export default function LiveRidersMap({
   selectedRiderIds,
   onToggleRider,
   recenter,
+  mapTheme = "day",
 }: LiveRidersMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   // Previous fix per rider, so a marker can point the way it's actually moving.
   const prevPositions = useRef<Map<number, [number, number]>>(new Map());
+  // The viewer's own last fix + last real heading — so their arrow keeps pointing the way they
+  // were going even after they stop, rather than snapping back to a plain dot.
+  const prevSelf = useRef<[number, number] | null>(null);
+  const selfHeading = useRef<number | null>(null);
   // Route + self position read via refs inside the recenter effect so that effect depends
   // ONLY on `recenter` (the nonce) and never re-runs — and never re-pans — on a poll tick.
   const routePointsRef = useRef(routePoints);
@@ -118,9 +126,8 @@ export default function LiveRidersMap({
       layers.push(
         L.marker(routePoints[routePoints.length - 1], { icon: finishIcon() }).bindTooltip("Finish"),
       );
-      // Base line = the whole route, kept deliberately light — the travelled overlay below
-      // draws the "done" portion darker on top of it.
-      layers.push(L.polyline(routePoints, { color: "#63a6fc", weight: 3, opacity: 0.45 }));
+      // The route line itself is drawn by the "route line" effect below (split into ahead /
+      // ridden), so nothing is drawn here — only the start/finish markers and the framing.
     }
     for (const layer of layers) layer.addTo(map);
     if (!framedRef.current) {
@@ -175,25 +182,44 @@ export default function LiveRidersMap({
     }
   }, [recenter]);
 
-  // --- travelled-route overlay ----------------------------------------------------------
-  // The creator's own progress: project their real GPS onto the polyline and redraw the
-  // "done" portion darker. Never a straight line — `nearestPointOnRoute` walks the segments.
+  // --- route line: Waze-style, split at the rider's position ---------------------------
+  // One thick, glowing line (the glow is a CSS `filter` on the SVG path — see the
+  // .route-ahead / .route-ridden rules in the CSS module), wide enough to read on the dark
+  // tiles too. The stretch still AHEAD of the rider is fluorescent blue; the stretch already
+  // RIDDEN is pink — the same blue / pink language as the My Rides cards. The split point is
+  // the rider's real GPS projected onto the polyline (`nearestPointOnRoute`, never a straight
+  // line from the start); with no fix yet the whole route is drawn as "ahead".
+  // biome-ignore lint/correctness/useExhaustiveDependencies: routeKey gates routePoints; selfPosition moves the split
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || routePoints.length < 2 || !selfPosition) return;
-    const { index, point } = nearestPointOnRoute(routePoints, selfPosition);
-    if (index < 0) return;
-    const travelled: [number, number][] = [...routePoints.slice(0, index + 1), point];
-    const line = L.polyline(travelled, {
-      color: "#1d4ed8",
-      weight: 6,
-      opacity: 0.95,
-      lineCap: "round",
-    }).addTo(map);
-    return () => {
-      line.remove();
+    if (!map || routePoints.length < 2) return;
+    const layers: L.Polyline[] = [];
+    const draw = (pts: [number, number][], className: string, color: string, weight: number) => {
+      if (pts.length < 2) return;
+      layers.push(
+        L.polyline(pts, {
+          className,
+          color,
+          weight,
+          opacity: 1,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(map),
+      );
     };
-  }, [selfPosition, routePoints]);
+
+    const split = selfPosition ? nearestPointOnRoute(routePoints, selfPosition) : null;
+    if (split && split.index >= 0) {
+      draw([...routePoints.slice(0, split.index + 1), split.point], "route-ridden", "#df4b7b", 5);
+      draw([split.point, ...routePoints.slice(split.index + 1)], "route-ahead", "#1ec8ff", 6);
+    } else {
+      draw(routePoints, "route-ahead", "#1ec8ff", 6);
+    }
+
+    return () => {
+      for (const l of layers) l.remove();
+    };
+  }, [routeKey, selfPosition]);
 
   // --- per-OTHER-rider travelled overlay (unchanged behaviour) --------------------------
   // A lighter green "how far has this rider gotten" hint, from their server odometer. The
@@ -276,7 +302,17 @@ export default function LiveRidersMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selfPosition) return;
-    const marker = L.marker(selfPosition, { icon: selfPositionIcon(), zIndexOffset: 1000 })
+    const prev = prevSelf.current;
+    // Update the heading only once the rider has actually moved ~5 m — GPS jitter while
+    // standing still must not spin the arrow. Once set, it persists through a stop.
+    if (prev && haversineDistanceKm(prev, selfPosition) > 0.005) {
+      selfHeading.current = bearingDeg(prev, selfPosition);
+    }
+    prevSelf.current = selfPosition;
+    const marker = L.marker(selfPosition, {
+      icon: selfPositionIcon(selfHeading.current),
+      zIndexOffset: 1000,
+    })
       .addTo(map)
       .bindTooltip("You");
     return () => {
@@ -298,5 +334,5 @@ export default function LiveRidersMap({
     }
   }, [selectedRiderIds]);
 
-  return <div ref={containerRef} className={styles.map} />;
+  return <div ref={containerRef} className={styles.map} data-theme={mapTheme} />;
 }

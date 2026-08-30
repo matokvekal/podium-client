@@ -97,15 +97,18 @@
  */
 
 import {
+  Accessibility,
   AlertTriangle,
   Bike,
   Check,
   Clock,
+  Coffee,
   Compass,
   Eye,
   FileText,
   Gauge,
   ImagePlus,
+  LifeBuoy,
   Lock,
   Map as MapIcon,
   MapPin,
@@ -115,12 +118,14 @@ import {
   Ruler,
   ShieldCheck,
   Target,
+  Timer,
   Trash2,
   Users
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
+import { SafetySheet } from "../app/SafetySheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { effectiveLimits } from "../lib/entitlements";
@@ -132,6 +137,12 @@ import {
   putCachedEventDetail,
   viewerKey,
 } from "../lib/local-db";
+import {
+  DURATION_PRESETS_MIN,
+  durationInputValue,
+  formatDuration,
+  parseDuration
+} from "../lib/ride-duration";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
 import {
   nextUpcomingSaturdayStart,
@@ -174,6 +185,11 @@ interface ExistingEvent {
    *  else the attached route's climb. Prefills the Climb field in edit mode. See
    *  sql/021-events-elevation-gain.sql. */
   elevationGain?: number | null;
+  /** Organizer-set ride plan (sql/022-event-ride-plan.sql). Absent on an older server / event;
+   *  edit mode then just starts these fields blank. */
+  durationMin?: number | null;
+  restStops?: number | null;
+  isAccessible?: boolean;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -311,6 +327,22 @@ export function EventCreatePage() {
   const [climbM, setClimbMInput] = useState("");
   const [distanceEdited, setDistanceEdited] = useState(false);
   const [climbEdited, setClimbEdited] = useState(false);
+  // Ride plan (sql/022). Duration is a free-text estimate the organizer types ("1", "1.5",
+  // "2:45") — parsed to whole minutes on save via lib/ride-duration.ts, never derived from
+  // distance. `durationEdited` mirrors `climbEdited`: once typed by hand, copying a track stops
+  // overwriting it. Rest stops is a small count (0 = none, null = not stated). Accessible is a
+  // marker the organizer sets for riders who need assistance / adaptive equipment.
+  const [durationInput, setDurationInput] = useState(
+    !isEditing ? durationInputValue(lastDefaults?.durationMin ?? null) : ""
+  );
+  const [durationEdited, setDurationEdited] = useState(false);
+  const [restStops, setRestStops] = useState<number | null>(
+    !isEditing ? (lastDefaults?.restStops ?? null) : null
+  );
+  const [isAccessible, setIsAccessible] = useState(
+    !isEditing ? (lastDefaults?.isAccessible ?? false) : false
+  );
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
   const [organizerGroup, setOrganizerGroupInput] = useState(
@@ -478,6 +510,13 @@ export function EventCreatePage() {
           setClimbEdited(true);
           serverHasElevation = true;
         }
+        // Ride plan — server is the only source (no local-extras fallback for these).
+        if (found.durationMin != null) {
+          setDurationInput(durationInputValue(found.durationMin));
+          setDurationEdited(true);
+        }
+        if (found.restStops != null) setRestStops(found.restStops);
+        setIsAccessible(found.isAccessible ?? false);
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -601,6 +640,14 @@ export function EventCreatePage() {
     // in by hand before picking a track.
     if (!location.trim()) setLocation(event.location ?? "");
     if (!area.trim()) setArea(event.area ?? "");
+    // Ride plan carries over as the default too — "if user copy track from other you may copy
+    // this also as default time". Same rule as everything else here: only when the organizer
+    // hasn't already set it by hand.
+    if (!durationEdited && !durationInput.trim() && event.durationMin != null) {
+      setDurationInput(durationInputValue(event.durationMin));
+    }
+    if (restStops === null && event.restStops != null) setRestStops(event.restStops);
+    if (event.isAccessible) setIsAccessible(true);
     const sourceExtras = extrasByEvent[event.id];
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
@@ -838,6 +885,11 @@ export function EventCreatePage() {
     const elevationGainM =
       Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
 
+    // Ride plan, all sent on the create/edit request itself so the server persists them
+    // (events.duration_min / rest_stops / is_accessible). `null` = not stated; an unparseable
+    // duration string is simply treated as not stated rather than blocking the save.
+    const durationMin = parseDuration(durationInput);
+
     setBusy(true);
     setError(null);
     try {
@@ -863,7 +915,11 @@ export function EventCreatePage() {
             // The organizer's effective elevation gain — authoritative, server-persisted,
             // survives logout/login and shows the same on every device. `null` clears it
             // (falls back to the attached route's climb).
-            elevationGainM
+            elevationGainM,
+            // Ride plan — server columns (sql/022). `null` clears duration / rest stops.
+            durationMin,
+            restStops,
+            isAccessible
           }
         });
         await saveExtras(eventId);
@@ -910,6 +966,11 @@ export function EventCreatePage() {
           // null when neither. Server persists it as events.elevation_gain_m; every viewer and
           // a post-logout reload then see this exact number.
           elevationGainM,
+          // Ride plan — server columns (sql/022). Persisted, so every viewer's card fills its
+          // "Est. Time" slot and shows the accessibility marker without a device-local copy.
+          durationMin,
+          restStops,
+          isAccessible,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -935,7 +996,10 @@ export function EventCreatePage() {
         organizerGroup,
         visibility,
         requiresApproval,
-        ridersListVisible
+        ridersListVisible,
+        durationMin,
+        restStops,
+        isAccessible
       });
       // Small delayed success state before redirecting home: requested as a short green
       // confirmation moment, not an instant route jump right after tapping Save.
@@ -1461,6 +1525,82 @@ export function EventCreatePage() {
                 </div>
               </div>
 
+              {/* Ride plan — how long the ride runs and how many rest/regroup stops it has.
+                  Duration is a free-text estimate ("1", "1.5", "2:45"); the quick chips just
+                  pre-fill common values. Parsed to minutes on save (lib/ride-duration.ts),
+                  shown in the card / detail "Est. Time" slot. Never derived from distance. */}
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="durationInput">
+                    <Timer aria-hidden="true" />
+                    Ride time
+                  </label>
+                  <input
+                    id="durationInput"
+                    inputMode="text"
+                    className={styles.input}
+                    value={durationInput}
+                    placeholder="e.g. 1, 1.5, 2:45"
+                    onChange={(e) => {
+                      setDurationInput(e.target.value);
+                      setDurationEdited(true);
+                    }}
+                  />
+                  <div
+                    className={styles.comms}
+                    style={{ marginTop: "var(--space-2)" }}
+                  >
+                    {DURATION_PRESETS_MIN.map((min) => {
+                      const label = durationInputValue(min);
+                      return (
+                        <button
+                          key={min}
+                          type="button"
+                          className={styles.commsOption}
+                          data-active={parseDuration(durationInput) === min}
+                          onClick={() => {
+                            setDurationInput(label);
+                            setDurationEdited(true);
+                          }}
+                        >
+                          {formatDuration(min)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {durationInput.trim() && parseDuration(durationInput) == null && (
+                    <p className={styles.hint}>
+                      Couldn't read that — try 1, 1.5 or 2:45.
+                    </p>
+                  )}
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="restStops">
+                    <Coffee aria-hidden="true" />
+                    Rest stops
+                  </label>
+                  <input
+                    id="restStops"
+                    type="number"
+                    min="0"
+                    max="20"
+                    step="1"
+                    className={styles.input}
+                    value={restStops ?? ""}
+                    placeholder="none"
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      if (!v) {
+                        setRestStops(null);
+                        return;
+                      }
+                      const n = Math.max(0, Math.min(20, Math.round(Number(v))));
+                      setRestStops(Number.isFinite(n) ? n : null);
+                    }}
+                  />
+                </div>
+              </div>
+
               <fieldset className={styles.panel} style={{ border: "none" }}>
                 <legend
                   className={styles.fieldLabel}
@@ -1534,9 +1674,46 @@ export function EventCreatePage() {
                     Riders list visible
                   </span>
                 </label>
+                {/* Accessibility marker — the organizer's claim that the ride is planned for
+                    riders who need assistance or adaptive equipment. A browsing rider who needs
+                    that sees it as a chip on the card / detail. */}
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={isAccessible}
+                    onChange={(e) => setIsAccessible(e.target.checked)}
+                  />
+                  <span
+                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
+                  >
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${isAccessible ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {isAccessible ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <Accessibility aria-hidden="true" />
+                    Suitable for riders who need assistance
+                  </span>
+                </label>
               </fieldset>
             </div>
           </div>
+
+          {/* Safety checklist — a small link, opens a sheet with the basic pre-ride kit. Not a
+              form field: it disturbs nothing, it's just there for the organizer (and shown
+              again on the event page for riders). */}
+          <button
+            type="button"
+            className={styles.safetyLink}
+            onClick={() => setSafetyOpen(true)}
+          >
+            <LifeBuoy aria-hidden="true" size={15} />
+            Safety checklist
+          </button>
 
           {/* Event cover — disabled for now. The event automatically uses the organizer's own
               profile cover photo (see app/useOwnerCover.ts / eventCoverBackground), so there is
@@ -1625,6 +1802,8 @@ export function EventCreatePage() {
             onClose={() => setCopySheetOpen(false)}
           />
         )}
+
+        {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
       </div>
     </section>
   );

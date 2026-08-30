@@ -17,8 +17,8 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { applyColorTheme, type ColorTheme, getInitialColorTheme } from "../lib/color-theme";
 import { apiRequest } from "../lib/api-client";
+import { applyColorTheme, type ColorTheme, getInitialColorTheme } from "../lib/color-theme";
 import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
@@ -125,6 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Avatar
               className="identity-avatar"
               name={me.displayName}
+              avatarUrl={me.avatarUrl}
               identity={me.avatar}
               localSelection={me.localAvatar}
               seed={me.seed}

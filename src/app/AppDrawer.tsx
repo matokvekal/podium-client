@@ -74,6 +74,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               <Avatar
                 className="identity-avatar"
                 name={me.displayName}
+                avatarUrl={me.avatarUrl}
                 identity={me.avatar}
                 localSelection={me.localAvatar}
                 seed={me.seed}
@@ -125,7 +126,8 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
 
           <button
             type="button"
-            className="drawer__nav-item"
+            className="drawer__nav-item drawer__theme-toggle"
+            data-theme={colorTheme}
             onClick={onToggleColorTheme}
             aria-label={colorTheme === "day" ? "Switch to dark mode" : "Switch to day mode"}
           >

@@ -20,6 +20,9 @@ export interface MyIdentity {
   userId: number | null;
   /** "Guest" when signed out, else nickname, else "First Last", else "Rider". */
   displayName: string;
+  /** The Google profile photo (profile.avatarUrl). Null until the server populates it. Below
+   * a chosen avatar in the chain — see lib/user-identity.ts's resolveUserAvatar. */
+  avatarUrl: string | null;
   /** The server-side avatar choice. Absent until the server carries one. */
   avatar: UserVisualAsset | null | undefined;
   cover: UserVisualAsset | null | undefined;
@@ -47,6 +50,7 @@ export function useMyIdentity(): MyIdentity {
     signedIn,
     userId,
     displayName: signedIn ? profile?.nickname?.trim() || fullName || "Rider" : "Guest",
+    avatarUrl: profile?.avatarUrl ?? null,
     avatar: profile?.avatar,
     cover: profile?.cover,
     localAvatar: local.avatar,

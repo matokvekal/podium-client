@@ -37,6 +37,14 @@ export interface Profile {
   emergencyPhone: string | null;
   requiresProfile: boolean;
   /**
+   * The Google profile photo, straight from the sign-in token — the same flat field every
+   * event/participant endpoint already sends for OTHER people (see EventOwner.avatarUrl in
+   * lib/local-db.ts). Optional because the server does not populate `users.avatar_url` on the
+   * /users/me response yet (plan/server-tasks.md §1); null for a rider who signed in another
+   * way. Sits BELOW a chosen avatar/preset in the resolution chain — see lib/user-identity.ts.
+   */
+  avatarUrl?: string | null;
+  /**
    * This rider's own avatar and cover (lib/user-identity.ts). Optional because GET /users/me
    * does not send them yet — and the client must not require them: a profile without these
    * keys is a perfectly valid profile, and every surface falls back to what it shows today.

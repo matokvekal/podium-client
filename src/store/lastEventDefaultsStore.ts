@@ -20,6 +20,12 @@ export interface LastEventDefaults {
   visibility: "public" | "private";
   requiresApproval: boolean;
   ridersListVisible: boolean;
+  /** Ride-plan fields (sql/022) — a recurring ride tends to keep the same length, stops and
+   *  accessibility, so carry them forward too. All optional so an older persisted blob (before
+   *  these existed) still loads. */
+  durationMin?: number | null;
+  restStops?: number | null;
+  isAccessible?: boolean;
 }
 
 interface LastEventDefaultsState {

@@ -35,9 +35,11 @@ import {
   ArrowLeft,
   Check,
   LocateFixed,
+  Moon,
   Navigation,
   Radio,
   Share2,
+  Sun,
   UsersRound,
   WifiOff,
   X,
@@ -168,6 +170,23 @@ export function LiveEventPage() {
   // One-shot recenter request handed to the map. nonce 0 = "never asked" (the map frames the
   // route itself on mount). mode picks the target when we DO ask.
   const [recenter, setRecenter] = useState<RecenterCommand>({ nonce: 0, mode: "route" });
+
+  // Day / dark tiles, toggled from the control stack. Defaults to "day" — the same plain OSM
+  // tiles the ride page shows — and is remembered per device.
+  const [mapTheme, setMapTheme] = useState<"day" | "dark">(() => {
+    try {
+      return localStorage.getItem("elnino.live-map-theme") === "dark" ? "dark" : "day";
+    } catch {
+      return "day";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("elnino.live-map-theme", mapTheme);
+    } catch {
+      /* storage unavailable — the choice just isn't remembered */
+    }
+  }, [mapTheme]);
 
   const prevFixRef = useRef<Map<number, { distanceKm: number; at: number }>>(new Map());
   const [riderSpeeds, setRiderSpeeds] = useState<Map<number, number>>(new Map());
@@ -520,6 +539,7 @@ export function LiveEventPage() {
           selectedRiderIds={selectedRiderIds}
           onToggleRider={toggleRider}
           recenter={recenter}
+          mapTheme={mapTheme}
         />
       </Suspense>
 
@@ -571,6 +591,16 @@ export function LiveEventPage() {
 
       {/* --- the control stack (few, large, one tap) -------------------------------- */}
       <div className={styles.controls}>
+        <button
+          type="button"
+          className={styles.control}
+          onClick={() => setMapTheme((t) => (t === "day" ? "dark" : "day"))}
+          aria-label={mapTheme === "day" ? "Switch to dark map" : "Switch to day map"}
+        >
+          {mapTheme === "day" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
+          <span className={styles.controlLabel}>{mapTheme === "day" ? "Dark" : "Day"}</span>
+        </button>
+
         <button
           type="button"
           className={styles.control}

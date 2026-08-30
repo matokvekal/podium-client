@@ -42,9 +42,12 @@
  */
 
 import {
+  Accessibility,
   CalendarDays,
   CheckCircle2,
   Circle,
+  Coffee,
+  LifeBuoy,
   MapPin,
   Mountain,
   Navigation,
@@ -63,6 +66,7 @@ import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
 import { LiveTracking } from "../app/LiveTracking";
+import { SafetySheet } from "../app/SafetySheet";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -83,6 +87,7 @@ import {
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { FALLBACK_LIMITS } from "../lib/plan-limits";
+import { formatDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
@@ -325,6 +330,7 @@ export function EventDetailPage() {
   const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -974,6 +980,10 @@ export function EventDetailPage() {
   const climbM =
     event.elevationGain ?? extras.climbM ?? event.climbM ?? results?.route?.elevationM ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
+  // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
+  // tile that read a hard-coded "soon" until now; rest stops / accessibility show as chips.
+  const durationText = formatDuration(event.durationMin);
+  const restStops = event.restStops ?? null;
   // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
   // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
   // under), but the avatar only ever comes from a real account, never from a club string.
@@ -1141,8 +1151,8 @@ export function EventDetailPage() {
             </span>
             <span className={styles.statTileLabel}>{levelHeadingFor(activityType)}</span>
           </div>
-          <div className={styles.statTile} data-pending>
-            <span className={styles.statTileValue}>soon</span>
+          <div className={styles.statTile} data-pending={durationText ? undefined : true}>
+            <span className={styles.statTileValue}>{durationText || "soon"}</span>
             <span className={styles.statTileLabel}>Est. Time</span>
           </div>
           <div className={styles.statTile} data-pending={!forecast || undefined}>
@@ -1173,6 +1183,28 @@ export function EventDetailPage() {
           <span className={styles.chip} data-kind={event.visibility}>
             {event.visibility === "private" ? "Private" : "Public"}
           </span>
+          {event.isAccessible && (
+            <span
+              className={styles.chip}
+              data-kind="accessible"
+              title="The organizer marked this ride suitable for riders who need assistance"
+            >
+              <Accessibility width={13} height={13} aria-hidden="true" />
+              Accessible
+            </span>
+          )}
+          {restStops != null && (
+            <span
+              className={styles.chip}
+              data-kind="rest"
+              title="Planned rest / regroup stops"
+            >
+              <Coffee width={13} height={13} aria-hidden="true" />
+              {restStops === 0
+                ? "No rest stops"
+                : `${restStops} rest ${restStops === 1 ? "stop" : "stops"}`}
+            </span>
+          )}
           {event.requiresApproval && (
             <span
               className={styles.chip}
@@ -1206,6 +1238,17 @@ export function EventDetailPage() {
             </span>
           )}
         </div>
+
+        {/* Safety checklist — a quiet link, same sheet the create form opens. Basic pre-ride
+            kit; disturbs nothing on the page. */}
+        <button
+          type="button"
+          className={styles.safetyLink}
+          onClick={() => setSafetyOpen(true)}
+        >
+          <LifeBuoy aria-hidden="true" width={15} height={15} />
+          Safety checklist
+        </button>
 
         {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
             live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
@@ -1799,6 +1842,8 @@ export function EventDetailPage() {
           />
         </Suspense>
       )}
+
+      {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

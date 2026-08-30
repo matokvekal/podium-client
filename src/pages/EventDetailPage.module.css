@@ -868,6 +868,8 @@
   --chip-private: #7c3aed;
   --chip-public: #2563eb;
   --chip-approval: #c2410c;
+  --chip-accessible: #0369a1;
+  --chip-rest: #7c3aed;
 
   display: flex;
   align-items: center;
@@ -885,6 +887,8 @@
     --chip-private: #a78bfa;
     --chip-public: #60a5fa;
     --chip-approval: #fb923c;
+    --chip-accessible: #38bdf8;
+    --chip-rest: #c4b5fd;
   }
 }
 
@@ -897,6 +901,8 @@
   --chip-private: #a78bfa;
   --chip-public: #60a5fa;
   --chip-approval: #fb923c;
+  --chip-accessible: #38bdf8;
+  --chip-rest: #c4b5fd;
 }
 
 .chip {
@@ -938,6 +944,12 @@
 .chip[data-kind="approval"] {
   --chip-hue: var(--chip-approval);
 }
+.chip[data-kind="accessible"] {
+  --chip-hue: var(--chip-accessible);
+}
+.chip[data-kind="rest"] {
+  --chip-hue: var(--chip-rest);
+}
 .chip[data-kind="cancelled"] {
   --chip-hue: var(--status-danger);
 }
@@ -946,6 +958,23 @@
 }
 .chip[data-kind="full"] {
   --chip-hue: var(--status-danger);
+}
+
+/* "Safety checklist" — a quiet inline link under the chip row, not a button-styled control. */
+.safetyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent, #2563eb);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* --- stat strip -------------------------------------------------------------------------- */

@@ -92,16 +92,33 @@ export function riderSquareIcon(
   });
 }
 
-/** The viewer's own device position — a distinct blue "you are here" dot, never confused with
- * a rider square or the red SOS marker. Shown while this rider is sharing location; that
+/**
+ * The viewer's own device position — a distinct blue "you are here" marker, never confused
+ * with a rider square or the red SOS marker. Shown while this rider is sharing location; that
  * sharing now also transmits to the server (app/useLocationBroadcast.ts) — see
- * ELNINO_CLIENT_AGENT_SOURCE_OF_TRUTH.md §14. */
-export function selfPositionIcon(): L.DivIcon {
+ * ELNINO_CLIENT_AGENT_SOURCE_OF_TRUTH.md §14.
+ *
+ * With a known heading it is a Google-/Waze-style navigation arrow (a chevron pointing the way
+ * the rider is moving) sitting in a soft accuracy halo; with no heading yet — first fix, or
+ * standing still — it falls back to the classic pulsing dot so it never points a made-up way.
+ */
+export function selfPositionIcon(headingDeg: number | null = null): L.DivIcon {
+  const halo = `<div style="position:absolute;inset:0;border-radius:50%;background:rgba(66,133,244,.18);box-shadow:0 0 0 3px rgba(66,133,244,.12);"></div>`;
+
+  const core =
+    headingDeg != null
+      ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(${headingDeg}deg);transform-origin:50% 50%;">
+          <svg width="26" height="26" viewBox="0 0 26 26" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">
+            <path d="M13 2 L20.5 21 L13 16.5 L5.5 21 Z" fill="#4285f4" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+        </div>`
+      : `<div style="position:absolute;top:50%;left:50%;width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;background:#4285f4;border:2px solid #fff;box-shadow:0 0 0 4px rgba(66,133,244,.35);"></div>`;
+
   return L.divIcon({
     className: "podium-map-icon",
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:#4285f4;border:2px solid #fff;box-shadow:0 0 0 4px rgba(66,133,244,.35);"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: `<div style="position:relative;width:30px;height:30px;">${halo}${core}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   });
 }
 

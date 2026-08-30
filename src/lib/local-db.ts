@@ -109,6 +109,16 @@ export interface EventSummary {
   /** @deprecated device-local mirror of climb (store/eventExtrasStore.ts) — read
    *  `elevationGain` first. Kept so an older cached row still resolves. */
   climbM?: number;
+  /**
+   * Organizer-set ride plan, sent by GET /events and GET /events/:id (server's toEventSummary,
+   * sql/022-event-ride-plan.sql). `durationMin` fills the card's "Est. Time" slot; `restStops`
+   * is the number of rest/regroup stops (0 = none); `isAccessible` marks a ride planned for
+   * riders who need assistance. Optional: a cached row or an older server omits duration/stops
+   * (card shows a dash) and isAccessible defaults false.
+   */
+  durationMin?: number | null;
+  restStops?: number | null;
+  isAccessible?: boolean;
 }
 
 /** "mine" — GET /events?filter=, signed in. "guest" — GET /events/public, signed out. */

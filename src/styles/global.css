@@ -360,6 +360,19 @@ textarea {
   color: var(--accent);
 }
 
+/* Day/night switch: the icon glows in its own light. In day mode it shows a moon — pale
+   yellow-white moonlight; in dark mode a sun — warm amber. data-theme is the CURRENT theme,
+   which is also which icon is showing (moon while in day, sun while in dark). */
+.drawer__theme-toggle[data-theme="day"] svg {
+  color: #efe3a4;
+  filter: drop-shadow(0 0 4px rgba(239, 227, 164, 0.55));
+}
+
+.drawer__theme-toggle[data-theme="dark"] svg {
+  color: #f7b733;
+  filter: drop-shadow(0 0 5px rgba(247, 183, 51, 0.6));
+}
+
 .drawer__footer {
   margin-top: auto;
   padding: var(--space-2);

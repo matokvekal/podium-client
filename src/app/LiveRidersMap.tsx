@@ -37,7 +37,15 @@ import {
 import type { LiveRider } from "../lib/live-types";
 import { formatAge } from "../lib/time";
 import styles from "./LiveRidersMap.module.css";
-import { bearingDeg, finishIcon, riderSquareIcon, selfPositionIcon, startIcon } from "./map-icons";
+import {
+  bearingDeg,
+  finishIcon,
+  riderSquareIcon,
+  routeArrowIndices,
+  routeDirectionArrowIcon,
+  selfPositionIcon,
+  startIcon,
+} from "./map-icons";
 
 export interface RecenterCommand {
   /** Bumped by the parent every time the Center control is tapped; 0 means "never asked". */
@@ -127,7 +135,19 @@ export default function LiveRidersMap({
         L.marker(routePoints[routePoints.length - 1], { icon: finishIcon() }).bindTooltip("Finish"),
       );
       // The route line itself is drawn by the "route line" effect below (split into ahead /
-      // ridden), so nothing is drawn here — only the start/finish markers and the framing.
+      // ridden). Here we add only the start/finish markers, the framing, and the sparse
+      // amber direction chevrons — those follow the ROUTE, not the rider, so they belong on
+      // this route-identity effect rather than the per-fix one.
+      for (const i of routeArrowIndices(routePoints.length)) {
+        const heading = bearingDeg(routePoints[i - 1], routePoints[i + 1]);
+        layers.push(
+          L.marker(routePoints[i], {
+            icon: routeDirectionArrowIcon(heading),
+            interactive: false,
+            keyboard: false,
+          }),
+        );
+      }
     }
     for (const layer of layers) layer.addTo(map);
     if (!framedRef.current) {
@@ -185,10 +205,10 @@ export default function LiveRidersMap({
   // --- route line: Waze-style, split at the rider's position ---------------------------
   // One thick, glowing line (the glow is a CSS `filter` on the SVG path — see the
   // .route-ahead / .route-ridden rules in the CSS module), wide enough to read on the dark
-  // tiles too. The stretch still AHEAD of the rider is fluorescent blue; the stretch already
-  // RIDDEN is pink — the same blue / pink language as the My Rides cards. The split point is
-  // the rider's real GPS projected onto the polyline (`nearestPointOnRoute`, never a straight
-  // line from the start); with no fix yet the whole route is drawn as "ahead".
+  // tiles too. All one hue on purpose (asked for directly): the stretch still AHEAD of the
+  // rider is a light glowing blue, the stretch already RIDDEN is a deeper, darker blue. The
+  // split point is the rider's real GPS projected onto the polyline (`nearestPointOnRoute`,
+  // never a straight line from the start); with no fix yet the whole route is drawn as "ahead".
   // biome-ignore lint/correctness/useExhaustiveDependencies: routeKey gates routePoints; selfPosition moves the split
   useEffect(() => {
     const map = mapRef.current;
@@ -210,7 +230,7 @@ export default function LiveRidersMap({
 
     const split = selfPosition ? nearestPointOnRoute(routePoints, selfPosition) : null;
     if (split && split.index >= 0) {
-      draw([...routePoints.slice(0, split.index + 1), split.point], "route-ridden", "#df4b7b", 5);
+      draw([...routePoints.slice(0, split.index + 1), split.point], "route-ridden", "#1d4ed8", 5);
       draw([split.point, ...routePoints.slice(split.index + 1)], "route-ahead", "#1ec8ff", 6);
     } else {
       draw(routePoints, "route-ahead", "#1ec8ff", 6);

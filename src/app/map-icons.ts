@@ -34,6 +34,19 @@ export function directionArrowIndices(pointCount: number): number[] {
     .filter((i) => i > 0 && i < pointCount - 1);
 }
 
+/** Evenly-spaced indices for the direction chevrons along the LIVE route — denser than
+ * directionArrowIndices (that one is for the small static preview map), still capped so a
+ * long route never spawns hundreds of markers. */
+export function routeArrowIndices(pointCount: number, count = 9): number[] {
+  if (pointCount < 4) return [];
+  const out = new Set<number>();
+  for (let k = 1; k <= count; k++) {
+    const i = Math.round((k / (count + 1)) * (pointCount - 1));
+    if (i > 0 && i < pointCount - 1) out.add(i);
+  }
+  return [...out];
+}
+
 export function startIcon(headingDeg: number, color = "#3edda4"): L.DivIcon {
   return L.divIcon({
     className: "podium-map-icon",
@@ -64,6 +77,20 @@ export function directionArrowIcon(headingDeg: number, color = "#63a6fc"): L.Div
     </svg>`,
     iconSize: [13, 13],
     iconAnchor: [6, 6],
+  });
+}
+
+/** Small direction chevrons dropped along the live route so the way it runs reads at a glance
+ * on both the day and dark map — a visible amber, dark-outlined so it never sinks into either
+ * background. Kept small on purpose (asked for directly: "arows smals ... seen color"). */
+export function routeDirectionArrowIcon(headingDeg: number): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<svg width="15" height="15" viewBox="0 0 16 16" style="transform:rotate(${headingDeg}deg);filter:drop-shadow(0 0 1.5px rgba(0,0,0,.85));">
+      <path d="M8 1.5 L14 14 L8 10.5 L2 14 Z" fill="#ffd23f" stroke="#1a1a1a" stroke-width="1" stroke-linejoin="round" />
+    </svg>`,
+    iconSize: [15, 15],
+    iconAnchor: [7.5, 7.5],
   });
 }
 

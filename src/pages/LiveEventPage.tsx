@@ -55,9 +55,10 @@ import {
 } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
-import { placeholderColorVar } from "../app/event-visuals";
+import { initialOf, placeholderColorVar } from "../app/event-visuals";
 import type { RecenterCommand } from "../app/LiveRidersMap";
 import { useLocationBroadcast } from "../app/useLocationBroadcast";
+import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
@@ -78,7 +79,7 @@ import {
 import { isLocationManuallyStopped } from "../lib/location-broadcast";
 import { formatAge } from "../lib/time";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
-import type { UserVisualAsset } from "../lib/user-identity";
+import { resolveUserAvatar, type UserVisualAsset } from "../lib/user-identity";
 import { type EventGroup, useEventGroupsStore } from "../store/eventGroupsStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./LiveEventPage.module.css";
@@ -140,6 +141,17 @@ export function LiveEventPage() {
   const { eventId } = useParams();
   const { profile } = useAuth();
   const viewerId = viewerKey(profile?.id);
+
+  // The viewer's own face for their position marker on the map — the same resolution chain the
+  // header avatar uses (chosen upload/preset → Google photo → nothing). Null falls back to the
+  // initial inside the marker.
+  const me = useMyIdentity();
+  const selfAvatarUrl = resolveUserAvatar(
+    { avatar: me.avatar, avatarUrl: me.avatarUrl },
+    me.localAvatar,
+    me.seed,
+  ).url;
+  const selfInitial = initialOf(me.displayName);
   const reconnectNonce = useConnectivityStore((s) => s.reconnectNonce);
   const serverReachable = useConnectivityStore((s) => s.serverReachable);
   const online = useOnlineStatus();
@@ -340,18 +352,9 @@ export function LiveEventPage() {
     };
   }, [eventId]);
 
-  // Seed a non-owner's rider selection from the roster once it arrives (owners poll everyone).
-  const seededSelection = useRef(false);
-  useEffect(() => {
-    if (isOwner || seededSelection.current) return;
-    if (!roster || roster.length === 0) return;
-    seededSelection.current = true;
-    const meId = event?.myParticipant?.id ?? null;
-    const ids = roster.map((r) => r.id);
-    const ordered =
-      meId != null && ids.includes(meId) ? [meId, ...ids.filter((id) => id !== meId)] : ids;
-    setSelectedRiderIds(ordered.slice(0, MAX_RIDERS_FOR_NON_OWNER));
-  }, [isOwner, roster, event?.myParticipant?.id]);
+  // A non-owner's rider selection is deliberately left empty: the "track other riders" picker
+  // is hidden for them for now (see the riders sheet below), so they only ever see the route
+  // and their own position. Owners poll everyone regardless of this list.
 
   // Initial framing: a participating creator with a real fix gets centred on themselves ONCE.
   // Everyone else keeps the route framing the map does on mount. Never re-fires (ref-guarded),
@@ -535,6 +538,8 @@ export function LiveEventPage() {
           routePoints={results?.route?.points ?? []}
           selfPosition={selfPosition}
           selfParticipantId={event.myParticipant?.id ?? null}
+          selfAvatarUrl={selfAvatarUrl}
+          selfInitial={selfInitial}
           showOthers={showOthers}
           selectedRiderIds={selectedRiderIds}
           onToggleRider={toggleRider}
@@ -707,30 +712,32 @@ export function LiveEventPage() {
 
         {sheetTab === "riders" ? (
           <div className={styles.sheetBody}>
-            <div className={styles.sheetActions}>
-              <label className={styles.showOthersToggle}>
-                <input
-                  type="checkbox"
-                  checked={showOthers}
-                  onChange={(e) => setShowOthers(e.target.checked)}
-                />
-                Show others on map
-              </label>
-              {roster && roster.length > 0 && (
-                <button type="button" className={styles.linkBtn} onClick={selectAllRiders}>
-                  Select all
-                </button>
-              )}
-              {selectedRiderIds.length > 0 && (
-                <button
-                  type="button"
-                  className={styles.linkBtn}
-                  onClick={() => setSelectedRiderIds([])}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+            {isOwner && (
+              <div className={styles.sheetActions}>
+                <label className={styles.showOthersToggle}>
+                  <input
+                    type="checkbox"
+                    checked={showOthers}
+                    onChange={(e) => setShowOthers(e.target.checked)}
+                  />
+                  Show others on map
+                </label>
+                {roster && roster.length > 0 && (
+                  <button type="button" className={styles.linkBtn} onClick={selectAllRiders}>
+                    Select all
+                  </button>
+                )}
+                {selectedRiderIds.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.linkBtn}
+                    onClick={() => setSelectedRiderIds([])}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             {rosterNote && !roster && <p className="muted">{rosterNote}</p>}
             {roster && roster.length === 0 && <p className="muted">No one has joined yet.</p>}
@@ -753,22 +760,27 @@ export function LiveEventPage() {
                     selfPosition && live?.lat != null && live.lng != null
                       ? haversineDistanceKm(selfPosition, [live.lat, live.lng])
                       : null;
+                  // A non-owner gets a read-only roster: no checkbox, no tracking. The row is a
+                  // plain <div> for them, a <label> wrapping the select checkbox for the owner.
+                  const RowTag = isOwner ? "label" : "div";
                   return (
-                    <label
+                    <RowTag
                       key={r.id}
                       className={styles.riderRow}
                       data-selected={selected || undefined}
                       data-disabled={disabled || undefined}
                     >
-                      <span className={styles.riderCheckbox} data-checked={selected}>
-                        {selected && <Check width={13} height={13} aria-hidden="true" />}
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          disabled={disabled}
-                          onChange={() => toggleRider(r.id)}
-                        />
-                      </span>
+                      {isOwner && (
+                        <span className={styles.riderCheckbox} data-checked={selected}>
+                          {selected && <Check width={13} height={13} aria-hidden="true" />}
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={disabled}
+                            onChange={() => toggleRider(r.id)}
+                          />
+                        </span>
+                      )}
                       <span
                         className={styles.riderDot}
                         style={{ background: placeholderColorVar(String(r.id)) }}
@@ -790,13 +802,15 @@ export function LiveEventPage() {
                           </span>
                           {isLeader && <span className={styles.leaderBadge}>Leader</span>}
                         </span>
-                        <span className={styles.riderSub}>
-                          {live?.lat != null
-                            ? `${speed != null ? `${speed.toFixed(1)} km/h` : "—"} · ${live.distanceKm?.toFixed(1) ?? "—"} km${live.recordedAt ? ` · ${formatAge(live.recordedAt)}` : ""}${distanceFromMe != null ? ` · ${distanceFromMe.toFixed(1)} km from you` : ""}`
-                            : selected
-                              ? "waiting for a fix…"
-                              : "tap to track"}
-                        </span>
+                        {(isOwner || live?.lat != null) && (
+                          <span className={styles.riderSub}>
+                            {live?.lat != null
+                              ? `${speed != null ? `${speed.toFixed(1)} km/h` : "—"} · ${live.distanceKm?.toFixed(1) ?? "—"} km${live.recordedAt ? ` · ${formatAge(live.recordedAt)}` : ""}${distanceFromMe != null ? ` · ${distanceFromMe.toFixed(1)} km from you` : ""}`
+                              : selected
+                                ? "waiting for a fix…"
+                                : "tap to track"}
+                          </span>
+                        )}
                       </span>
                       {live?.distanceKm != null && (
                         <span className={styles.riderStats}>
@@ -812,7 +826,7 @@ export function LiveEventPage() {
                           </span>
                         </span>
                       )}
-                    </label>
+                    </RowTag>
                   );
                 })}
               </div>

@@ -63,10 +63,10 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
-import { useOwnerAvatar } from "../app/useOwnerAvatar";
-import { useOwnerCover } from "../app/useOwnerCover";
 import { LiveTracking } from "../app/LiveTracking";
 import { SafetySheet } from "../app/SafetySheet";
+import { useOwnerAvatar } from "../app/useOwnerAvatar";
+import { useOwnerCover } from "../app/useOwnerCover";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -975,8 +975,7 @@ export function EventDetailPage() {
   // number the list card shows and the Edit form prefills, so all three agree. The device-
   // local copy (extras) and the separately-fetched route are only fallbacks for the instant
   // before the detail resolves / an older server. Null when none exists — the tile isn't drawn.
-  const distanceKm =
-    event.distanceKm ?? extras.distanceKm ?? results?.route?.distanceKm ?? null;
+  const distanceKm = event.distanceKm ?? extras.distanceKm ?? results?.route?.distanceKm ?? null;
   const climbM =
     event.elevationGain ?? extras.climbM ?? event.climbM ?? results?.route?.elevationM ?? null;
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
@@ -1009,8 +1008,7 @@ export function EventDetailPage() {
   const maxParticipants = event.maxParticipants || FALLBACK_LIMITS.maxParticipantsPerEvent;
   const eventFull = event.isFull || participantCount >= maxParticipants;
   const bucket = figmaStatus(displayStatus);
-  const canEditNow =
-    showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
+  const canEditNow = showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
   // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
   // hid the live map from the ride's own registered riders: show_live_locations defaults to
   // FALSE (plan/02-database-schema.md:195), so on a typical event nobody but the organizer
@@ -1022,11 +1020,11 @@ export function EventDetailPage() {
   // is the "LIVE" button in the owner-actions row; in Rider mode that row is hidden, so the
   // owner falls through to the same rider-style LIVE entry below (gated on `!showOrganizerUi`).
   //
-  // TEMPORARY: live tracking is creator-only for now. Regular riders (members / non-members)
-  // should not see any way into the live page yet — we'll re-enable the rider view later.
-  // Restore the line below to `event.myParticipant != null || event.showLiveLocations || event.isOwner`
-  // when the rider live experience is ready.
-  const canSeeLive = event.isOwner;
+  // A rider now gets the same way in as the owner: they open the live page and see the route
+  // and their own position, live. The one thing still held back is the "track other riders"
+  // picker — that stays owner-only inside LiveEventPage for now (a rider never sees the other
+  // riders' markers or the selection list yet).
+  const canSeeLive = event.myParticipant != null || event.showLiveLocations || event.isOwner;
 
   // Owner never registers for their own ride; a rider who already finished/cancelled events
   // can't join either — same guard the old bottom card and sign-in link used.
@@ -1040,7 +1038,11 @@ export function EventDetailPage() {
           name/organizer overlaid at the bottom. ------------------------------------------ */}
       <div
         className={styles.hero}
-        style={{ background: coverBackground, backgroundSize: "cover", backgroundPosition: "center" }}
+        style={{
+          background: coverBackground,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       >
         {ActivityIcon && <ActivityIcon className={styles.heroWatermark} aria-hidden="true" />}
         <div className={styles.heroScrim} />
@@ -1194,11 +1196,7 @@ export function EventDetailPage() {
             </span>
           )}
           {restStops != null && (
-            <span
-              className={styles.chip}
-              data-kind="rest"
-              title="Planned rest / regroup stops"
-            >
+            <span className={styles.chip} data-kind="rest" title="Planned rest / regroup stops">
               <Coffee width={13} height={13} aria-hidden="true" />
               {restStops === 0
                 ? "No rest stops"
@@ -1241,11 +1239,7 @@ export function EventDetailPage() {
 
         {/* Safety checklist — a quiet link, same sheet the create form opens. Basic pre-ride
             kit; disturbs nothing on the page. */}
-        <button
-          type="button"
-          className={styles.safetyLink}
-          onClick={() => setSafetyOpen(true)}
-        >
+        <button type="button" className={styles.safetyLink} onClick={() => setSafetyOpen(true)}>
           <LifeBuoy aria-hidden="true" width={15} height={15} />
           Safety checklist
         </button>
@@ -1358,11 +1352,7 @@ export function EventDetailPage() {
             worse than none. ---------------------------------------------------------------- */}
         {organizer && (
           <div className={styles.organizerCard}>
-            <Avatar
-              className={styles.organizerAvatar}
-              name={organizer}
-              {...organizerAvatarProps}
-            />
+            <Avatar className={styles.organizerAvatar} name={organizer} {...organizerAvatarProps} />
             <div className={styles.organizerText}>
               <span className={styles.organizerLabel}>Organized by</span>
               <span className={styles.organizerName}>
@@ -1704,10 +1694,7 @@ export function EventDetailPage() {
                                       >
                                         {approval.text}
                                       </span>
-                                      <span
-                                        className={styles.riderStatus}
-                                        data-tone={arrival.tone}
-                                      >
+                                      <span className={styles.riderStatus} data-tone={arrival.tone}>
                                         {arrival.text}
                                       </span>
                                     </span>

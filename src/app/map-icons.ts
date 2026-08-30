@@ -149,6 +149,39 @@ export function selfPositionIcon(headingDeg: number | null = null): L.DivIcon {
   });
 }
 
+/**
+ * The viewer's OWN position, shown as their profile photo (or their initial) inside a bold
+ * double ring — sized and outlined to stay instantly findable on a bright daytime map while
+ * moving. With a known heading a white chevron orbits the disc pointing the way they are
+ * going; with no heading yet it is just the disc in its accuracy halo. `photoUrl` null → the
+ * initial on `tint`.
+ */
+export function selfAvatarIcon(
+  headingDeg: number | null,
+  opts: { photoUrl?: string | null; initial?: string; tint?: string } = {},
+): L.DivIcon {
+  const tint = opts.tint || "#2563eb";
+  const disc = opts.photoUrl
+    ? `<img src="${opts.photoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+    : `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:${tint};color:#fff;font:600 17px/1 system-ui,-apple-system,sans-serif;">${opts.initial || ""}</span>`;
+  const pointer =
+    headingDeg != null
+      ? `<div style="position:absolute;top:0;left:50%;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:12px solid #fff;transform-origin:50% 30px;transform:translateX(-50%) rotate(${headingDeg}deg);filter:drop-shadow(0 0 1.5px rgba(0,0,0,.6));"></div>`
+      : "";
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="position:relative;width:60px;height:60px;">
+      <div style="position:absolute;inset:10px;border-radius:50%;background:rgba(37,99,235,.18);box-shadow:0 0 0 6px rgba(37,99,235,.10);"></div>
+      ${pointer}
+      <div style="position:absolute;top:50%;left:50%;width:42px;height:42px;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 3px #fff,0 0 0 5.5px ${tint},0 2px 8px rgba(0,0,0,.55);">
+        ${disc}
+      </div>
+    </div>`,
+    iconSize: [60, 60],
+    iconAnchor: [30, 30],
+  });
+}
+
 export function restStopIcon(color = "#3edda4"): L.DivIcon {
   return L.divIcon({
     className: "podium-map-icon",

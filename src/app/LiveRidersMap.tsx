@@ -43,7 +43,7 @@ import {
   riderSquareIcon,
   routeArrowIndices,
   routeDirectionArrowIcon,
-  selfPositionIcon,
+  selfAvatarIcon,
   startIcon,
 } from "./map-icons";
 
@@ -60,6 +60,10 @@ interface LiveRidersMapProps {
   routePoints: [number, number][];
   /** This device's own position, once location sharing is on (or null when not sharing). */
   selfPosition: [number, number] | null;
+  /** The viewer's own profile photo, for their position marker. Null → the initial is drawn. */
+  selfAvatarUrl?: string | null;
+  /** One- or two-letter fallback drawn in the marker when there is no photo. */
+  selfInitial?: string;
   /** The viewer's own participant id, so their marker/progress isn't also drawn by the generic
    * per-rider overlay. Null for a non-participating creator. */
   selfParticipantId: number | null;
@@ -78,6 +82,8 @@ export default function LiveRidersMap({
   riders,
   routePoints,
   selfPosition,
+  selfAvatarUrl,
+  selfInitial,
   selfParticipantId,
   showOthers,
   selectedRiderIds,
@@ -330,7 +336,10 @@ export default function LiveRidersMap({
     }
     prevSelf.current = selfPosition;
     const marker = L.marker(selfPosition, {
-      icon: selfPositionIcon(selfHeading.current),
+      icon: selfAvatarIcon(selfHeading.current, {
+        photoUrl: selfAvatarUrl,
+        initial: selfInitial,
+      }),
       zIndexOffset: 1000,
     })
       .addTo(map)
@@ -338,7 +347,7 @@ export default function LiveRidersMap({
     return () => {
       marker.remove();
     };
-  }, [selfPosition]);
+  }, [selfPosition, selfAvatarUrl, selfInitial]);
 
   // Re-pan only when the SELECTION changes (a deliberate user action), not on every poll tick.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally excludes `positioned`

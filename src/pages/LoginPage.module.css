@@ -1,0 +1,268 @@
+/*
+ * Login page — the one full-bleed screen in the app.
+ *
+ * Modelled on Images/login1.jpg: a photographic trail scene behind the whole viewport, the
+ * mark and wordmark high in the frame, the sign-in actions sitting on the bottom edge. The
+ * scene itself is public/login-hero.jpg — the photograph out of that mockup, with its
+ * baked-in text removed (see the .page::before comment below).
+ *
+ * Everything here is scoped to this page on purpose: no other screen has white-on-image
+ * text, and none of these rules should leak into the shell's light/dark tokens.
+ */
+
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 0;
+  /* Vertical overflow must stay scrollable — on a short window the brand block plus the
+     buttons can be taller than the viewport, and hiding it would cut the sign-in button
+     off. The two layers below are position: fixed so the scene still covers the viewport
+     when that happens. */
+  overflow-x: hidden;
+  color: #ffffff;
+  text-align: center;
+  background-color: #24425a;
+}
+
+/* The scene is Images/login2.png — the clean photograph, no text baked into it, so the app
+   draws the real wordmark, tagline and buttons over it.
+
+   The 70% vertical position is the whole point of the picture: on a phone `cover` shows
+   nearly the entire frame anyway, but on any wider window it crops top and bottom, and
+   anchoring at the centre cut the group of riders out and left only sky and mountains.
+   70% keeps the riders and the trail in frame at every aspect ratio. */
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("/login-hero.jpg") center 70% / cover no-repeat;
+}
+
+/* Two scrims, top and bottom: without them the wordmark sits on bright sky and the buttons
+   sit on bright trail, and neither reads. */
+.page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 20, 32, 0.55) 0%,
+      rgba(6, 20, 32, 0.12) 34%,
+      rgba(6, 20, 32, 0) 52%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(6, 18, 28, 0.82) 0%,
+      rgba(6, 18, 28, 0.45) 22%,
+      rgba(6, 18, 28, 0) 46%
+    );
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 3.5rem) var(--space-5)
+    calc(env(safe-area-inset-bottom, 0px) + var(--space-5));
+}
+
+/* --- brand ---------------------------------------------------------------- */
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mark {
+  width: 3.5rem;
+  height: auto;
+  color: #f5b942;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+.wordmark {
+  margin: 0;
+  font-size: clamp(2.75rem, 15vw, 4.25rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+  font-stretch: condensed;
+  font-family: "Arial Narrow", "Helvetica Neue", var(--font-sans);
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* Handwritten line, as in the reference. No webfont is loaded for it — a script face the
+   device already has, falling back to plain italic where there is none. */
+.tagline {
+  margin: 0;
+  font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", "Brush Script MT", cursive;
+  font-style: italic;
+  font-size: clamp(1.5rem, 6.5vw, 2rem);
+  color: #f5b942;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.pitch {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-lg);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* --- actions -------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+}
+
+.error {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(223, 75, 123, 0.9);
+  color: #ffffff;
+  font-size: var(--text-sm);
+}
+
+/* Google renders its own button (see auth/google-signin.ts — a custom one is not allowed
+   for this flow), so it can only be placed and framed, not restyled. The frame is what
+   makes it read as the primary action on a photograph. */
+.googleSlot {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  /* Google's own button, unmodified — its exact mark and wording are required (see
+     auth/google-signin.ts). Only the drop shadow is ours, so it does not float flat on the
+     photograph. */
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.45));
+}
+
+/* The green pill from the reference. Browsing rides needs no account (see App.tsx's
+   OpenHome), so it is a real destination, not a decoration. */
+.browse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0 var(--space-5);
+  border-radius: 999px;
+  background: #6aa84f;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: var(--text-base);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.browse:hover {
+  background: #75b558;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.version {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* --- phone sign-in (kept, currently hidden — see LoginPage.tsx) ------------ */
+
+.phoneCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: rgba(8, 20, 30, 0.6);
+  backdrop-filter: blur(8px);
+  text-align: left;
+}
+
+.phoneCard h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+}
+
+.phoneCard input {
+  background: rgba(255, 255, 255, 0.92);
+  color: #14243c;
+  border-color: transparent;
+}
+
+.phoneForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.submit {
+  min-height: var(--tap-target);
+  border: 0;
+  border-radius: 999px;
+  background: #6aa84f;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.quiet {
+  min-height: var(--tap-target);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* Landscape phones and short windows: the brand block alone can be taller than the
+   viewport, so let the page scroll rather than clipping the sign-in button off-screen. */
+@media (max-height: 620px) {
+  .content {
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-5));
+    gap: var(--space-4);
+  }
+
+  .pitch {
+    display: none;
+  }
+}

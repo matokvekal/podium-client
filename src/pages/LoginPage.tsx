@@ -10,16 +10,23 @@
  * Only the methods /auth/config returns are shown. Google and SMS both answer the same
  * question — who is this person — and both end with the server issuing its own tokens.
  *
+ * Presentation: the one full-bleed screen in the app (LoginPage.module.css +
+ * public/login-hero.jpg, the photograph from Images/login2.png), laid out to the mockup in
+ * Images/login1.jpg — trail scene behind everything, mark and wordmark high in the frame,
+ * sign-in on the bottom edge. Nothing about the auth flow changed with it; the previous
+ * plain-card version is kept verbatim at src/_backup-pre-hero-login/LoginPage.tsx.bak.
+ *
  * Also shows the app version (lib/config.ts, from package.json) so a screenshot is enough
  * to tell which build someone is on.
  */
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { renderGoogleButton } from "../auth/google-signin";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
+import styles from "./LoginPage.module.css";
 
 type Provider = "GOOGLE" | "SMS" | "EMAIL";
 
@@ -43,7 +50,16 @@ export function LoginPage() {
   useEffect(() => {
     apiRequest<AuthConfig>("/auth/config", { anonymous: true })
       .then((authConfig) => setProviders(authConfig.providers))
-      .catch(() => setError("Could not reach the server. Check your connection and try again."));
+      .catch(() => {
+        // A server that cannot be reached used to leave this screen with no way in at all:
+        // no providers, so no button, just a red banner. Google sign-in does not need the
+        // server until the ID token is exchanged, so offer it anyway whenever a client id is
+        // configured — if the server really is down, the attempt says so then, which is a
+        // far better screen than a dead one. With no client id there is genuinely nothing to
+        // offer, so the banner stands.
+        if (config.googleClientId) setProviders(["GOOGLE"]);
+        else setError("Could not reach the server. Check your connection and try again.");
+      });
   }, []);
 
   // SMS sign-in is hidden for now — product decision, not a removal. The provider, the
@@ -103,90 +119,133 @@ export function LoginPage() {
   }
 
   return (
-    <main className="app-main stack" style={{ maxWidth: "26rem" }}>
-      <h1>El Niño Move</h1>
-      <p className="muted">
-        Create a ride or a race, join with a code, and follow every rider live on the map.
-      </p>
+    <main className={styles.page}>
+      <div className={styles.content}>
+        <header className={styles.brand}>
+          <PeaksMark />
+          <h1 className={styles.wordmark}>El-Niño</h1>
+          <p className={styles.tagline}>Never ride alone.</p>
+          <p className={styles.pitch}>
+            Discover rides.
+            <br />
+            Meet riders.
+            <br />
+            Ride together.
+          </p>
+        </header>
 
-      {error && (
-        <p className="banner banner--error" role="alert">
-          {error}
-        </p>
-      )}
-
-      {/* A standard email/password login is planned as a second option later — see the
-          `Provider` union above, which already has "EMAIL". */}
-      {providers.includes("GOOGLE") && (
-        <section className="card stack">
-          <h2>Continue with Google</h2>
-          <div ref={googleButtonRef} />
-        </section>
-      )}
-
-      {smsLoginVisible && providers.includes("SMS") && (
-        <section className="card stack">
-          <h2>Continue with your phone</h2>
-
-          {challengeId === null ? (
-            <form className="stack" onSubmit={requestCode}>
-              <label htmlFor="phone">Phone number</label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="+15551234567"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                required
-              />
-              <p className="muted">
-                International format, starting with <code>+</code>.
-              </p>
-              <button className="button" type="submit" disabled={busy || phone.length < 8}>
-                Send me a code
-              </button>
-            </form>
-          ) : (
-            <form className="stack" onSubmit={submitCode}>
-              <label htmlFor="code">The 6-digit code we sent to {phone}</label>
-              <input
-                id="code"
-                name="code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                required
-              />
-              <button className="button" type="submit" disabled={busy || code.length !== 6}>
-                Sign in
-              </button>
-              <button
-                className="button button--quiet"
-                type="button"
-                onClick={() => {
-                  setChallengeId(null);
-                  setCode("");
-                }}
-              >
-                Use a different number
-              </button>
-            </form>
+        <div className={styles.actions}>
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
           )}
-        </section>
-      )}
 
-      {providers.length === 0 && !error && <p className="muted">Loading sign-in options…</p>}
+          {/* The reference screen's green call to action, in its place. Browsing rides
+              genuinely needs no account (App.tsx, OpenHome), so this is a real way in, not a
+              second sign-in. */}
+          <Link className={styles.browse} to="/">
+            Find a ride
+          </Link>
 
-      <p className="muted" style={{ textAlign: "center", fontSize: "0.8rem" }}>
-        Version {config.appVersion}
-      </p>
+          {/* A standard email/password login is planned as a second option later — see the
+              `Provider` union above, which already has "EMAIL". The button itself is
+              Google's own, rendered by their script — it is not restyled, only placed. */}
+          {providers.includes("GOOGLE") && (
+            <>
+              <p className={styles.hint}>Already a member?</p>
+              <div className={styles.googleSlot} ref={googleButtonRef} />
+            </>
+          )}
+
+          {smsLoginVisible && providers.includes("SMS") && (
+            <section className={styles.phoneCard}>
+              <h2>Continue with your phone</h2>
+
+              {challengeId === null ? (
+                <form className={styles.phoneForm} onSubmit={requestCode}>
+                  <label htmlFor="phone">Phone number</label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="+15551234567"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    required
+                  />
+                  <p className={styles.note}>
+                    International format, starting with <code>+</code>.
+                  </p>
+                  <button
+                    className={styles.submit}
+                    type="submit"
+                    disabled={busy || phone.length < 8}
+                  >
+                    Send me a code
+                  </button>
+                </form>
+              ) : (
+                <form className={styles.phoneForm} onSubmit={submitCode}>
+                  <label htmlFor="code">The 6-digit code we sent to {phone}</label>
+                  <input
+                    id="code"
+                    name="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    required
+                  />
+                  <button
+                    className={styles.submit}
+                    type="submit"
+                    disabled={busy || code.length !== 6}
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    className={styles.quiet}
+                    type="button"
+                    onClick={() => {
+                      setChallengeId(null);
+                      setCode("");
+                    }}
+                  >
+                    Use a different number
+                  </button>
+                </form>
+              )}
+            </section>
+          )}
+
+          {providers.length === 0 && !error && (
+            <p className={styles.hint}>Loading sign-in options…</p>
+          )}
+
+          <p className={styles.version}>Version {config.appVersion}</p>
+        </div>
+      </div>
     </main>
+  );
+}
+
+/** The twin-peak mark above the wordmark, drawn inline so it takes its amber from CSS. */
+function PeaksMark() {
+  return (
+    <svg className={styles.mark} viewBox="0 0 64 26" fill="none" role="img" aria-label="El Niño">
+      <path
+        d="M4 24 L20 4 L32 19 M28 24 L44 4 L60 24"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

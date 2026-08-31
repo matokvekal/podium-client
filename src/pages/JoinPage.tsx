@@ -36,6 +36,8 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { findEventByCode } from "../lib/event-code";
+import type { EventSummary } from "../lib/local-db";
 import { useEventsStore } from "../store/eventsStore";
 import { type InviteSource, useInvitedEventsStore } from "../store/invitedEventsStore";
 import styles from "./JoinPage.module.css";
@@ -56,6 +58,26 @@ function extractCode(scannedText: string): string {
     // Not a URL — treat the scanned text itself as the code.
   }
   return text;
+}
+
+/**
+ * Resolve a code from the public list, for the one case by-code cannot serve: a ride that has
+ * already happened. See lib/event-code.ts for why that endpoint refuses it.
+ *
+ * No `bucket`, deliberately — the default the rest of the app sends is `upcoming`, and finished
+ * rides are exactly what this is looking for. Failure is silent and returns null: this only ever
+ * runs as a second chance after a 404, so the caller's existing "check the code" message is
+ * already the right answer if it cannot help.
+ */
+async function findPublicEventByCode(rawCode: string): Promise<EventSummary | null> {
+  try {
+    const events = await apiRequest<EventSummary[]>("/events/public?limit=100", {
+      anonymous: true,
+    });
+    return findEventByCode(events, rawCode);
+  } catch {
+    return null;
+  }
 }
 
 interface EventConfig {
@@ -138,10 +160,26 @@ export function JoinPage() {
           return;
         }
       } catch (err) {
+        // A 404 does not mean "no such ride" — see lib/event-code.ts. by-code resolves ACTIVE
+        // events only, so a ride that has finished since the link was shared answers 404 while
+        // still being perfectly readable at GET /events/:id. Before believing the code is
+        // wrong, look for it in the public list, which carries finished rides too.
+        if (err instanceof ApiError && err.status === 404) {
+          const past = await findPublicEventByCode(rawCode);
+          if (past) {
+            // Straight to the ride, whoever is asking. Not the bib form even for a signed-in
+            // rider: joining a finished event is refused server-side (joinEvent uses the same
+            // active-only lookup), so offering the form would only end in a failure. The event
+            // page shows the ride and its results, and already hides the join CTA once a ride
+            // is over. No invite is recorded — there is nothing left to accept.
+            navigate(`/events/${past.id}`, { replace: true });
+            return;
+          }
+        }
         setEvent(null);
         setError(
           err instanceof ApiError && err.status === 404
-            ? "No event has that code. Check it and try again."
+            ? "No ride has that code, or it is no longer open to join. Check the code and try again."
             : "Could not look that code up right now.",
         );
       } finally {

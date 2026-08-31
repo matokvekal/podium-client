@@ -112,8 +112,26 @@ export function LoginPage() {
     });
   }, [providers, signInWithGoogle, acceptedTerms]);
 
+  // Where this visitor was headed before being asked to sign in. Everything that routes here
+  // sets it the same way: App.tsx's RequireAuth, the event page's "Sign in to join" and its
+  // private-event fallback, and JoinPage's submit guard.
+  const from = (location.state as { from?: string } | null)?.from ?? null;
+
+  /**
+   * Did they arrive with a ride already in mind?
+   *
+   * Someone who followed an organizer's link or QR is here for ONE event — they have already
+   * found their ride, and "Find a ride" points away from the very thing they were invited to.
+   * For them this screen is only the two things that stand between them and joining: the Terms
+   * tick and Continue with Google. A visitor who opened /login cold still gets the browse
+   * route, because for them it is a real way in rather than a detour.
+   *
+   * "/" is deliberately not a destination: it IS the browse screen, so the button would just
+   * repeat where they are already going.
+   */
+  const arrivedWithDestination = from != null && from !== "/" && from !== "/login";
+
   if (status === "signed-in") {
-    const from = (location.state as { from?: string } | null)?.from;
     return <Navigate to={from && from !== "/login" ? from : "/"} replace />;
   }
 
@@ -174,10 +192,13 @@ export function LoginPage() {
 
           {/* The reference screen's green call to action, in its place. Browsing rides
               genuinely needs no account (App.tsx, OpenHome), so this is a real way in, not a
-              second sign-in. */}
-          <Link className={styles.browse} to="/">
-            Find a ride
-          </Link>
+              second sign-in — but only for someone who has no particular ride in mind. See
+              arrivedWithDestination above. */}
+          {!arrivedWithDestination && (
+            <Link className={styles.browse} to="/">
+              Find a ride
+            </Link>
+          )}
 
           {/* Terms gate — a real, required checkbox (not just fine print), because signing in
               here is also how a new rider registers. No sign-in method is usable until it is

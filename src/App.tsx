@@ -237,21 +237,29 @@ export function App() {
         }
       />
 
-      {/* Join by link, code or QR. Signed-in only: joining creates a participant row. */}
+      {/* Join by link, code or QR.
+          OPEN, not RequireAuth. This is the first thing a stranger ever sees of the app — the
+          organizer's shared link and printed QR both point here — and gating it sent them to
+          the login screen before they had any idea what they were being invited to. Looking a
+          code up is already unauthenticated (GET /events/by-code/:code, frozen), so a guest can
+          be shown the ride itself: JoinPage.tsx redirects them to /events/:eventId, which is
+          equally open, and the "Sign in to join" CTA there is where an identity first becomes
+          necessary. Signing in only guards the ACT of joining — POST /events/join is still
+          requireAuth server-side, which is the check that actually matters. */}
       <Route
         path="/join"
         element={
-          <RequireAuth>
+          <OpenHome>
             <JoinPage />
-          </RequireAuth>
+          </OpenHome>
         }
       />
       <Route
         path="/join/:code"
         element={
-          <RequireAuth>
+          <OpenHome>
             <JoinPage />
-          </RequireAuth>
+          </OpenHome>
         }
       />
 

@@ -12,12 +12,31 @@ import { apiRequest } from "../lib/api-client";
 import {
   clearCachedEvents,
   clearUserScopedCache,
+  type EventSource,
   type EventSummary,
   getCachedEvents,
   putCachedEvent,
   putCachedEvents,
   toggleFavorite,
 } from "../lib/local-db";
+
+/**
+ * Which half of GET /events/public to ask for — the server's own `bucket` param
+ * (event.schemas.ts).
+ *
+ * This matters because the endpoint pages: it answers with at most 20 rows. Asking for
+ * everything and filtering client-side, which is what this used to do, meant a busy season's
+ * finished rides could fill that page and leave a newcomer looking at an empty Upcoming list
+ * while real upcoming rides sat on page two. Asking the server for the bucket the rider is
+ * actually looking at is the only version of this that stays correct as the list grows.
+ */
+export type PublicBucket = "upcoming" | "finished";
+
+/** Each bucket caches into its own slot — see EventSource in lib/local-db.ts. */
+const BUCKET_CACHE: Record<PublicBucket, EventSource> = {
+  upcoming: "guest",
+  finished: "guest-past",
+};
 
 function dedupeById(events: EventSummary[]): EventSummary[] {
   const seen = new Set<string>();
@@ -43,7 +62,11 @@ interface EventsState {
   otherLoading: boolean;
   otherError: string | null;
   loadMyRides(authed: boolean): Promise<void>;
-  loadOtherRides(): Promise<void>;
+  /**
+   * Find Rides. `bucket` picks which half of the public list to ask the server for and
+   * defaults to "upcoming" — see the doc comment on the implementation.
+   */
+  loadOtherRides(bucket?: PublicBucket): Promise<void>;
   toggleFavoriteRide(id: string): Promise<void>;
   /** Files one authoritative server event — a create response, or the event returned by a
    *  status transition — into My Rides and the IndexedDB cache in one step, so the two never
@@ -97,19 +120,36 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     }
   },
 
-  async loadOtherRides() {
+  async loadOtherRides(bucket: PublicBucket = "upcoming") {
     const requestId = ++otherRidesRequestId;
+    const cacheSlot = BUCKET_CACHE[bucket];
 
-    const cached = await getCachedEvents("guest");
+    const cached = await getCachedEvents(cacheSlot);
     if (requestId === otherRidesRequestId && cached.length > 0) {
       set({ otherRides: cached, otherLoading: false });
+    } else if (requestId === otherRidesRequestId) {
+      // Nothing cached for THIS bucket. Switching to Past for the first time must not leave the
+      // upcoming rides sitting on screen under a "Past" heading while the fetch runs — an empty
+      // list plus the spinner is the honest state.
+      set({ otherRides: [], otherLoading: true });
     }
 
     try {
-      const result = await apiRequest<EventSummary[]>("/events/public", { anonymous: true });
+      // sort=soonest for upcoming (the next ride you could join is the one that matters);
+      // latest for past (the ride that just happened, not one from last spring). limit is the
+      // server's own max — this list is not paged in the UI, so one generous page is the whole
+      // list as far as a rider is concerned.
+      const params = new URLSearchParams({
+        bucket,
+        sort: bucket === "finished" ? "latest" : "soonest",
+        limit: "100",
+      });
+      const result = await apiRequest<EventSummary[]>(`/events/public?${params.toString()}`, {
+        anonymous: true,
+      });
       if (requestId !== otherRidesRequestId) return;
       set({ otherRides: result, otherError: null });
-      putCachedEvents("guest", result);
+      putCachedEvents(cacheSlot, result);
     } catch {
       if (requestId !== otherRidesRequestId) return;
       // A cache read above may already be showing something — a failed refresh with cached

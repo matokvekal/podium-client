@@ -310,7 +310,11 @@ export function EventDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectMessage = (location.state as { message?: string } | null)?.message ?? null;
-  const { profile } = useAuth();
+  const { profile, status: authStatus } = useAuth();
+  // "signed-in" specifically, not "not signed-out": during the cold-start "loading" phase there
+  // is no bearer token to send yet, so an authenticated-only request made now would 401 for the
+  // wrong reason. Every auth-gated fetch on this page waits for this.
+  const signedIn = authStatus === "signed-in";
   // Which rider these offline caches belong to. Every read is scoped to it, so a cached ride
   // can never be served to a different account — see lib/local-db.ts.
   const viewerId = viewerKey(profile?.id);
@@ -415,6 +419,18 @@ export function EventDetailPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
     if (!eventId) return;
+    // Signed out there is nothing to poll for: GET /events/:eventId/participants is
+    // requireAuth (participant.routes.ts), and listParticipantsForViewer would refuse an
+    // anonymous viewer even if it weren't — a guest can never see a start list. Asking anyway
+    // bought a guaranteed 401 every poll interval, which is what used to boot a stranger out
+    // of a public ride and back to the login screen. The roster simply renders its
+    // "unavailable" placeholder, which is the truth for them.
+    if (!signedIn) {
+      setRealRiderCount(null);
+      setRealRoster(null);
+      setPendingCount(0);
+      return;
+    }
     let cancelled = false;
     setRealRiderCount(null);
     setRealRoster(null);
@@ -471,7 +487,7 @@ export function EventDetailPage() {
       window.clearInterval(id);
     };
     // reconnectNonce: pull a fresh roster as soon as the server is back.
-  }, [eventId, viewerId, reconnectNonce]);
+  }, [eventId, viewerId, signedIn, reconnectNonce]);
 
   // Real start list, name-sorted — see the fetch effect's doc comment above for why this is
   // the only rider list this page ever renders.
@@ -917,9 +933,21 @@ export function EventDetailPage() {
 
   if (error && !event) {
     return (
-      <p className="banner banner--error" role="alert">
-        {error}
-      </p>
+      <div className="stack">
+        <p className="banner banner--error" role="alert">
+          {error}
+        </p>
+        {/* A stranger who followed an organizer's link to a ride that isn't public sees the
+            same 403/404 as anyone else — the server tells nobody more than that. But for THEM
+            signing in may genuinely change the answer (an invited rider, a private team ride),
+            so offer it rather than leaving a dead end. `from` brings them straight back here
+            afterwards, the same way the "Sign in to join" CTA below does. */}
+        {!signedIn && (
+          <Link className="button" to="/login" state={{ from: `/events/${eventId}` }}>
+            Sign in to see this ride
+          </Link>
+        )}
+      </div>
     );
   }
 
@@ -1548,7 +1576,18 @@ export function EventDetailPage() {
               <div className="card stack">
                 <div className={styles.ridersHeader}>
                   <p className={styles.infoLabel}>
-                    Riders ({visibleRealRoster ? visibleRealRoster.length : "…"})
+                    {/* A guest never gets the roster (it is requireAuth server-side), so "…"
+                        would sit there spinning forever for them. The event's own
+                        participantCount comes down with the public detail and answers the
+                        question they actually have — how many people are riding — without
+                        naming anyone. */}
+                    Riders (
+                    {visibleRealRoster
+                      ? visibleRealRoster.length
+                      : signedIn
+                        ? "…"
+                        : (event.participantCount ?? 0)}
+                    )
                   </p>
                   {/* The pencil: organizer only, and gone entirely once the event is finished.
                       A shortcut for the event-day job of ticking riders off — the full
@@ -1708,8 +1747,12 @@ export function EventDetailPage() {
                   ) : (
                     // Real list not visible/available to this viewer yet (still loading, or a
                     // permission this viewer doesn't have) — an honest placeholder, never a
-                    // fabricated rider list (BUGS.md "Remove fake/mock riders").
-                    <p className="muted">Rider list unavailable.</p>
+                    // fabricated rider list (BUGS.md "Remove fake/mock riders"). For a guest the
+                    // reason is known and worth saying: nothing is broken, they are simply not
+                    // signed in.
+                    <p className="muted">
+                      {signedIn ? "Rider list unavailable." : "Sign in to see who's riding."}
+                    </p>
                   )}
                 </div>
               </div>

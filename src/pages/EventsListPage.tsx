@@ -67,7 +67,7 @@ import {
 } from "../lib/find-rides-filter";
 import type { EventSummary } from "../lib/local-db";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
-import { useEventsStore } from "../store/eventsStore";
+import { type PublicBucket, useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useIsOrganizer } from "../store/userModeStore";
 import styles from "./EventsListPage.module.css";
@@ -325,7 +325,10 @@ export function EventsListPage() {
   const [findSortOpen, setFindSortOpen] = useState(false);
   const [findDifficulty, setFindDifficulty] = useState<DifficultyBucket[]>([]);
   const [findSurface, setFindSurface] = useState<SurfaceType[]>([]);
-  const [findWhen, setFindWhen] = useState<WhenFilter>("any");
+  // Upcoming, not "anytime" — see DEFAULT_FIND_RIDES_CRITERIA in lib/find-rides-filter.ts for
+  // why. The matching server bucket is fetched below, so this is not merely a lens over a
+  // mixed list.
+  const [findWhen, setFindWhen] = useState<WhenFilter>(DEFAULT_FIND_RIDES_CRITERIA.when);
   const [findSort, setFindSort] = useState<FindRidesSort>(DEFAULT_FIND_RIDES_CRITERIA.sort);
 
   const findCriteria = useMemo(
@@ -353,13 +356,19 @@ export function EventsListPage() {
   function clearFindFilters() {
     setFindDifficulty([]);
     setFindSurface([]);
-    setFindWhen("any");
+    setFindWhen(DEFAULT_FIND_RIDES_CRITERIA.when);
   }
+
+  // Which half of the public list the server is asked for. Only "Past" leaves the upcoming
+  // bucket — Today / This week / This month are narrower views INSIDE it, so they need no
+  // second trip. See store/eventsStore.ts for why this is a server-side bucket and not a
+  // client-side filter over one fetch.
+  const findBucket: PublicBucket = findWhen === "past" ? "finished" : "upcoming";
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
-    loadOtherRides();
-  }, [loadOtherRides, reconnectNonce]);
+    loadOtherRides(findBucket);
+  }, [loadOtherRides, findBucket, reconnectNonce]);
 
   // Full set (incl. created events) — so Find Rides never lists something already on this
   // rider's plate, even one they own but aren't in Rider-mode "My Rides".
@@ -789,11 +798,11 @@ export function EventsListPage() {
                   <X width={12} height={12} aria-hidden="true" />
                 </button>
               ))}
-              {findWhen !== "any" && (
+              {findWhen !== DEFAULT_FIND_RIDES_CRITERIA.when && (
                 <button
                   type="button"
                   className={styles.activeFilterChip}
-                  onClick={() => setFindWhen("any")}
+                  onClick={() => setFindWhen(DEFAULT_FIND_RIDES_CRITERIA.when)}
                 >
                   {WHEN_LABEL[findWhen]}
                   <X width={12} height={12} aria-hidden="true" />
@@ -907,7 +916,13 @@ export function EventsListPage() {
               <div className={styles.sheetGroup}>
                 <span className={styles.sheetGroupLabel}>When</span>
                 <div className={styles.sheetChips}>
-                  {(["any", "today", "week", "month"] as const).map((when) => (
+                  {/* Single-select, and there is no "off": a ride is either still ahead of
+                      you or already behind you, so the list is always showing one of them.
+                      Upcoming leads because it is the answer nearly everyone wants; Today /
+                      This week / This month narrow inside it; Past is the deliberate trip to
+                      the archive, and picking it refetches (the effect below) rather than
+                      filtering a list that never contained finished rides. */}
+                  {(["upcoming", "today", "week", "month", "past"] as const).map((when) => (
                     <button
                       key={when}
                       type="button"
@@ -916,7 +931,7 @@ export function EventsListPage() {
                       aria-pressed={findWhen === when}
                       onClick={() => setFindWhen(when)}
                     >
-                      {when === "any" ? "Anytime" : WHEN_LABEL[when]}
+                      {WHEN_LABEL[when]}
                     </button>
                   ))}
                 </div>

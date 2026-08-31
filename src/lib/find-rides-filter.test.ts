@@ -49,31 +49,70 @@ describe("difficultyBucket", () => {
 
 describe("matchesWhen", () => {
   it("any always matches, even with no date", () => {
-    expect(matchesWhen(null, "any", NOW)).toBe(true);
+    expect(matchesWhen(ride({ startsAt: null }), "any", NOW)).toBe(true);
   });
   it("dated filters never match an event with no start time", () => {
-    expect(matchesWhen(null, "week", NOW)).toBe(false);
+    expect(matchesWhen(ride({ startsAt: null }), "week", NOW)).toBe(false);
   });
   it("today matches only today", () => {
-    expect(matchesWhen(inDays(0), "today", NOW)).toBe(true);
-    expect(matchesWhen(inDays(1), "today", NOW)).toBe(false);
+    expect(matchesWhen(ride({ startsAt: inDays(0) }), "today", NOW)).toBe(true);
+    expect(matchesWhen(ride({ startsAt: inDays(1) }), "today", NOW)).toBe(false);
   });
   it("week matches within 7 days, month within 31", () => {
-    expect(matchesWhen(inDays(6), "week", NOW)).toBe(true);
-    expect(matchesWhen(inDays(10), "week", NOW)).toBe(false);
-    expect(matchesWhen(inDays(10), "month", NOW)).toBe(true);
-    expect(matchesWhen(inDays(40), "month", NOW)).toBe(false);
+    expect(matchesWhen(ride({ startsAt: inDays(6) }), "week", NOW)).toBe(true);
+    expect(matchesWhen(ride({ startsAt: inDays(10) }), "week", NOW)).toBe(false);
+    expect(matchesWhen(ride({ startsAt: inDays(10) }), "month", NOW)).toBe(true);
+    expect(matchesWhen(ride({ startsAt: inDays(40) }), "month", NOW)).toBe(false);
   });
   it("excludes past events", () => {
-    expect(matchesWhen(inDays(-2), "month", NOW)).toBe(false);
+    expect(matchesWhen(ride({ startsAt: inDays(-2) }), "month", NOW)).toBe(false);
+  });
+
+  describe("upcoming / past", () => {
+    it("a scheduled ride still ahead is upcoming, not past", () => {
+      const future = ride({ startsAt: inDays(3), endsAt: inDays(3) });
+      expect(matchesWhen(future, "upcoming", NOW)).toBe(true);
+      expect(matchesWhen(future, "past", NOW)).toBe(false);
+    });
+
+    it("a finished or cancelled ride is past, whatever its dates say", () => {
+      for (const status of ["finished", "cancelled"] as const) {
+        const done = ride({ status, startsAt: inDays(3), endsAt: inDays(3) });
+        expect(matchesWhen(done, "past", NOW)).toBe(true);
+        expect(matchesWhen(done, "upcoming", NOW)).toBe(false);
+      }
+    });
+
+    it("a ride whose end time has passed is past even if its status never moved", () => {
+      // Nothing flips a stored status automatically — this is the case that used to keep last
+      // month's rides at the top of a newcomer's Find Rides list.
+      const stale = ride({ status: "published", startsAt: inDays(-9), endsAt: inDays(-9) });
+      expect(matchesWhen(stale, "past", NOW)).toBe(true);
+      expect(matchesWhen(stale, "upcoming", NOW)).toBe(false);
+    });
+
+    it("a live ride counts as upcoming, not past", () => {
+      const live = ride({ status: "live", startsAt: inDays(0), endsAt: null });
+      expect(matchesWhen(live, "upcoming", NOW)).toBe(true);
+    });
+
+    it("no end time and an open status stays upcoming rather than disappearing", () => {
+      const undated = ride({ status: "published", startsAt: null, endsAt: null });
+      expect(matchesWhen(undated, "upcoming", NOW)).toBe(true);
+    });
   });
 });
 
 describe("activeFilterCount", () => {
-  it("counts difficulty + surface + a non-any when", () => {
+  it("counts difficulty + surface + a when other than the default", () => {
     expect(activeFilterCount(crit())).toBe(0);
     expect(activeFilterCount(crit({ difficulty: ["easy", "hard"], when: "week" }))).toBe(3);
     expect(activeFilterCount(crit({ surface: ["road"] }))).toBe(1);
+  });
+
+  it("does not badge the default Upcoming view as a filter the rider set", () => {
+    expect(activeFilterCount(crit({ when: "upcoming" }))).toBe(0);
+    expect(activeFilterCount(crit({ when: "past" }))).toBe(1);
   });
 });
 
@@ -84,9 +123,24 @@ describe("applyFindRidesCriteria", () => {
     ride({ name: "Sunday Spin", level: "masters", activityType: "road", startsAt: inDays(20) }),
   ];
 
-  it("passes everything through with default criteria (sorted soonest)", () => {
+  it("passes every upcoming ride through with default criteria (sorted soonest)", () => {
     const out = applyFindRidesCriteria(rides, crit(), NOW);
     expect(out.map((r) => r.name)).toEqual(["Dawn Patrol", "Gravel Grind", "Sunday Spin"]);
+  });
+
+  it("hides rides that already happened, by default, without being asked", () => {
+    const withPast = [
+      ...rides,
+      ride({ name: "Last Month", status: "finished", startsAt: inDays(-30) }),
+    ];
+    expect(applyFindRidesCriteria(withPast, crit(), NOW).map((r) => r.name)).toEqual([
+      "Dawn Patrol",
+      "Gravel Grind",
+      "Sunday Spin",
+    ]);
+    expect(applyFindRidesCriteria(withPast, crit({ when: "past" }), NOW).map((r) => r.name)).toEqual(
+      ["Last Month"],
+    );
   });
 
   it("filters by difficulty bucket", () => {

@@ -8,6 +8,13 @@
  * State:    the typed code, the looked-up event, the bib, the error
  * Calls:    GET /events/by-code/:code, POST /events/join
  *
+ * Open to guests (App.tsx), because this IS the front door: an organizer shares a link or
+ * prints a QR, and whoever opens it has usually never seen the app. A signed-out visitor whose
+ * code resolves is sent straight on to /events/:eventId — the ride itself, with its route,
+ * time, place and rider count — instead of being asked to prove who they are first. That page
+ * already offers "Sign in to join" and carries them back here afterwards. A signed-in rider
+ * still gets this bib/confirm form, which is the only thing they actually need.
+ *
  * Both endpoints are frozen — the Android transmitter uses exactly these. Joining is
  * idempotent: re-joining returns the same participantId rather than an error, so a rider
  * who taps twice, or retries after a dropped connection, is fine.
@@ -27,6 +34,7 @@ import jsQR from "jsqr";
 import { Camera, ScanQrCode, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
@@ -68,6 +76,11 @@ interface JoinResult {
 export function JoinPage() {
   const { code: codeFromUrl } = useParams();
   const navigate = useNavigate();
+  const { status } = useAuth();
+  // "signed-out", specifically — during the cold-start "loading" phase we do not yet know, and
+  // bouncing a returning rider to the event page before their session resolves would take the
+  // bib form away from someone who needs it.
+  const isGuest = status === "signed-out";
 
   const [code, setCode] = useState(codeFromUrl ?? "");
   const [event, setEvent] = useState<EventConfig | null>(null);
@@ -102,6 +115,17 @@ export function JoinPage() {
           type: found.type,
           invitedAt: Date.now(),
         });
+        // A guest gets the ride, not a form. The bib field and the Join button below are
+        // meaningless to someone with no account, and the only honest thing to show them is
+        // what they were actually invited to — so hand them the event page, which is open to
+        // strangers and already ends in "Sign in to join". `replace` so Back leaves the app
+        // (or returns to wherever the link was opened from) instead of bouncing through this
+        // redirect again. The invite above is recorded first, so it is waiting for them on the
+        // home screen the moment they do sign in.
+        if (isGuest) {
+          navigate(`/events/${found.eventId}`, { replace: true });
+          return;
+        }
       } catch (err) {
         setEvent(null);
         setError(
@@ -113,7 +137,7 @@ export function JoinPage() {
         setBusy(false);
       }
     },
-    [addInvite],
+    [addInvite, isGuest, navigate],
   );
 
   // A scanned QR arrives with the code already in the URL — look it up without a tap.
@@ -218,6 +242,14 @@ export function JoinPage() {
   async function join(submitEvent: FormEvent) {
     submitEvent.preventDefault();
     if (!event) return;
+    // Joining is the one thing here that genuinely needs an identity — POST /events/join is
+    // requireAuth. A guest is redirected to the event page above and never reaches this form,
+    // but the brief cold-start "loading" window can, so send them to sign in and bring them
+    // back to the ride rather than letting the request 401 and reading as a server problem.
+    if (status !== "signed-in") {
+      navigate("/login", { state: { from: `/events/${event.eventId}` } });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

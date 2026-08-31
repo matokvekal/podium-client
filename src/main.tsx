@@ -4,7 +4,19 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { SplashScreen } from "./app/SplashScreen";
 import { AuthProvider } from "./auth/AuthContext";
+import { applyColorTheme, getInitialColorTheme } from "./lib/color-theme";
 import "./styles/global.css";
+
+// Stamp data-color-theme before the first paint, not from a component effect.
+//
+// tokens.css falls back to the dark palette under `@media (prefers-color-scheme: dark)` for as
+// long as the attribute is ABSENT (`:root:not([data-color-theme])`), so a dark-phone rider used
+// to get a frame or two of dark before AppShell's effect wrote "day" over it. Two screens made
+// that worse than a flicker: sign-in and Terms render outside AppShell entirely, so nothing ever
+// applied the attribute there and they stayed dark whatever the rider had chosen.
+//
+// AppShell still owns the toggle and re-applies on change; this only settles the starting state.
+applyColorTheme(getInitialColorTheme());
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root is missing from index.html");

@@ -187,10 +187,30 @@ async function send(path: string, options: RequestOptions, retryOn401: boolean):
   }
 
   if (response.status === 401 && retryOn401 && !options.anonymous) {
-    const refreshed = await ensureRefresh();
-    if (refreshed) return send(path, options, false);
-    clearTokens();
-    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    // Only a viewer who HAD a session can lose one.
+    //
+    // A guest browsing a public ride holds no tokens at all, and a 401 off an
+    // authenticated-only endpoint (the start list, say) is simply the honest answer to "you
+    // are not signed in" — nothing expired. Treating it as an expiry signed nobody out, but it
+    // DID dispatch SESSION_EXPIRED, which AuthContext handles with a hard
+    // window.location.replace("/login") — rebooting the whole SPA and replaying the splash
+    // video. That is the "tap a ride as a stranger and the app restarts" bug: the guest never
+    // saw the ride, just the intro clip and a login screen.
+    //
+    // With no session to recover, the 401 is returned as-is and the caller's own catch decides
+    // what it means (EventDetailPage keeps its roster placeholder, the CTA still says "Sign in
+    // to join"). Only a viewer who actually holds tokens can reach the expiry path below.
+    if (getRefreshToken()) {
+      const refreshed = await ensureRefresh();
+      if (refreshed) return send(path, options, false);
+      clearTokens();
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    } else if (getAccessToken()) {
+      // Tokens half-present: an access token with no refresh token cannot be recovered, so
+      // this session really is over. Same reset as above.
+      clearTokens();
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
   }
 
   return response;

@@ -1,6 +1,6 @@
 {
   "name": "podium-client",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "El Niño Move PWA: events, participants, routes and live rider tracking",
   "private": true,
   "type": "module",

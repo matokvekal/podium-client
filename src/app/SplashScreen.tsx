@@ -32,8 +32,42 @@ const VISIBLE_MS = 4900;
 // has actually finished, not part-way through it.
 const FADE_MS = 500;
 
+/**
+ * "Once per cold start" means once per TAB, not once per page load.
+ *
+ * The app hard-navigates itself in a few places — signing out, and a session the server has
+ * rejected (AuthContext.tsx) — which reboots the SPA and remounts this component. Without this
+ * guard each of those replays the full five seconds, so an in-app redirect reads to a rider as
+ * "the app restarted", which is exactly how it was reported. sessionStorage is the right scope:
+ * it survives a reload in this tab (so the video does not come back), and it is gone for the
+ * next launch (so a real cold start still gets its splash).
+ */
+const SEEN_KEY = "elnino.splash-seen";
+
+function alreadyPlayedThisSession(): boolean {
+  try {
+    return window.sessionStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    // Storage unavailable (private mode, disabled): fall back to showing it, which is the
+    // behaviour before this guard existed.
+    return false;
+  }
+}
+
+function markPlayed(): void {
+  try {
+    window.sessionStorage.setItem(SEEN_KEY, "1");
+  } catch {
+    // Nothing to do — worst case the splash plays again on the next reload.
+  }
+}
+
 export function SplashScreen() {
-  const [phase, setPhase] = useState<"visible" | "fading" | "done">("visible");
+  // Decided once, at mount, and never re-read — see SEEN_KEY above.
+  const [skipped] = useState(alreadyPlayedThisSession);
+  const [phase, setPhase] = useState<"visible" | "fading" | "done">(() =>
+    skipped ? "done" : "visible",
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   // A fresh random tint each time the splash mounts ("each time at different color") — picked
   // once per mount, not re-rolled on rerender, and applied via the --logo-hue custom property
@@ -42,13 +76,17 @@ export function SplashScreen() {
   const [logoHue] = useState(() => Math.floor(Math.random() * 360));
 
   useEffect(() => {
+    if (skipped) return;
+    // Marked as soon as it starts, not when it finishes: a rider who reloads two seconds in
+    // should not be handed the clip a second time either.
+    markPlayed();
     const toFade = setTimeout(() => setPhase("fading"), VISIBLE_MS);
     const toDone = setTimeout(() => setPhase("done"), VISIBLE_MS + FADE_MS);
     return () => {
       clearTimeout(toFade);
       clearTimeout(toDone);
     };
-  }, []);
+  }, [skipped]);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -12,12 +12,22 @@
 //
 // No new API, no server change.
 
+// figmaStatus lives in app/ rather than lib/, but it is pure (no React, no CSS) and it is THE
+// definition of live/upcoming/finished in this app — the card tags, the My Rides chips and this
+// filter all read it, which is the only reason they always agree. Restating the rule here
+// instead would be the start of the two drifting apart.
+import { figmaStatus } from "../app/event-visuals";
 import type { EventSummary } from "./local-db";
 import { LEVELS, type RiderLevel } from "./rider-level";
 import type { SurfaceType } from "./surface-types";
 
 export type DifficultyBucket = "easy" | "medium" | "hard";
-export type WhenFilter = "any" | "today" | "week" | "month";
+/**
+ * `upcoming` and `past` split the list in two; `today`/`week`/`month` narrow the upcoming half
+ * further. `any` is both halves at once and is no longer the landing state — see
+ * DEFAULT_FIND_RIDES_CRITERIA.
+ */
+export type WhenFilter = "any" | "upcoming" | "past" | "today" | "week" | "month";
 export type FindRidesSort = "soonest" | "latest" | "name" | "easiest" | "hardest";
 
 export interface FindRidesCriteria {
@@ -29,11 +39,24 @@ export interface FindRidesCriteria {
   sort: FindRidesSort;
 }
 
+/**
+ * Upcoming, not "any".
+ *
+ * Find Rides is what a stranger who followed an invitation link lands on, and a list that opens
+ * with last month's rides in it reads as a broken app — there is nothing to do with a ride that
+ * already happened. Rides you can still turn up to come first, and Past is one tap away in the
+ * filter sheet for anyone actually looking for one.
+ *
+ * This matches on the server too: the store asks for `bucket=upcoming`, so the twenty rows the
+ * API returns are twenty upcoming rides rather than whatever twenty happened to sort first —
+ * see store/eventsStore.ts. The client-side check below still runs, because a cached list
+ * painted before the network answers has no such guarantee.
+ */
 export const DEFAULT_FIND_RIDES_CRITERIA: FindRidesCriteria = {
   search: "",
   difficulty: [],
   surface: [],
-  when: "any",
+  when: "upcoming",
   sort: "soonest",
 };
 
@@ -59,7 +82,10 @@ export const DIFFICULTY_LABEL: Record<DifficultyBucket, string> = {
   hard: "Hard",
 };
 
-export const WHEN_LABEL: Record<Exclude<WhenFilter, "any">, string> = {
+export const WHEN_LABEL: Record<WhenFilter, string> = {
+  any: "All rides",
+  upcoming: "Upcoming",
+  past: "Past",
   today: "Today",
   week: "This week",
   month: "This month",
@@ -81,11 +107,42 @@ function parseTime(iso: string | null): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-/** `today` = starts today; `week`/`month` = starts between today and +7d / +31d. Events with
- *  no start time never match a dated filter. */
-export function matchesWhen(startsAt: string | null, when: WhenFilter, now: number = Date.now()): boolean {
+/**
+ * Has this ride already happened?
+ *
+ * Two independent things can make it so, and either is enough — the same pair the server's
+ * `bucket=finished` uses (event.queries.ts): the status says finished/cancelled, OR the end
+ * time is behind us while the stored status never caught up. Nothing flips that status
+ * automatically, so an event whose Saturday has been and gone is still sitting there as
+ * "published" — checking only the status would keep it in the upcoming list forever.
+ *
+ * A ride with no end time is judged on its status alone; it stays upcoming until someone
+ * finishes it, which is the honest reading of "we never said when this ends".
+ */
+function isOver(event: EventSummary, now: number): boolean {
+  if (figmaStatus(event.status) === "finished") return true;
+  const end = parseTime(event.endsAt);
+  return end != null && end < now;
+}
+
+/** `upcoming`/`past` split the list; `today` = starts today; `week`/`month` = starts between
+ *  today and +7d / +31d, and never include something already over. Events with no start time
+ *  still never match one of the three DATED filters — there is no date to test — but they do
+ *  count as upcoming, because hiding a ride outright over a missing field is worse than listing
+ *  it. */
+export function matchesWhen(
+  event: EventSummary,
+  when: WhenFilter,
+  now: number = Date.now(),
+): boolean {
   if (when === "any") return true;
-  const t = parseTime(startsAt);
+
+  const over = isOver(event, now);
+  if (when === "past") return over;
+  if (when === "upcoming") return !over;
+  if (over) return false;
+
+  const t = parseTime(event.startsAt);
   if (t == null) return false;
   const startOfToday = new Date(now).setHours(0, 0, 0, 0);
   if (t < startOfToday) return false;
@@ -94,9 +151,15 @@ export function matchesWhen(startsAt: string | null, when: WhenFilter, now: numb
   return t <= now + 31 * 86_400_000;
 }
 
-/** How many filters (not sort) are currently narrowing the list — for the button badge. */
+/** How many filters (not sort) are currently narrowing the list — for the button badge.
+ *
+ *  Measured against the DEFAULTS, not against "no filter at all": Upcoming is the state the
+ *  screen opens in, so badging it as an active filter would show every rider a permanent "1"
+ *  they never set and cannot clear. Choosing anything else — Past, All rides, a date window —
+ *  is a real narrowing and does count. */
 export function activeFilterCount(c: FindRidesCriteria): number {
-  return c.difficulty.length + c.surface.length + (c.when !== "any" ? 1 : 0);
+  const whenChanged = c.when !== DEFAULT_FIND_RIDES_CRITERIA.when ? 1 : 0;
+  return c.difficulty.length + c.surface.length + whenChanged;
 }
 
 /** Comparator that sorts by `key` in the given direction, but always sinks rows whose key is
@@ -139,7 +202,7 @@ export function applyFindRidesCriteria(
     if (c.surface.length > 0) {
       if (ride.activityType == null || !c.surface.includes(ride.activityType)) return false;
     }
-    if (!matchesWhen(ride.startsAt, c.when, now)) return false;
+    if (!matchesWhen(ride, c.when, now)) return false;
     return true;
   });
 

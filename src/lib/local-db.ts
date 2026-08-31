@@ -121,8 +121,17 @@ export interface EventSummary {
   isAccessible?: boolean;
 }
 
-/** "mine" — GET /events?filter=, signed in. "guest" — GET /events/public, signed out. */
-export type EventSource = "mine" | "guest";
+/**
+ * "mine" — GET /events?filter=, signed in.
+ * "guest" — GET /events/public with the default `bucket=upcoming`: rides you can still turn up
+ *           to, and what Find Rides opens on.
+ * "guest-past" — the same endpoint asked for `bucket=finished`, kept in its OWN slot rather
+ *           than merged into "guest". putCachedEvents replaces a whole slot at once, so sharing
+ *           one would mean the last-fetched bucket wiping the other, and the cached paint on the
+ *           next cold start would show past rides under an Upcoming filter until the network
+ *           answered. See store/eventsStore.ts.
+ */
+export type EventSource = "mine" | "guest" | "guest-past";
 
 /** The viewer's own row on an event — the half of GET /events/:id that is about *you*. */
 export interface MyParticipant {

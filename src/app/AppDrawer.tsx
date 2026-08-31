@@ -16,6 +16,7 @@ import {
   LogOut,
   Map as MapIcon,
   Megaphone,
+  MessageCircleHeart,
   Moon,
   QrCode,
   Sun,
@@ -23,12 +24,19 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { ColorTheme } from "../lib/color-theme";
 import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
 import { Avatar } from "./Avatar";
 import { useMyIdentity } from "./useMyIdentity";
+
+// The drawer is on every screen, so its own weight matters. Most sessions never open the
+// contact sheet — same lazy treatment ShareEventSheet gets on the event page.
+const ContactSheet = lazy(() =>
+  import("./ContactSheet").then((m) => ({ default: m.ContactSheet })),
+);
 
 interface AppDrawerProps {
   open: boolean;
@@ -47,6 +55,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
   // page always agree about who this is.
   const me = useMyIdentity();
   const displayName = me.displayName;
+  const [contactOpen, setContactOpen] = useState(false);
 
   function go(path: string) {
     onClose();
@@ -134,6 +143,15 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             {colorTheme === "day" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
             {colorTheme === "day" ? "Switch to dark" : "Switch to day"}
           </button>
+
+          {/* Last in the list on purpose: the nav above is places to go and preferences, and
+              this is the one item that leaves the app. Open to everyone — a rider hitting a
+              bug before they have an account is exactly who most needs to be able to say so.
+              The drawer stays open behind the sheet so closing it returns them to the menu. */}
+          <button type="button" className="drawer__nav-item" onClick={() => setContactOpen(true)}>
+            <MessageCircleHeart aria-hidden="true" />
+            Contact us
+          </button>
         </nav>
 
         <div className="drawer__footer">
@@ -163,6 +181,12 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
           )}
         </div>
       </div>
+
+      {contactOpen && (
+        <Suspense fallback={null}>
+          <ContactSheet onClose={() => setContactOpen(false)} />
+        </Suspense>
+      )}
     </>
   );
 }

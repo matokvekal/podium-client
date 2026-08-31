@@ -17,6 +17,11 @@ const dayMonthFormat = new Intl.DateTimeFormat(undefined, {
   month: "short",
 });
 
+// Single-field formatters, so a caller that needs a guaranteed field ORDER can build one
+// itself instead of trusting Intl's per-locale pattern. See formatLocalDayMonthYear.
+const dayNumberFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
+const monthShortFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
+
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
   day: "2-digit",
@@ -44,6 +49,20 @@ export function formatLocalTime(utcIso: string | Date | null | undefined): strin
 export function formatLocalDateTime(utcIso: string | Date | null | undefined): string {
   const date = toDate(utcIso);
   return date ? `${dayMonthFormat.format(date)}, ${timeFormat.format(date)}` : "—";
+}
+
+/** 13 Aug 2026 — a plain calendar day, no weekday. For prose that names a date inside a
+ *  sentence ("You are invited to Dawn Patrol at 13 Aug 2026"), where formatLocalDate's leading
+ *  weekday reads as clutter.
+ *
+ *  Day and month come from SEPARATE formatters concatenated in a fixed order, not from one
+ *  {day, month} pattern — the exact trap formatLocalDateTime documents. dayMonthFormat renders
+ *  "Dec 12" under en-US and "12 Dec" under en-GB, so reusing it here would have printed
+ *  "invited to … at Dec 12 2026" for half the world. Caught by invite-greeting.test.ts. */
+export function formatLocalDayMonthYear(utcIso: string | Date | null | undefined): string {
+  const date = toDate(utcIso);
+  if (!date) return "—";
+  return `${dayNumberFormat.format(date)} ${monthShortFormat.format(date)} ${date.getFullYear()}`;
 }
 
 /** Wed, 13 Aug 2026 — for headings. */

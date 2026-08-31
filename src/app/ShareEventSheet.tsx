@@ -31,15 +31,30 @@ export function ShareEventSheet({ eventName, eventCode, onClose }: ShareEventShe
   // the real app, never a localhost dev server.
   const joinUrl = `${config.shareBaseUrl}/join/${encodeURIComponent(eventCode)}`;
 
+  /**
+   * The QR encodes the same URL plus `?via=qr`; the link above stays clean.
+   *
+   * That one parameter is the only thing that can tell a scan from a forwarded link. Both
+   * otherwise land on exactly the same /join/:code, yet they are different situations — a link
+   * was sent TO you, a QR is something you walked up to and chose to point a camera at — and
+   * the event page greets each differently (lib/invite-greeting.ts). Marking the QR rather than
+   * the link is what makes this work for the phone's own camera app, which is how most people
+   * actually scan and which the in-app scanner never sees.
+   *
+   * Inert everywhere else: JoinPage reads the code from the path, and extractCode() parses only
+   * the pathname, so the parameter never reaches the server or corrupts a scanned code.
+   */
+  const qrUrl = `${joinUrl}?via=qr`;
+
   useEffect(() => {
     let cancelled = false;
-    QRCode.toDataURL(joinUrl, { width: 240, margin: 1 }).then((url) => {
+    QRCode.toDataURL(qrUrl, { width: 240, margin: 1 }).then((url) => {
       if (!cancelled) setQrDataUrl(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [joinUrl]);
+  }, [qrUrl]);
 
   async function copyLink() {
     await navigator.clipboard.writeText(joinUrl);

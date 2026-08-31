@@ -55,6 +55,7 @@ import {
   Ruler,
   Settings,
   Share2,
+  Ticket,
   Users,
   UsersRound,
   X,
@@ -73,6 +74,7 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 
 import { useConnectivityStore } from "../lib/connectivity";
+import { inviteGreeting } from "../lib/invite-greeting";
 import {
   type CachedParticipant,
   type EventDetail,
@@ -334,6 +336,12 @@ export function EventDetailPage() {
   const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // The invitation this rider arrived on, if they got here from a link or a QR — recorded by
+  // JoinPage when the code resolved (store/invitedEventsStore.ts). Persisted rather than passed
+  // in router state so a refresh, or a trip through sign-in and back, does not lose it.
+  const invite = useInvitedEventsStore((state) =>
+    eventId ? (state.byEventId[eventId] ?? null) : null,
+  );
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
@@ -837,6 +845,11 @@ export function EventDetailPage() {
         body: { eventCode: event.code },
       });
       await load();
+      // The invitation has been accepted, so it stops being one: drop it from the invited list
+      // the same way JoinPage's own join() does. Without this the ride would sit in BOTH the
+      // home screen's Invited section and My Rides, and the "You are invited to…" ribbon would
+      // still greet a rider who is already on the start list.
+      useInvitedEventsStore.getState().removeInvite(event.id);
       // Now a participant — refresh My Rides so the joined-id set (eventsStore) includes this
       // ride and it shows on the home screen's My Rides tab without a manual reload.
       void useEventsStore.getState().loadMyRides(true);
@@ -1040,6 +1053,21 @@ export function EventDetailPage() {
   // button below. figmaStatus folds cancelled in with finished, which is right here: both are
   // rides nobody can join.
   const canShare = bucket !== "finished";
+
+  /**
+   * The invitation line across the top — "You are invited to Dawn Patrol at 12 Dec 2026", or
+   * "Join Dawn Patrol at …" for someone who scanned a QR. See lib/invite-greeting.ts for why
+   * those two read differently.
+   *
+   * Shown only while the invitation still stands. Once they are on the start list the greeting
+   * is stale — they are not being invited any more, they are in — and a ride that is over
+   * cannot be accepted at all, so both drop it. The date comes off the loaded event rather than
+   * the stored invite, because the frozen by-code endpoint never sent one.
+   */
+  const showInvite = invite != null && !event.myParticipant && canShare;
+  const inviteLine = showInvite
+    ? inviteGreeting(event.name || invite.name, event.startsAt, invite.via)
+    : null;
   const canEditNow = showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
   // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
   // hid the live map from the ride's own registered riders: show_live_locations defaults to
@@ -1065,6 +1093,19 @@ export function EventDetailPage() {
 
   return (
     <section className={styles.page}>
+      {/* The invitation, said plainly, before anything else on the page — an organizer's link
+          or QR is often someone's very first contact with this app, and "You are invited to
+          Dawn Patrol at 12 Dec 2026" answers what they actually want to know. Its own ribbon
+          above the hero rather than text laid over the photo: a cover image can be any colour,
+          and the hero's scrim is nearly clear at the top, so overlaid text would be a coin
+          toss on legibility. */}
+      {inviteLine && (
+        <p className={styles.inviteRibbon}>
+          <Ticket className={styles.inviteRibbonIcon} aria-hidden="true" />
+          {inviteLine}
+        </p>
+      )}
+
       {/* --- hero: colored placeholder (no real cover-image field yet, same honest-fallback
           rule as EventCard/EventTile) with the date/status pinned to its corners and the
           name/organizer overlaid at the bottom. ------------------------------------------ */}

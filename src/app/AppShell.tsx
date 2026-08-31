@@ -18,7 +18,12 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiRequest } from "../lib/api-client";
-import { applyColorTheme, type ColorTheme, getInitialColorTheme } from "../lib/color-theme";
+import {
+  applyColorTheme,
+  type ColorTheme,
+  getInitialColorTheme,
+  saveColorTheme,
+} from "../lib/color-theme";
 import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
@@ -73,8 +78,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     applyColorTheme(colorTheme);
   }, [colorTheme]);
 
+  // The only place a theme is REMEMBERED. The effect above merely paints whatever is current,
+  // which on a first visit is the day default — persisting from there is what made an
+  // OS-derived default indistinguishable from a real choice. See lib/color-theme.ts.
   function toggleColorTheme() {
-    setColorTheme((current) => (current === "day" ? "dark" : "day"));
+    setColorTheme((current) => {
+      const next = current === "day" ? "dark" : "day";
+      saveColorTheme(next);
+      return next;
+    });
   }
 
   return (

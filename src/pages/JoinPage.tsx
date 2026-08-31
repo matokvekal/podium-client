@@ -33,11 +33,11 @@
 import jsQR from "jsqr";
 import { Camera, ScanQrCode, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { useEventsStore } from "../store/eventsStore";
-import { useInvitedEventsStore } from "../store/invitedEventsStore";
+import { type InviteSource, useInvitedEventsStore } from "../store/invitedEventsStore";
 import styles from "./JoinPage.module.css";
 
 /**
@@ -75,6 +75,12 @@ interface JoinResult {
 
 export function JoinPage() {
   const { code: codeFromUrl } = useParams();
+  // ShareEventSheet builds the QR with `?via=qr` and leaves the copyable link clean, so this is
+  // what tells a scan apart from a forwarded link — including a scan made by the phone's own
+  // camera app, which never touches the in-app scanner below. Anything else (or nothing) is a
+  // link: the reading that greets rather than assumes.
+  const [searchParams] = useSearchParams();
+  const urlVia: InviteSource = searchParams.get("via") === "qr" ? "qr" : "link";
   const navigate = useNavigate();
   const { status } = useAuth();
   // "signed-out", specifically — during the cold-start "loading" phase we do not yet know, and
@@ -96,7 +102,7 @@ export function JoinPage() {
   const removeInvite = useInvitedEventsStore((state) => state.removeInvite);
 
   const lookUp = useCallback(
-    async (rawCode: string) => {
+    async (rawCode: string, via: InviteSource) => {
       setBusy(true);
       setError(null);
       try {
@@ -114,6 +120,11 @@ export function JoinPage() {
           name: found.name,
           type: found.type,
           invitedAt: Date.now(),
+          via,
+          // by-code is a frozen endpoint and carries no start time, so the event page reads the
+          // date off the event it loads anyway; this stays undefined and the banner falls back
+          // to that. Recorded here only for a future by-code that does send one.
+          startsAt: null,
         });
         // A guest gets the ride, not a form. The bib field and the Join button below are
         // meaningless to someone with no account, and the only honest thing to show them is
@@ -142,8 +153,8 @@ export function JoinPage() {
 
   // A scanned QR arrives with the code already in the URL — look it up without a tap.
   useEffect(() => {
-    if (codeFromUrl) void lookUp(codeFromUrl);
-  }, [codeFromUrl, lookUp]);
+    if (codeFromUrl) void lookUp(codeFromUrl, urlVia);
+  }, [codeFromUrl, urlVia, lookUp]);
 
   function openScanner() {
     setScanError(null);
@@ -221,7 +232,7 @@ export function JoinPage() {
             const extracted = extractCode(result.data);
             setCode(extracted);
             setScanning(false); // closes the sheet; the cleanup below stops the camera
-            void lookUp(extracted);
+            void lookUp(extracted, "qr");
             return; // decoded — stop the loop instead of scheduling another frame
           }
         }
@@ -287,7 +298,7 @@ export function JoinPage() {
         className="card stack"
         onSubmit={(submitEvent) => {
           submitEvent.preventDefault();
-          void lookUp(code);
+          void lookUp(code, "code");
         }}
       >
         <label htmlFor="code">Event code</label>

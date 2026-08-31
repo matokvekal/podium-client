@@ -9,12 +9,33 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+/**
+ * How this rider came by the code, which decides how the event page greets them.
+ *
+ *   link  someone sent it to them — passive, so "You are invited to …"
+ *   qr    they pointed a camera at an organizer's QR — an act they chose, so "Join …"
+ *   code  they typed the code in by hand — equally deliberate, greeted like a QR
+ *
+ * A QR is told apart from a link by the URL it encodes: ShareEventSheet builds the QR with
+ * `?via=qr` while the copyable link stays clean, so a scan is recognisable no matter which
+ * scanner made it — the phone's own camera app included, which is how most people scan.
+ * Without that marker both arrive at the same /join/:code and are indistinguishable.
+ */
+type InviteSource = "link" | "qr" | "code";
+
 interface InvitedEvent {
   eventId: string;
   code: string;
   name: string;
   type: "RIDE" | "RACE";
   invitedAt: number;
+  /** Optional: records persisted before this field existed simply have no source, and are
+   *  treated as "link" — the safe reading, since it greets rather than assumes. */
+  via?: InviteSource;
+  /** Start time, copied off the event when the code resolved, so the invitation banner can
+   *  name the date without waiting on a second request. Optional for the same reason as
+   *  `via`. */
+  startsAt?: string | null;
 }
 
 interface InvitedEventsState {
@@ -47,4 +68,4 @@ export const useInvitedEventsStore = create<InvitedEventsState>()(
   ),
 );
 
-export type { InvitedEvent };
+export type { InvitedEvent, InviteSource };

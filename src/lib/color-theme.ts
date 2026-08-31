@@ -13,7 +13,7 @@ export type ColorTheme = "day" | "dark";
  * saveColorTheme writes, and only the toggle calls it, so anything found under v2 really was
  * chosen by the person using the app.
  */
-const STORAGE_KEY = "elnino.color-theme.v2";
+export const COLOR_THEME_STORAGE_KEY = "elnino.color-theme.v2";
 
 function isColorTheme(value: unknown): value is ColorTheme {
   return value === "day" || value === "dark";
@@ -32,7 +32,7 @@ function isColorTheme(value: unknown): value is ColorTheme {
  */
 export function getInitialColorTheme(): ColorTheme {
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const stored = window.localStorage.getItem(COLOR_THEME_STORAGE_KEY);
     if (isColorTheme(stored)) return stored;
   } catch {
     // Storage unavailable (private mode, disabled): fall through to the default below.
@@ -54,7 +54,7 @@ export function applyColorTheme(theme: ColorTheme): void {
 /** Remember a theme the rider actually picked. Only the header toggle calls this. */
 export function saveColorTheme(theme: ColorTheme): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    window.localStorage.setItem(COLOR_THEME_STORAGE_KEY, theme);
   } catch {
     // Storage unavailable: the choice still applies for this session, just isn't remembered.
   }

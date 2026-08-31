@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { COLOR_THEME_STORAGE_KEY } from "./color-theme";
 import { isOwnedStorageKey, ownedStorageKeys } from "./logout-cleanup";
 
 describe("isOwnedStorageKey", () => {
@@ -10,8 +11,16 @@ describe("isOwnedStorageKey", () => {
     expect(isOwnedStorageKey("elnino.approval-seen.xyz")).toBe(true);
   });
 
-  it("preserves elnino.color-theme — a device preference, not user data", () => {
-    expect(isOwnedStorageKey("elnino.color-theme")).toBe(false);
+  it("preserves the colour theme — a device preference, not user data", () => {
+    // Read from the constant, never retyped. A copy of this string here is what let logout
+    // start wiping the theme when color-theme.ts moved to its v2 key: the literal still
+    // matched an old key nothing used any more, and the real one fell through to "owned".
+    expect(isOwnedStorageKey(COLOR_THEME_STORAGE_KEY)).toBe(false);
+  });
+
+  it("no longer spares the dead pre-v2 theme key", () => {
+    // Nothing reads it, so logout may as well clear it off the device.
+    expect(isOwnedStorageKey("elnino.color-theme")).toBe(true);
   });
 
   it("does not touch anything else", () => {
@@ -31,7 +40,7 @@ describe("ownedStorageKeys", () => {
       "podium.profile",
       "podium.userMode",
       "podium.eventGroups",
-      "elnino.color-theme",
+      COLOR_THEME_STORAGE_KEY,
       "G_AUTHUSER_H",
       "some-other-app.data",
     ];

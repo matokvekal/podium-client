@@ -14,6 +14,7 @@
 // Every step is independently guarded. If clearing one key, one store, or IndexedDB throws,
 // the rest still run and the user still ends up logged out.
 
+import { COLOR_THEME_STORAGE_KEY } from "./color-theme";
 import { clearAllCaches } from "./local-db";
 
 /** Keys this app owns. A key is fair game to delete iff it starts with one of these. */
@@ -21,11 +22,19 @@ export const OWNED_STORAGE_PREFIXES = ["podium.", "elnino."] as const;
 
 /**
  * Owned keys that are a DEVICE/APP preference rather than authenticated-user data, so logout
- * must not touch them. `elnino.color-theme` is the Dark/Light choice — the same for a
- * signed-out visitor, contains nothing about any user, and resetting it on every logout would
- * flashbang someone who set dark mode.
+ * must not touch them. The colour theme is the Dark/Light choice — the same for a signed-out
+ * visitor, contains nothing about any user, and resetting it on every logout would flashbang
+ * someone who set dark mode.
+ *
+ * IMPORTED, never retyped. This set held the literal "elnino.color-theme" while color-theme.ts
+ * moved to a v2 key, and the two silently disagreed: the real key no longer matched anything
+ * preserved here, so signing out started wiping the rider's theme. A shared constant is the
+ * only thing that keeps them from drifting apart again.
+ *
+ * The pre-v2 key is deliberately absent: nothing reads it any more, so logout may as well
+ * clear the dead value off the device.
  */
-const PRESERVED_ON_LOGOUT = new Set<string>(["elnino.color-theme"]);
+const PRESERVED_ON_LOGOUT = new Set<string>([COLOR_THEME_STORAGE_KEY]);
 
 export function isOwnedStorageKey(key: string): boolean {
   if (PRESERVED_ON_LOGOUT.has(key)) return false;

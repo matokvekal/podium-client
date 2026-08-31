@@ -7,25 +7,45 @@
  *
  * QR encoding happens entirely in the browser (the `qrcode` package, no network call) —
  * consistent with this app's offline-first bent elsewhere (IndexedDB event cache, local dev
- * sign-in). Native share (`navigator.share`) is used when the browser offers it; otherwise a
- * plain "Copy link" button covers the same case.
+ * sign-in). Native share (`navigator.share`) is used when the browser offers it; otherwise the
+ * copy buttons cover the same case.
+ *
+ * What gets sent is a real invitation — the ride's name, day, time and place, built by
+ * lib/share-invite.ts and previewed in the sheet so the organizer sees exactly what lands in
+ * the chat. It replaced "Join <name> on El Niño Move", which told the reader nothing they
+ * needed in order to say yes.
+ *
+ * Two copy actions, because they answer different questions: "Copy invitation" is the whole
+ * message for pasting into a chat, "Copy link" is the bare URL for a form, a poster or a
+ * calendar entry.
  */
 
-import { Check, Copy, Share2, X } from "lucide-react";
+import { Check, Copy, Link2, Share2, X } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { config } from "../lib/config";
+import { shareInviteMessage, shareInviteTitle } from "../lib/share-invite";
 import styles from "./ShareEventSheet.module.css";
 
 interface ShareEventSheetProps {
   eventName: string;
   eventCode: string;
+  /** UTC ISO. Optional so a caller that genuinely has no start time still works — the
+   *  invitation simply drops its date line rather than printing a placeholder. */
+  startsAt?: string | null;
+  location?: string | null;
   onClose: () => void;
 }
 
-export function ShareEventSheet({ eventName, eventCode, onClose }: ShareEventSheetProps) {
+export function ShareEventSheet({
+  eventName,
+  eventCode,
+  startsAt,
+  location,
+  onClose,
+}: ShareEventSheetProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"invite" | "link" | null>(null);
 
   // Always the production origin (config.shareBaseUrl) — a shared link / printed QR must open
   // the real app, never a localhost dev server.
@@ -56,16 +76,37 @@ export function ShareEventSheet({ eventName, eventCode, onClose }: ShareEventShe
     };
   }, [qrUrl]);
 
+  // The invitation as the recipient will read it. Two shapes of the same message: the clipboard
+  // has no separate URL field so its copy carries the link inline, while navigator.share passes
+  // `url` on its own — putting it in both would print the link twice in the chat bubble.
+  const messageForChat = useMemo(
+    () => shareInviteMessage({ eventName, startsAt, location }),
+    [eventName, startsAt, location],
+  );
+  const messageWithLink = useMemo(
+    () => shareInviteMessage({ eventName, startsAt, location, url: joinUrl }),
+    [eventName, startsAt, location, joinUrl],
+  );
+
+  function flash(which: "invite" | "link") {
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function copyInvite() {
+    await navigator.clipboard.writeText(messageWithLink);
+    flash("invite");
+  }
+
   async function copyLink() {
     await navigator.clipboard.writeText(joinUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    flash("link");
   }
 
   async function nativeShare() {
     await navigator.share({
-      title: eventName,
-      text: `Join ${eventName} on El Niño Move`,
+      title: shareInviteTitle(eventName),
+      text: messageForChat,
       url: joinUrl,
     });
   }
@@ -96,28 +137,39 @@ export function ShareEventSheet({ eventName, eventCode, onClose }: ShareEventShe
             )}
           </div>
 
-          <div className={styles.linkRow}>
-            <code className={styles.link}>{joinUrl}</code>
-            <button
-              type="button"
-              className="button button--quiet"
-              onClick={copyLink}
-              aria-label="Copy link"
-            >
-              {copied ? (
-                <Check width={16} height={16} aria-hidden="true" />
-              ) : (
-                <Copy width={16} height={16} aria-hidden="true" />
-              )}
-            </button>
+          {/* What the recipient will actually read, shown before it is sent. An organizer
+              about to post this into a group chat should not have to send it to themselves
+              first to find out what it says. */}
+          <div className={styles.preview}>
+            <span className={styles.previewLabel}>They'll receive</span>
+            <p className={styles.previewText}>{messageForChat}</p>
           </div>
 
           {typeof navigator.share === "function" && (
             <button type="button" className="button" onClick={nativeShare}>
               <Share2 width={16} height={16} aria-hidden="true" style={{ marginRight: 6 }} />
-              Share
+              Share invitation
             </button>
           )}
+
+          <div className={styles.copyRow}>
+            <button type="button" className="button button--quiet" onClick={copyInvite}>
+              {copied === "invite" ? (
+                <Check width={16} height={16} aria-hidden="true" />
+              ) : (
+                <Copy width={16} height={16} aria-hidden="true" />
+              )}
+              {copied === "invite" ? "Copied" : "Copy invitation"}
+            </button>
+            <button type="button" className="button button--quiet" onClick={copyLink}>
+              {copied === "link" ? (
+                <Check width={16} height={16} aria-hidden="true" />
+              ) : (
+                <Link2 width={16} height={16} aria-hidden="true" />
+              )}
+              {copied === "link" ? "Copied" : "Copy link"}
+            </button>
+          </div>
 
           <p className="muted" style={{ fontSize: "0.85rem" }}>
             Anyone who scans this or opens the link can find and join {eventName} with code{" "}

@@ -1922,6 +1922,8 @@ export function EventDetailPage() {
           <ShareEventSheet
             eventName={event.name}
             eventCode={event.code}
+            startsAt={event.startsAt}
+            location={event.location}
             onClose={() => setShareOpen(false)}
           />
         </Suspense>

@@ -87,3 +87,44 @@
   color: var(--text);
   text-align: left;
 }
+
+/* The invitation exactly as the recipient will read it. Pre-wrap because share-invite.ts
+   builds the message with real newlines and the line breaks ARE the layout — each fact on
+   its own line so a Hebrew ride name and an English date never share one. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.previewLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.previewText {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.copyRow {
+  display: flex;
+  gap: 8px;
+}
+
+.copyRow > button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}

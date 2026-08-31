@@ -4,10 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
+    <!--
+      These tags ARE the link preview. A chat app fetches the URL, reads the head, and draws its
+      card from what it finds here — before any JavaScript runs, so nothing the React app knows
+      can reach them. The old copy was a product blurb ("create a ride or a race, join with a
+      code…"), which is what an invited rider saw in WhatsApp instead of an invitation.
+
+      Written as an invitation, in the second person, because the overwhelming majority of links
+      to this site are someone inviting someone else to a ride.
+
+      LIMIT worth knowing before editing: this is one fixed card for the whole site. Naming the
+      specific ride ("רכיבת שבת, Saturday 5 Sep") needs the server to render /join/:code with
+      per-event tags — a server change, not a client one. Until then the card must read
+      truthfully for ANY ride, which is why it says "a ride" and never invents a name or a date.
+    -->
     <meta
       name="description"
-      content="El Niño Move — create a ride or a race, join with a code, and follow every rider live on the map."
+      content="Someone has invited you to a ride on El Niño Move. Open the link to see the route, the time and who's coming — then join."
     />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="El Niño Move" />
+    <meta property="og:title" content="You're invited to ride" />
+    <meta
+      property="og:description"
+      content="Someone has invited you to a ride on El Niño Move. Open the link to see the route, the time and who's coming — then join."
+    />
+    <!-- Absolute, not root-relative: several chat clients (WhatsApp among them) will not resolve
+         a relative og:image against the page URL and simply show no picture. 1200x630 is the
+         1.91:1 card every one of them crops to — see public/og-invite.jpg. -->
+    <meta property="og:image" content="https://el-nino.site/og-invite.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Riders climbing a gravel trail toward snow-capped peaks" />
+    <meta property="og:url" content="https://el-nino.site/" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="You're invited to ride" />
+    <meta
+      name="twitter:description"
+      content="Someone has invited you to a ride on El Niño Move. Open the link to see the route, the time and who's coming — then join."
+    />
+    <meta name="twitter:image" content="https://el-nino.site/og-invite.jpg" />
+
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!-- Abel: the event card typeface in the Figma design (Tomer-Design / new-commissaire).

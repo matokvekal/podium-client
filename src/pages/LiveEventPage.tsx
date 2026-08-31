@@ -100,6 +100,10 @@ interface LiveEventInfo {
   isPaused: boolean;
   showLiveLocations: boolean;
   startsAt: string | null;
+  /** Only used to fill in the share invitation's "where" line (lib/share-invite.ts). Nothing on
+   *  the map needs it — the map has real coordinates — so a missing value simply drops that
+   *  line from the message. */
+  location: string | null;
   myParticipant: { id: number } | null;
   status: EventStatus;
   effectiveStatus: EventStatus;
@@ -114,6 +118,7 @@ function liveInfoFromCachedSummary(summary: EventSummary, viewerId: number | nul
     isPaused: false,
     showLiveLocations: true,
     startsAt: summary.startsAt,
+    location: summary.location,
     myParticipant: null,
     status: summary.status,
     effectiveStatus: summary.status,
@@ -884,6 +889,8 @@ export function LiveEventPage() {
           <ShareEventSheet
             eventName={event.name}
             eventCode={event.code}
+            startsAt={event.startsAt}
+            location={event.location}
             onClose={() => setShareOpen(false)}
           />
         </Suspense>

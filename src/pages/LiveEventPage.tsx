@@ -832,14 +832,21 @@ export function LiveEventPage() {
               </div>
             )}
 
-            <button
-              type="button"
-              className={styles.shareEventRow}
-              onClick={() => setShareOpen(true)}
-            >
-              <Share2 width={16} height={16} aria-hidden="true" />
-              Share this event
-            </button>
+            {/* Dropped once the ride is over, same as the event page's share icon: the code
+                behind the link stops resolving when the server clears is_active, so sharing a
+                finished ride only hands out a dead invitation. This screen outlives the ride
+                itself — it stays open showing final positions — so the guard is needed here
+                too, not just on a page you arrive at afterwards. */}
+            {!eventIsFinished && (
+              <button
+                type="button"
+                className={styles.shareEventRow}
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 width={16} height={16} aria-hidden="true" />
+                Share this event
+              </button>
+            )}
           </div>
         ) : (
           <div className={styles.sheetBody}>

@@ -1036,6 +1036,10 @@ export function EventDetailPage() {
   const maxParticipants = event.maxParticipants || FALLBACK_LIMITS.maxParticipantsPerEvent;
   const eventFull = event.isFull || participantCount >= maxParticipants;
   const bucket = figmaStatus(displayStatus);
+  // Only a ride someone can still turn up to is worth handing out a link to — see the share
+  // button below. figmaStatus folds cancelled in with finished, which is right here: both are
+  // rides nobody can join.
+  const canShare = bucket !== "finished";
   const canEditNow = showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
   // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
   // hid the live map from the ride's own registered riders: show_live_locations defaults to
@@ -1096,15 +1100,24 @@ export function EventDetailPage() {
             >
               {displayStatus === "cancelled" ? "Cancelled" : FIGMA_TAG_LABEL[bucket]}
             </span>
-            <button
-              type="button"
-              className={styles.heroIconBtn}
-              onClick={() => setShareOpen(true)}
-              aria-label="Share this event"
-              title="Share — code, QR, link"
-            >
-              <Share2 aria-hidden="true" />
-            </button>
+            {/* Share is gone once the ride is over. A share link exists to get someone TO a
+                ride — it opens the join flow behind a code that the server stops resolving the
+                moment the event finishes (selectActiveEventByCode filters on is_active, which
+                the server keeps false for finished/cancelled). So on a past ride the button
+                could only ever hand out a code that answers "no event has that code": an
+                invitation to something nobody can accept. Riders who were there still reach it
+                from My Rides, and anyone else from the Past filter — neither needs a link. */}
+            {canShare && (
+              <button
+                type="button"
+                className={styles.heroIconBtn}
+                onClick={() => setShareOpen(true)}
+                aria-label="Share this event"
+                title="Share — code, QR, link"
+              >
+                <Share2 aria-hidden="true" />
+              </button>
+            )}
             {showOrganizerUi && (
               <button
                 type="button"

@@ -866,6 +866,8 @@
   --chip-approval: #c2410c;
   --chip-accessible: #0369a1;
   --chip-rest: #7c3aed;
+  /* See EventCard.module.css — slate, deliberately the quietest chip on the row. */
+  --chip-support: #475569;
 
   display: flex;
   align-items: center;
@@ -885,6 +887,7 @@
     --chip-approval: #fb923c;
     --chip-accessible: #38bdf8;
     --chip-rest: #c4b5fd;
+    --chip-support: #94a3b8;
   }
 }
 
@@ -899,6 +902,7 @@
   --chip-approval: #fb923c;
   --chip-accessible: #38bdf8;
   --chip-rest: #c4b5fd;
+  --chip-support: #94a3b8;
 }
 
 .chip {
@@ -942,6 +946,9 @@
 }
 .chip[data-kind="accessible"] {
   --chip-hue: var(--chip-accessible);
+}
+.chip[data-kind="support"] {
+  --chip-hue: var(--chip-support);
 }
 .chip[data-kind="rest"] {
   --chip-hue: var(--chip-rest);

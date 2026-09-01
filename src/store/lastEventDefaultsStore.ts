@@ -26,6 +26,7 @@ export interface LastEventDefaults {
   durationMin?: number | null;
   restStops?: number | null;
   isAccessible?: boolean;
+  hasSupportVehicle?: boolean;
 }
 
 interface LastEventDefaultsState {

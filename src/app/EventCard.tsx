@@ -37,6 +37,7 @@ import {
   Mountain,
   Ruler,
   Timer,
+  Truck,
   UsersRound,
 } from "lucide-react";
 import type { MouseEvent } from "react";
@@ -216,6 +217,19 @@ export function EventCard({
               >
                 <Accessibility width={12} height={12} aria-hidden="true" />
                 Accessible
+              </span>
+            )}
+            {/* Only ever rendered when the organizer actually ticked it. There is deliberately
+                no "no support vehicle" chip: absence is the default for every ride ever
+                created, so drawing it would put a claim on thousands of cards nobody made. */}
+            {event.hasSupportVehicle && (
+              <span
+                className={styles.chip}
+                data-kind="support"
+                title="The organizer states a support vehicle follows this ride"
+              >
+                <Truck width={12} height={12} aria-hidden="true" />
+                Support vehicle
               </span>
             )}
             {/* "Approval Required" belongs here in the design, but requiresApproval is only on

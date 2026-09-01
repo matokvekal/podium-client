@@ -56,6 +56,7 @@ import {
   Settings,
   Share2,
   Ticket,
+  Truck,
   Users,
   UsersRound,
   X,
@@ -1275,6 +1276,18 @@ export function EventDetailPage() {
             >
               <Accessibility width={13} height={13} aria-hidden="true" />
               Accessible
+            </span>
+          )}
+          {/* Shown only when the organizer ticked it — see the same chip on EventCard for why
+              there is no negative form of this badge. */}
+          {event.hasSupportVehicle && (
+            <span
+              className={styles.chip}
+              data-kind="support"
+              title="The organizer states a support vehicle follows this ride"
+            >
+              <Truck width={13} height={13} aria-hidden="true" />
+              Support vehicle
             </span>
           )}
           {restStops != null && (

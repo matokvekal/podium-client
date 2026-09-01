@@ -119,6 +119,12 @@ export interface EventSummary {
   durationMin?: number | null;
   restStops?: number | null;
   isAccessible?: boolean;
+  /**
+   * The organizer states a support / sag vehicle follows the ride (sql/024). Optional for the
+   * same reason as the rest: a row cached before this field existed simply omits it, and an
+   * absent value means the same as false — no vehicle was promised.
+   */
+  hasSupportVehicle?: boolean;
 }
 
 /**

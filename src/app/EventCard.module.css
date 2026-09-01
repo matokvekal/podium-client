@@ -22,6 +22,10 @@
   --chip-private: #7c3aed;
   --chip-public: #2563eb;
   --chip-accessible: #0369a1;
+  /* Support vehicle: slate rather than another saturated hue. It is a reassurance, not an
+     alert — "subtle, not visually aggressive" — and every warm and bright colour on this row
+     already means something else (surface, visibility, accessibility). */
+  --chip-support: #475569;
 
   /* My Rides border signal: fluorescent blue = an upcoming ride, pink = a past one. Declared
      here (and re-lit for dark below) so the glow colour tracks the theme like the chips do. */
@@ -60,6 +64,7 @@
     --chip-private: #a78bfa;
     --chip-public: #60a5fa;
     --chip-accessible: #38bdf8;
+    --chip-support: #94a3b8;
     --edge-upcoming: #4ddbff;
   }
 }
@@ -73,6 +78,7 @@
   --chip-private: #a78bfa;
   --chip-public: #60a5fa;
   --chip-accessible: #38bdf8;
+  --chip-support: #94a3b8;
   --edge-upcoming: #4ddbff;
 }
 
@@ -317,6 +323,9 @@
 }
 .chip[data-kind="accessible"] {
   --chip-hue: var(--chip-accessible);
+}
+.chip[data-kind="support"] {
+  --chip-hue: var(--chip-support);
 }
 
 .chip {

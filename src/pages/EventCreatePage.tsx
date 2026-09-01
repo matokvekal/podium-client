@@ -120,6 +120,7 @@ import {
   Target,
   Timer,
   Trash2,
+  Truck,
   Users
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
@@ -191,6 +192,7 @@ interface ExistingEvent {
   durationMin?: number | null;
   restStops?: number | null;
   isAccessible?: boolean;
+  hasSupportVehicle?: boolean;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -344,6 +346,13 @@ export function EventCreatePage() {
   );
   const [isAccessible, setIsAccessible] = useState(
     !isEditing ? (lastDefaults?.isAccessible ?? false) : false
+  );
+  // Support / sag vehicle following the ride (sql/024). Same shape as isAccessible: a plain
+  // boolean the organizer sets, false by default, and false means "none promised" — never a
+  // maybe. Riders plan long and remote rides around this, so it is only ever what the organizer
+  // actually ticked.
+  const [hasSupportVehicle, setHasSupportVehicle] = useState(
+    !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false
   );
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
@@ -520,6 +529,7 @@ export function EventCreatePage() {
         }
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
+        setHasSupportVehicle(found.hasSupportVehicle ?? false);
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -651,6 +661,7 @@ export function EventCreatePage() {
     }
     if (restStops === null && event.restStops != null) setRestStops(event.restStops);
     if (event.isAccessible) setIsAccessible(true);
+    if (event.hasSupportVehicle) setHasSupportVehicle(true);
     const sourceExtras = extrasByEvent[event.id];
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
@@ -922,7 +933,10 @@ export function EventCreatePage() {
             // Ride plan — server columns (sql/022). `null` clears duration / rest stops.
             durationMin,
             restStops,
-            isAccessible
+            isAccessible,
+            // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
+            // the badge back off rather than leaving the old claim standing.
+            hasSupportVehicle
           }
         });
         await saveExtras(eventId);
@@ -974,6 +988,8 @@ export function EventCreatePage() {
           durationMin,
           restStops,
           isAccessible,
+          // Support / sag vehicle (sql/024), on the create request itself for the same reason.
+          hasSupportVehicle,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1002,7 +1018,8 @@ export function EventCreatePage() {
         ridersListVisible,
         durationMin,
         restStops,
-        isAccessible
+        isAccessible,
+        hasSupportVehicle
       });
       // Small delayed success state before redirecting home: requested as a short green
       // confirmation moment, not an instant route jump right after tapping Save.
@@ -1735,6 +1752,34 @@ export function EventCreatePage() {
                   <span className={styles.switchLabel}>
                     <Accessibility aria-hidden="true" />
                     Suitable for riders who need assistance
+                  </span>
+                </label>
+                {/* Support / sag vehicle (sql/024) — a vehicle following the group that can
+                    pick up a rider who punctures out, cracks or gets hurt. Optional, off by
+                    default, and the same switch shape as the accessibility marker above
+                    because it is the same kind of thing: a claim only the organizer can make,
+                    which a rider then plans a long or remote ride around. Off therefore means
+                    "none promised", never "unknown" — see sql/024-event-support-vehicle.sql. */}
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={hasSupportVehicle}
+                    onChange={(e) => setHasSupportVehicle(e.target.checked)}
+                  />
+                  <span
+                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
+                  >
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${hasSupportVehicle ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {hasSupportVehicle ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <Truck aria-hidden="true" />
+                    Support vehicle
                   </span>
                 </label>
               </fieldset>

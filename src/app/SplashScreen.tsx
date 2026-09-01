@@ -23,6 +23,7 @@
  */
 
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import "./splash-screen.css";
 
 // The clip is 4.92s and fades to black over its last half second; leaving at 4.9s hands that
@@ -125,10 +126,10 @@ export function SplashScreen() {
           height={192}
           style={{ "--logo-hue": `${logoHue}deg` } as CSSProperties}
         />
-        <span className="splash__mark-name" data-text="El Niño Move">
-          El Niño Move
+        <span className="splash__mark-name" data-text={APP_NAME}>
+          {APP_NAME}
         </span>
-        <span className="splash__mark-tag">Find friends. Ride together.</span>
+        <span className="splash__mark-tag">{APP_SLOGAN}</span>
       </div>
     </div>
   );

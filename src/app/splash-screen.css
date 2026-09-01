@@ -173,9 +173,12 @@
   }
 }
 
+/* Two words, not a sentence — a little tracking is what stops "Community Cycling" reading
+   as a caption under the wordmark rather than as the slogan it is. */
 .splash__mark-tag {
   font-size: clamp(0.8rem, 3.2vw, 0.95rem);
   font-weight: 600;
+  letter-spacing: 0.08em;
   color: #14405f;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
 }

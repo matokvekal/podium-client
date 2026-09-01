@@ -25,6 +25,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { renderGoogleButton } from "../auth/google-signin";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { APP_SLOGAN } from "../lib/branding";
 import { config } from "../lib/config";
 import styles from "./LoginPage.module.css";
 
@@ -173,7 +174,7 @@ export function LoginPage() {
         <header className={styles.brand}>
           <PeaksMark />
           <h1 className={styles.wordmark}>El-Niño</h1>
-          <p className={styles.tagline}>Never ride alone.</p>
+          <p className={styles.tagline}>{APP_SLOGAN}</p>
           <p className={styles.pitch}>
             Discover rides.
             <br />

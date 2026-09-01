@@ -27,6 +27,7 @@ import {
 import { lazy, Suspense, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import type { ColorTheme } from "../lib/color-theme";
 import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
 import { Avatar } from "./Avatar";
@@ -69,8 +70,8 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
       <div className={open ? "drawer drawer--open" : "drawer"} aria-hidden={!open}>
         <div className="drawer__header">
           <div className="drawer__brand">
-            <div className="drawer__brand-name">El Niño Move</div>
-            <div className="drawer__brand-tag">Find friends. Ride together.</div>
+            <div className="drawer__brand-name">{APP_NAME}</div>
+            <div className="drawer__brand-tag">{APP_SLOGAN}</div>
           </div>
           <button type="button" className="drawer__close" onClick={onClose} aria-label="Close menu">
             <X aria-hidden="true" />

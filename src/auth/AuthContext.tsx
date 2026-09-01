@@ -37,6 +37,18 @@ export interface Profile {
   emergencyPhone: string | null;
   requiresProfile: boolean;
   /**
+   * This rider's OWN sign-in email and phone, sent only by GET /users/me — which is self-only
+   * and authenticated. Used for exactly one thing: pre-filling the optional per-ride contact
+   * fields on the create form so an organizer is not made to retype what the app already knows.
+   *
+   * Pre-filling is not publishing. Nothing reaches a ride page unless the organizer saves the
+   * ride with the value still in the field, and clearing it there never touches the account.
+   * Never render these anywhere else, and never treat them as profile fields.
+   *
+   * Optional: an older server omits them, in which case the fields simply start empty.
+   */
+  contactDefaults?: { email: string | null; phone: string | null };
+  /**
    * The Google profile photo, straight from the sign-in token — the same flat field every
    * event/participant endpoint already sends for OTHER people (see EventOwner.avatarUrl in
    * lib/local-db.ts). Optional because the server does not populate `users.avatar_url` on the

@@ -174,6 +174,17 @@ export interface EventDetail extends EventSummary {
   owner: EventOwner | null;
   requiresBib: boolean;
   description: string | null;
+  /**
+   * How to reach the organizer about THIS ride — only what they typed on the create/edit form
+   * and saved (sql/025-event-contact.sql). null means they published none, and the ride page
+   * then shows no contact block at all.
+   *
+   * Detail only, never on a list summary, and nulled by the server for a viewer who may not
+   * see when and where the ride is. Optional here because a row cached before this existed
+   * simply omits it — which reads the same as null.
+   */
+  contactPhone?: string | null;
+  contactEmail?: string | null;
   finishedAt: string | null;
   isOwner: boolean;
   requiresApproval: boolean;

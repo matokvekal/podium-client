@@ -268,6 +268,17 @@
   cursor: pointer;
 }
 
+/* Phone and email stacked, not side by side: an address is long and a 1fr/1fr split on a
+   360px phone leaves both of them too narrow to read what you typed. They sit in a fieldset
+   with the shared hint under both, so the "anything you leave empty is not published" line
+   covers the pair rather than repeating. */
+.contactFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
 .teamRow {
   display: flex;
   align-items: center;

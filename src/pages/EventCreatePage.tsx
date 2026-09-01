@@ -110,9 +110,11 @@ import {
   ImagePlus,
   LifeBuoy,
   Lock,
+  Mail,
   Map as MapIcon,
   MapPin,
   Mountain,
+  Phone,
   Radio,
   Route,
   Ruler,
@@ -157,7 +159,7 @@ import {
   LEVELS,
   type RiderLevel
 } from "../lib/rider-level";
-import { validateCreateEventForm } from "../validation/forms";
+import { contactEmailError, validateCreateEventForm } from "../validation/forms";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -193,6 +195,8 @@ interface ExistingEvent {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -354,6 +358,28 @@ export function EventCreatePage() {
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false
   );
+  /**
+   * Per-ride contact details (sql/025). Optional, and published ONLY because the organizer
+   * left a value in the field and pressed Save.
+   *
+   * On CREATE these start from the caller's own sign-in email / phone (GET /users/me's
+   * contactDefaults, self-only) so nobody has to retype what the app already knows. Pre-filling
+   * is not publishing — the organizer can change either one, or clear it, before saving.
+   *
+   * On EDIT they start EMPTY and are then filled from the event's own stored values below.
+   * They must never fall back to the profile here: an organizer who deliberately cleared the
+   * contact on a ride would have it silently reinstated the next time they opened Edit.
+   */
+  const [contactPhone, setContactPhone] = useState(
+    !isEditing ? (profile?.contactDefaults?.phone ?? "") : ""
+  );
+  const [contactEmail, setContactEmail] = useState(
+    !isEditing ? (profile?.contactDefaults?.email ?? "") : ""
+  );
+  // Live, not on submit: the organizer should see this while still looking at the field, not
+  // after a save that bounces. Empty is never an error — that is how they publish no address.
+  // The rule itself lives with every other form rule, in validation/forms.ts.
+  const contactEmailInvalid = contactEmailError(contactEmail) != null;
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
@@ -530,6 +556,10 @@ export function EventCreatePage() {
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
+        // The event's own published values — null means the organizer publishes none, and the
+        // field correctly stays empty rather than reverting to their account details.
+        setContactPhone(found.contactPhone ?? "");
+        setContactEmail(found.contactEmail ?? "");
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -890,6 +920,13 @@ export function EventCreatePage() {
       setError("Fill in the highlighted fields before saving.");
       return;
     }
+    // The contact email is optional, so it is not part of validateCreateEventForm's required
+    // set — but a value that IS there and is not an address would be rejected by the server,
+    // and losing the whole form to that is a worse outcome than saying so here.
+    if (contactEmailInvalid) {
+      setError("Fix the contact email, or clear it.");
+      return;
+    }
 
     // The Climb field's value, parsed — the ONE effective elevation gain the organizer is
     // publishing for this ride (auto-filled from a GPX import, then freely editable). Sent on
@@ -936,7 +973,11 @@ export function EventCreatePage() {
             isAccessible,
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
-            hasSupportVehicle
+            hasSupportVehicle,
+            // Published contact (sql/025). Always sent, and an emptied field sends null, so
+            // clearing it on an edit really does stop publishing it.
+            contactPhone: contactPhone.trim() || null,
+            contactEmail: contactEmail.trim() || null
           }
         });
         await saveExtras(eventId);
@@ -990,6 +1031,10 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
+          // Published contact (sql/025) — null when the organizer emptied the pre-filled value,
+          // which is how they decline to publish it.
+          contactPhone: contactPhone.trim() || null,
+          contactEmail: contactEmail.trim() || null,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1655,6 +1700,65 @@ export function EventCreatePage() {
                   />
                 </div>
               </div>
+
+              {/* Contact for THIS ride (sql/025). Both optional.
+
+                  Pre-filled on create from the organizer's own sign-in email / phone, which
+                  only they can see (GET /users/me is self-only) — so this saves retyping
+                  without ever publishing anything behind their back. What lands on the ride
+                  page is whatever is still in these boxes at Save; emptying one stops
+                  publishing it, on a new ride and on an edit alike.
+
+                  The hint says so in plain words, because "we pre-filled your phone number"
+                  is exactly the kind of thing that needs saying out loud rather than being
+                  discovered on a public page. */}
+              <fieldset className={styles.panel} style={{ border: "none" }}>
+                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
+                  <Phone aria-hidden="true" />
+                  Contact for this ride (optional)
+                </legend>
+                <div className={styles.contactFields}>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="contactPhone">
+                      <Phone aria-hidden="true" />
+                      Phone
+                    </label>
+                    <input
+                      id="contactPhone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={100}
+                      className={styles.input}
+                      value={contactPhone}
+                      placeholder="Leave empty to publish none"
+                      onChange={(e) => setContactPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="contactEmail">
+                      <Mail aria-hidden="true" />
+                      Email
+                    </label>
+                    <input
+                      id="contactEmail"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      maxLength={255}
+                      className={`${styles.input} ${contactEmailInvalid ? styles.inputInvalid : ""}`}
+                      value={contactEmail}
+                      placeholder="Leave empty to publish none"
+                      onChange={(e) => setContactEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <p className={styles.hint}>
+                  {contactEmailInvalid
+                    ? "That doesn't look like an email address."
+                    : "Shown on the ride page to riders who can see this ride. Anything you leave empty is not published."}
+                </p>
+              </fieldset>
 
               <fieldset className={styles.panel} style={{ border: "none" }}>
                 <legend

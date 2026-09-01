@@ -83,6 +83,32 @@ export function validateCreateEventForm(
   return result(errors);
 }
 
+/**
+ * Is this string plausibly an email address?
+ *
+ * Deliberately loose — "something@something.something", no spaces. The server (zod's email
+ * check) is the real gate; this exists only so an organizer sees the problem while they are
+ * still looking at the field, instead of after a round trip that rejects the whole save.
+ *
+ * A stricter client rule would be worse than none: every "clever" email regex rejects
+ * addresses that genuinely work, and this field is optional, so a false rejection would stop
+ * somebody publishing a contact for no reason at all.
+ */
+export function isLikelyEmail(value: string): boolean {
+  const v = value.trim();
+  return v.length > 0 && !/\s/.test(v) && /^[^@]+@[^@]+\.[^@]+$/.test(v);
+}
+
+/**
+ * The optional per-ride contact email. Empty is always fine — that is how an organizer says
+ * "publish no address". Only a non-empty value that is not an address is an error.
+ */
+export function contactEmailError(value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  return isLikelyEmail(v) ? null : "That doesn't look like an email address.";
+}
+
 // --- join a ride ---------------------------------------------------------------------------
 
 export type JoinRideField = "code";

@@ -1,63 +1,37 @@
 // Ride duration — the organizer's estimate of how long the ride takes, entered on the create
 // form and shown in the card / detail "Est. Time" slot (which read a hard-coded "soon" until
 // this existed). Stored server-side as whole minutes in events.duration_min
-// (sql/022-event-ride-plan.sql); this module is only the parse/format layer the form and the
-// read views share so they agree on what "2:45" means.
+// (sql/022-event-ride-plan.sql); this module is only the format/split layer the form and the
+// read views share so they agree on what 165 minutes means.
 //
-// It is an estimate the organizer types, never derived from distance — deriving one would need
+// It is an estimate the organizer sets, never derived from distance — deriving one would need
 // an assumed speed, which is the kind of invented number this app does not ship.
+//
+// This is a DURATION, not a start time. The two are separate fields and must not be conflated:
+// startsAt is when the group rolls out, durationMin is how long they expect to be out.
+//
+// The field used to be free text ("1", "1.5", "2:45") parsed with a small grammar, plus four
+// preset chips. It is now two dropdowns — see EventCreatePage — so there is nothing left to
+// parse and no way to type something unreadable. The parser and the presets went with it.
 
-/** Upper bound mirrors the server schema (durationMin ≤ 2880). */
+/** Upper bound mirrors the server schema (durationMin ≤ 2880 = 48h). */
 export const MAX_DURATION_MIN = 2880;
 
 /**
- * Parse a human duration string into whole minutes, or null when it is empty / unparseable.
- * Accepts, case-insensitively and ignoring surrounding space:
- *   "2"        → 120   (bare number = hours)
- *   "1.5"      → 90    (decimal hours)
- *   "2:45"     → 165   (h:mm)
- *   "2h"       → 120
- *   "2h30" / "2h 30m" / "2h30m" → 150
- *   "90m" / "90 min" → 90
- * Returns null rather than throwing, so a half-typed field is just "not set yet".
+ * Hour values offered by the picker: 0…48, so the control can express exactly the range the
+ * server accepts and no more. Long enough for a multi-day audax, and a native <select> on a
+ * phone renders it as a scroll wheel, so length costs nothing.
  */
-export function parseDuration(raw: string): number | null {
-  const s = raw.trim().toLowerCase();
-  if (!s) return null;
+export const DURATION_HOUR_OPTIONS: readonly number[] = Array.from({ length: 49 }, (_, i) => i);
 
-  let minutes: number | null = null;
-
-  // h:mm
-  const colon = s.match(/^(\d{1,2}):([0-5]?\d)$/);
-  if (colon) {
-    minutes = Number(colon[1]) * 60 + Number(colon[2]);
-  }
-
-  // 2h, 2h30, 2h30m, 2h 30 m
-  if (minutes === null) {
-    const hm = s.match(/^(\d{1,2})\s*h\s*(\d{1,2})?\s*m?$/);
-    if (hm) {
-      minutes = Number(hm[1]) * 60 + (hm[2] ? Number(hm[2]) : 0);
-    }
-  }
-
-  // 90m, 90 min, 90 mins
-  if (minutes === null) {
-    const m = s.match(/^(\d{1,4})\s*m(?:in)?s?$/);
-    if (m) minutes = Number(m[1]);
-  }
-
-  // bare number — treated as hours (whole or decimal)
-  if (minutes === null) {
-    const n = s.match(/^(\d+(?:\.\d+)?)$/);
-    if (n) minutes = Math.round(Number(n[1]) * 60);
-  }
-
-  if (minutes === null || !Number.isFinite(minutes)) return null;
-  minutes = Math.round(minutes);
-  if (minutes <= 0 || minutes > MAX_DURATION_MIN) return null;
-  return minutes;
-}
+/**
+ * Minute values offered by the picker. Five-minute steps: an estimate finer than that is
+ * false precision, and twelve wheel rows are far quicker to land on than sixty.
+ */
+export const DURATION_MINUTE_OPTIONS: readonly number[] = Array.from(
+  { length: 12 },
+  (_, i) => i * 5,
+);
 
 /** "2h 45m" / "2h" / "45m". Empty string for null / non-positive — callers render a dash. */
 export function formatDuration(minutes: number | null | undefined): string {
@@ -69,15 +43,33 @@ export function formatDuration(minutes: number | null | undefined): string {
   return `${h}h ${m}m`;
 }
 
-/** Value shown back in the create/edit text input for a stored minute count ("", "1.5", "2:45"). */
-export function durationInputValue(minutes: number | null | undefined): string {
-  if (minutes == null || minutes <= 0) return "";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (m === 0) return String(h);
-  if (h === 0) return `${m}m`;
-  return `${h}:${String(m).padStart(2, "0")}`;
+/**
+ * Split a stored minute count into the two values the picker's dropdowns show.
+ *
+ * `null` in, `null` out for both: "not stated" is a real state for this field and must survive
+ * a round trip through the form untouched. It is NOT the same as zero.
+ */
+export function splitDuration(minutes: number | null | undefined): {
+  hours: number | null;
+  mins: number | null;
+} {
+  if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) {
+    return { hours: null, mins: null };
+  }
+  const clamped = Math.min(Math.round(minutes), MAX_DURATION_MIN);
+  return { hours: Math.floor(clamped / 60), mins: clamped % 60 };
 }
 
-/** Quick-pick chips offered under the field. */
-export const DURATION_PRESETS_MIN = [60, 90, 120, 180] as const;
+/**
+ * Combine the two dropdown values back into whole minutes for the server.
+ *
+ * Both unset, or a total of zero, means "not stated" and sends `null` — the server column is
+ * nullable and the read views render a dash. The total is clamped to the server's own bound so
+ * a 48h + 55m selection cannot produce a body the API would reject.
+ */
+export function joinDuration(hours: number | null, mins: number | null): number | null {
+  if (hours == null && mins == null) return null;
+  const total = (hours ?? 0) * 60 + (mins ?? 0);
+  if (total <= 0) return null;
+  return Math.min(total, MAX_DURATION_MIN);
+}

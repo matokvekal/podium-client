@@ -138,10 +138,11 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import {
-  DURATION_PRESETS_MIN,
-  durationInputValue,
+  DURATION_HOUR_OPTIONS,
+  DURATION_MINUTE_OPTIONS,
   formatDuration,
-  parseDuration
+  joinDuration,
+  splitDuration
 } from "../lib/ride-duration";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
 import {
@@ -327,13 +328,15 @@ export function EventCreatePage() {
   const [climbM, setClimbMInput] = useState("");
   const [distanceEdited, setDistanceEdited] = useState(false);
   const [climbEdited, setClimbEdited] = useState(false);
-  // Ride plan (sql/022). Duration is a free-text estimate the organizer types ("1", "1.5",
-  // "2:45") — parsed to whole minutes on save via lib/ride-duration.ts, never derived from
-  // distance. `durationEdited` mirrors `climbEdited`: once typed by hand, copying a track stops
-  // overwriting it. Rest stops is a small count (0 = none, null = not stated). Accessible is a
-  // marker the organizer sets for riders who need assistance / adaptive equipment.
-  const [durationInput, setDurationInput] = useState(
-    !isEditing ? durationInputValue(lastDefaults?.durationMin ?? null) : ""
+  // Ride plan (sql/022). Duration is the organizer's estimate of how long the ride takes, held
+  // as whole minutes — exactly what events.duration_min stores — and picked from two dropdowns
+  // rather than typed. `null` is a real value here and means "not stated"; it is not zero.
+  // Never derived from distance. `durationEdited` mirrors `climbEdited`: once set by hand,
+  // copying a track stops overwriting it. Rest stops is a small count (0 = none, null = not
+  // stated). Accessible is a marker the organizer sets for riders who need assistance /
+  // adaptive equipment.
+  const [durationMin, setDurationMin] = useState<number | null>(
+    !isEditing ? (lastDefaults?.durationMin ?? null) : null
   );
   const [durationEdited, setDurationEdited] = useState(false);
   const [restStops, setRestStops] = useState<number | null>(
@@ -512,7 +515,7 @@ export function EventCreatePage() {
         }
         // Ride plan — server is the only source (no local-extras fallback for these).
         if (found.durationMin != null) {
-          setDurationInput(durationInputValue(found.durationMin));
+          setDurationMin(found.durationMin);
           setDurationEdited(true);
         }
         if (found.restStops != null) setRestStops(found.restStops);
@@ -643,8 +646,8 @@ export function EventCreatePage() {
     // Ride plan carries over as the default too — "if user copy track from other you may copy
     // this also as default time". Same rule as everything else here: only when the organizer
     // hasn't already set it by hand.
-    if (!durationEdited && !durationInput.trim() && event.durationMin != null) {
-      setDurationInput(durationInputValue(event.durationMin));
+    if (!durationEdited && durationMin === null && event.durationMin != null) {
+      setDurationMin(event.durationMin);
     }
     if (restStops === null && event.restStops != null) setRestStops(event.restStops);
     if (event.isAccessible) setIsAccessible(true);
@@ -886,9 +889,9 @@ export function EventCreatePage() {
       Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
 
     // Ride plan, all sent on the create/edit request itself so the server persists them
-    // (events.duration_min / rest_stops / is_accessible). `null` = not stated; an unparseable
-    // duration string is simply treated as not stated rather than blocking the save.
-    const durationMin = parseDuration(durationInput);
+    // (events.duration_min / rest_stops / is_accessible). `null` = not stated. `durationMin` is
+    // already whole minutes clamped to the server's bound (lib/ride-duration.ts), so there is
+    // nothing to parse or validate here — the picker cannot produce anything else.
 
     setBusy(true);
     setError(null);
@@ -1526,53 +1529,88 @@ export function EventCreatePage() {
               </div>
 
               {/* Ride plan — how long the ride runs and how many rest/regroup stops it has.
-                  Duration is a free-text estimate ("1", "1.5", "2:45"); the quick chips just
-                  pre-fill common values. Parsed to minutes on save (lib/ride-duration.ts),
-                  shown in the card / detail "Est. Time" slot. Never derived from distance. */}
-              <div className={styles.fieldRow}>
+                  Shown in the card / detail "Est. Time" slot. Never derived from distance.
+
+                  DURATION, not a start time: how long the group expects to be out, which is a
+                  different field from startsAt above and must never be confused with it. Hence
+                  "Ride duration", the hours/minutes units printed inside the options, and the
+                  "How long the ride takes" hint under the control.
+
+                  Two dropdowns rather than the free-text box + four preset chips this replaced.
+                  The old box asked the organizer to type "1", "1.5" or "2:45" and guess what
+                  the app would make of it — a bare "1" silently meant an hour, "90" meant
+                  ninety HOURS, and anything it could not read raised an error message under a
+                  field that had looked fine while typing. On a phone it also opened a keyboard
+                  for what is a choice from a short list. A native <select> is a scroll wheel on
+                  iOS and Android: thumb-sized targets, no keyboard, nothing unparseable to
+                  type, and the value is whole minutes at every moment (lib/ride-duration.ts) so
+                  there is no parse step left to fail.
+
+                  Both halves carry a "—" option because "not stated" is a real, common answer
+                  for this field and has to stay reachable after a value has been picked. */}
+              <div className={styles.ridePlanRow}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="durationInput">
+                  <label className={styles.fieldLabel} htmlFor="durationHours">
                     <Timer aria-hidden="true" />
-                    Ride time
+                    Ride duration
                   </label>
-                  <input
-                    id="durationInput"
-                    inputMode="text"
-                    className={styles.input}
-                    value={durationInput}
-                    placeholder="e.g. 1, 1.5, 2:45"
-                    onChange={(e) => {
-                      setDurationInput(e.target.value);
-                      setDurationEdited(true);
-                    }}
-                  />
-                  <div
-                    className={styles.comms}
-                    style={{ marginTop: "var(--space-2)" }}
-                  >
-                    {DURATION_PRESETS_MIN.map((min) => {
-                      const label = durationInputValue(min);
-                      return (
-                        <button
-                          key={min}
-                          type="button"
-                          className={styles.commsOption}
-                          data-active={parseDuration(durationInput) === min}
-                          onClick={() => {
-                            setDurationInput(label);
+                  {(() => {
+                    const { hours, mins } = splitDuration(durationMin);
+                    // A duration saved before this picker existed (the old free-text field
+                    // accepted any minute) can land off the 5-minute grid. Its exact value is
+                    // added to the list rather than snapped, so opening Edit and saving again
+                    // cannot silently change a ride the organizer never touched.
+                    const minuteOptions = DURATION_MINUTE_OPTIONS.includes(mins ?? 0)
+                      ? DURATION_MINUTE_OPTIONS
+                      : [...DURATION_MINUTE_OPTIONS, mins as number].sort((a, b) => a - b);
+                    return (
+                      <div className={styles.duration}>
+                        <select
+                          id="durationHours"
+                          className={`${styles.input} ${styles.durationSelect}`}
+                          aria-label="Ride duration — hours"
+                          value={hours ?? ""}
+                          onChange={(e) => {
+                            const next = e.target.value === "" ? null : Number(e.target.value);
+                            setDurationMin(joinDuration(next, mins));
                             setDurationEdited(true);
                           }}
                         >
-                          {formatDuration(min)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {durationInput.trim() && parseDuration(durationInput) == null && (
-                    <p className={styles.hint}>
-                      Couldn't read that — try 1, 1.5 or 2:45.
-                    </p>
-                  )}
+                          <option value="">— h</option>
+                          {DURATION_HOUR_OPTIONS.map((h) => (
+                            <option key={h} value={h}>
+                              {h} h
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className={`${styles.input} ${styles.durationSelect}`}
+                          aria-label="Ride duration — minutes"
+                          value={mins ?? ""}
+                          onChange={(e) => {
+                            const next = e.target.value === "" ? null : Number(e.target.value);
+                            setDurationMin(joinDuration(hours, next));
+                            setDurationEdited(true);
+                          }}
+                        >
+                          <option value="">— m</option>
+                          {minuteOptions.map((m) => (
+                            <option key={m} value={m}>
+                              {String(m).padStart(2, "0")} m
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
+                  {/* Reads back the stored value in the same words the ride card and the
+                      detail page will use, so what the organizer picked and what riders will
+                      read are visibly the same thing. */}
+                  <p className={styles.hint}>
+                    {durationMin == null
+                      ? "How long the ride takes. Optional."
+                      : `Riders will see “${formatDuration(durationMin)}”.`}
+                  </p>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel} htmlFor="restStops">

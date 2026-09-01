@@ -240,6 +240,34 @@
   gap: var(--space-3);
 }
 
+/* Ride duration + rest stops. Deliberately NOT .fieldRow: that row's 190px side column is
+   sized for the native datetime-local widget, and lending it to a 0-20 rest-stop counter left
+   the duration picker about 126px on a 360px phone — two dropdowns in half a field. Rest stops
+   needs 110px, which gives the picker room for both of its wheels. */
+.ridePlanRow {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* The two halves of the duration picker. Equal columns so neither wheel is the cramped one,
+   and a small gap so they read as one control rather than two unrelated fields. */
+.duration {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Selects inherit .input for height/border/focus so the picker lines up with every other field
+   on the form. The only additions are the ones a <select> needs: room for the platform's own
+   arrow, and no text-overflow when the list is open. */
+.durationSelect {
+  min-width: 0;
+  padding-right: 6px;
+  cursor: pointer;
+}
+
 .teamRow {
   display: flex;
   align-items: center;

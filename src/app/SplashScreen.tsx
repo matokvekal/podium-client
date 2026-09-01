@@ -4,7 +4,7 @@
  * Shown once per cold start, layered over the real app while it mounts underneath — it does
  * not delay anything; routing and auth are already loading in parallel behind it.
  *
- * It is a five-second clip of a group riding a mountain road (public/splash.mp4, cut from
+ * It is a clip of a group riding a mountain road (public/splash.mp4, cut from
  * Images/video1.mp4) with the wordmark and the spinning storm mark over it. Same wordless
  * pitch the old drawn version made — a group riding together — but with real riders. The
  * previous drawn splash (glowing road route, rider dots, blinking SOS ping) is kept verbatim
@@ -26,9 +26,19 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import "./splash-screen.css";
 
-// The clip is 4.92s and fades to black over its last half second; leaving at 4.9s hands that
-// fade straight over to the app's own. Change one and the other looks wrong.
-const VISIBLE_MS = 4900;
+/**
+ * Total time on screen is VISIBLE_MS + FADE_MS — 3 seconds, down from the 5.4 it used to be.
+ * A splash is a held breath before the app, and five seconds is long enough that a returning
+ * rider reads it as the app being slow rather than as branding.
+ *
+ * The clip itself is unchanged and still 4.92s, so it is now cut roughly halfway through and
+ * fades out while the riders are still moving. That is deliberately BETTER than what it
+ * replaced: the last half second of the clip is its own fade to black, and the old 4.9s exit
+ * landed inside it, so the handover went through a black frame. Leaving at 2.5s never reaches
+ * that fade, so nothing on screen ever goes blank — the moving footage cross-fades straight
+ * into the app underneath, which has been mounting behind the splash the whole time.
+ */
+const VISIBLE_MS = 2500;
 // Matches the opacity transition in splash-screen.css. The element is removed when the fade
 // has actually finished, not part-way through it.
 const FADE_MS = 500;
@@ -38,7 +48,7 @@ const FADE_MS = 500;
  *
  * The app hard-navigates itself in a few places — signing out, and a session the server has
  * rejected (AuthContext.tsx) — which reboots the SPA and remounts this component. Without this
- * guard each of those replays the full five seconds, so an in-app redirect reads to a rider as
+ * guard each of those replays the whole splash, so an in-app redirect reads to a rider as
  * "the app restarted", which is exactly how it was reported. sessionStorage is the right scope:
  * it survives a reload in this tab (so the video does not come back), and it is gone for the
  * next launch (so a real cold start still gets its splash).

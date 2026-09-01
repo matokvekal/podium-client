@@ -164,7 +164,10 @@
   /* One soft white bloom so a lit letter reads as a reflection, not a hard edge. Kept gentle
      — cinematic, not flashy. */
   filter: drop-shadow(0 0 5px rgb(255 255 255 / 0.55));
-  animation: splash-name-sheen 4.5s ease-in-out 800ms infinite;
+  /* 500ms delay, not 800: the sweep occupies the first 40% of the 4.5s cycle (~1.8s), so it
+     now runs 0.5s→2.3s and finishes before the splash starts fading at 2.5s. At the old delay
+     the band was still crossing the last letters as the whole screen faded out. */
+  animation: splash-name-sheen 4.5s ease-in-out 500ms infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

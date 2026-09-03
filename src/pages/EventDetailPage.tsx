@@ -111,6 +111,42 @@ const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
+
+/**
+ * "Track copied from <ride>" — the credit line under the route preview, shown when this ride's
+ * track came from another ride (server: events.copied_from_event_id, sql/025).
+ *
+ * The server sends the source ride's ID, not its name, so the name is fetched here — best
+ * effort, and the whole point of this component is what happens when that fails. A source ride
+ * can be cancelled, deleted, or private to someone else, and none of those are errors: the ride
+ * and the track are separate entities, and the record of where a track came from deliberately
+ * outlives the ride it came from. So a name that will not resolve degrades to plain,
+ * unlinked text rather than a dead link or a disappearing credit.
+ */
+function CopiedFromCredit({ sourceEventId }: { sourceEventId: string }) {
+  const [name, setName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<{ name?: string }>(`/events/${sourceEventId}`)
+      .then((source) => {
+        if (!cancelled && source?.name) setName(source.name);
+      })
+      .catch(() => {
+        // Gone, cancelled, or not ours to see. The credit stays, the link does not.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceEventId]);
+
+  return (
+    <p className={styles.routeCredit}>
+      Track copied from{" "}
+      {name ? <Link to={`/events/${sourceEventId}`}>{name}</Link> : "another ride"}
+    </p>
+  );
+}
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
@@ -1557,6 +1593,9 @@ export function EventDetailPage() {
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={results.route.points} />
                 </Suspense>
+                {event.copiedFromEventId && (
+                  <CopiedFromCredit sourceEventId={event.copiedFromEventId} />
+                )}
               </div>
             )}
 

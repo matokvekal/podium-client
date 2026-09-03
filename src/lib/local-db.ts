@@ -196,6 +196,20 @@ export interface EventDetail extends EventSummary {
    * client-only concept today (store/eventGroupsStore.ts), so a response may omit these. */
   groupCount?: number;
   maxGroups?: number;
+  /**
+   * Where this ride's track came from (server: sql/025-track-copy-lineage.sql). Both absent for
+   * a track uploaded or drawn; only `copiedFromRouteId` for one picked out of Find Tracks,
+   * where there is no source ride to point at.
+   *
+   * Optional because a row cached before this existed omits them, and because a server that has
+   * not shipped them yet simply does not send them — same rule as `groupCount` above.
+   *
+   * `copiedFromEventId` may name a ride that is gone. That is a normal end state, not a broken
+   * link: the ride and the track are separate entities, and the record of where a track came
+   * from outlives the ride it came from. Never assume it still resolves.
+   */
+  copiedFromEventId?: string | null;
+  copiedFromRouteId?: number | null;
 }
 
 /** One GET /events/:eventId/participants row, as far as any UI here needs it. */

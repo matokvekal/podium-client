@@ -650,11 +650,6 @@ export function EventCreatePage() {
 
   async function pickEventToCopy(event: EventSummary) {
     setCopiedFrom(event);
-    // Whatever track was chosen before, this replaces it. Without this, a rider who arrived
-    // from Find Tracks (fromRouteId set) and then picked a ride here would still SAVE the Find
-    // Tracks route: saveExtras checks fromRouteId first, and nothing ever cleared it. They got
-    // a track they did not choose, and the copy would have been counted against it too.
-    setFromRouteId(null);
     setUploadedFileName(null);
     setUploadedRestStops([]);
     setGalleryOpen(false);
@@ -710,9 +705,6 @@ export function EventCreatePage() {
   function clearCopiedTrack() {
     setCopiedFrom(null);
     setCopiedRoute(null);
-    // Removing the track has to remove ALL of it. Leaving fromRouteId set meant the ride still
-    // saved with the Find Tracks route the rider had just cleared off the form.
-    setFromRouteId(null);
     setUploadedFileName(null);
     setUploadedRestStops([]);
     // Only clears values that came from the route being removed — a hand-typed distance/climb
@@ -723,9 +715,6 @@ export function EventCreatePage() {
 
   function handleUploadRoute(uploaded: UploadedTrack) {
     setCopiedFrom(null);
-    // Same reason as pickEventToCopy: an uploaded file replaces any previously picked track,
-    // and a stale fromRouteId would otherwise win in saveExtras and attach that route instead.
-    setFromRouteId(null);
     setCopyLoading(false);
     setGalleryOpen(false);
     setCopiedRoute(uploaded.route);
@@ -809,30 +798,6 @@ export function EventCreatePage() {
     setNewTeamName("");
   }
 
-  /**
-   * Stores geometry as a NEW route row — POST /events/:id/route with { points }.
-   *
-   * Extracted unchanged from saveExtras so the uploaded-file path and the copy-from-a-ride
-   * fallback send byte-identical bodies. This is the only branch that still forks a row, and
-   * for an uploaded file that is correct: there is no existing track to attach.
-   */
-  async function postRoutePoints(
-    id: string,
-    route: EventRoute,
-    typedDistance: number | null,
-    typedClimb: number | null
-  ) {
-    const points = capRoutePayload(route.points, route.distanceKm, route.elevationM);
-    await apiRequest(`/events/${id}/route`, {
-      method: "POST",
-      body: {
-        points,
-        distanceKm: typedDistance ?? route.distanceKm,
-        elevationM: typedClimb ?? route.elevationM
-      }
-    });
-  }
-
   async function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
@@ -859,38 +824,24 @@ export function EventCreatePage() {
         method: "POST",
         body: { routeId: fromRouteId }
       });
-    } else if (copiedFrom && copiedRoute) {
-      // A track copied from another RIDE. Send the source ride's id and let the server attach
-      // that ride's own route row (copyTrackFromEvent).
-      //
-      // This used to fall into the `points` branch below: we re-POSTed the geometry we had just
-      // fetched from the source ride, which made the server store a SECOND routes row. The two
-      // rides then shared nothing — a fix to the original never reached the copy, and the
-      // original track had no way to know it had been used, so it could never be counted.
-      // Sending the id instead makes it one shared row, which is what
-      // ELNINO_AGENT_SOURCE_OF_TRUTH_SHORT.md always said a copy was.
-      //
+    } else if (copiedRoute) {
       // Instant, same-device feedback (and an offline fallback) — see eventRouteStore.ts.
       setEventRoute(id, copiedRoute);
-      try {
-        await apiRequest(`/events/${id}/route`, {
-          method: "POST",
-          body: { sourceEventId: copiedFrom.id }
-        });
-      } catch {
-        // A server that predates the { sourceEventId } body rejects it. Fall back to the old
-        // way — the ride still saves with its track, it just forks the geometry exactly as it
-        // did before. This is only about deploy order: it lets the client ship ahead of the
-        // server without anyone losing a ride, and it stops being reached once both are up.
-        await postRoutePoints(id, copiedRoute, typedDistance, typedClimb);
-      }
-    } else if (copiedRoute) {
-      // An uploaded or drawn line — there is no existing row to attach, so this genuinely does
-      // store new geometry. Instant, same-device feedback first (eventRouteStore.ts), then the
-      // server so every viewer sees the same route. Awaited so navigation never races ahead of
-      // route persistence.
-      setEventRoute(id, copiedRoute);
-      await postRoutePoints(id, copiedRoute, typedDistance, typedClimb);
+      // Also persist to the server so every viewer sees the same route. Await this so
+      // navigation never races ahead of route persistence.
+      const points = capRoutePayload(
+        copiedRoute.points,
+        copiedRoute.distanceKm,
+        copiedRoute.elevationM
+      );
+      await apiRequest(`/events/${id}/route`, {
+        method: "POST",
+        body: {
+          points,
+          distanceKm: typedDistance ?? copiedRoute.distanceKm,
+          elevationM: typedClimb ?? copiedRoute.elevationM
+        }
+      });
     }
     setEventDistanceClimb(id, typedDistance, typedClimb);
     setEventCoverImage(id, coverImageDataUrl);

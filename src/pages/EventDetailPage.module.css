@@ -1146,6 +1146,16 @@
   gap: 5px;
 }
 
+/* "Track copied from <ride>" — a credit under the map, deliberately quiet: it names whose work
+   this ride is built on without competing with the route itself. Sits at the same muted weight
+   as .routeMeta above. The link half is absent when the source ride is gone, so this styles the
+   text, not the anchor. */
+.routeCredit {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* --- info strip ---------------------------------------------------------------------------- */
 
 /* Same auto-fit reasoning as the stat strip: cells appear only when their value is real. */

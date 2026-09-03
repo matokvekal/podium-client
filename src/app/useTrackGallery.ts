@@ -47,11 +47,21 @@ export type GallerySource = "all" | "mine";
  * key, which means "not asked yet". Storing the negative is what stops a routeless ride being
  * re-requested every time it scrolls past.
  */
-const routeCache = new Map<string, EventRoute | null>();
+const routeCache = new Map<string, GalleryRoute | null>();
 const inFlight = new Set<string>();
 
+/**
+ * The geometry response, plus the reuse count when the server reports one.
+ *
+ * `usedByRides` is how many rides have been built on this track — the honest version of a
+ * "downloads" number, since nothing in this product downloads a track file. It rides along on
+ * the `?preview=1` response the gallery already makes rather than costing a second call per
+ * card. A server that has not shipped it yet simply omits it, and the card drops the stat.
+ */
+export type GalleryRoute = EventRoute & { usedByRides?: number };
+
 /** A ride whose route came back missing or too short to draw. */
-function isRouteless(route: EventRoute | null | undefined): boolean {
+function isRouteless(route: GalleryRoute | null | undefined): boolean {
   return route === null || (route != null && route.points.length < 2);
 }
 
@@ -66,7 +76,7 @@ interface UseTrackGalleryResult {
   /** Called by a card when it scrolls into view; resolves and caches that ride's route. */
   requestRoute: (eventId: string) => void;
   /** Resolved geometry by event id. `undefined` = not asked yet, `null` = asked, none exists. */
-  routes: ReadonlyMap<string, EventRoute | null>;
+  routes: ReadonlyMap<string, GalleryRoute | null>;
 }
 
 export function useTrackGallery(source: GallerySource, search: string): UseTrackGalleryResult {
@@ -95,7 +105,7 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
    * Seeded FROM the cache, so reopening the gallery paints the routes already known instead of
    * re-fetching them and flashing placeholders.
    */
-  const [routes, setRoutes] = useState<ReadonlyMap<string, EventRoute | null>>(
+  const [routes, setRoutes] = useState<ReadonlyMap<string, GalleryRoute | null>>(
     () => new Map(routeCache),
   );
 
@@ -186,10 +196,12 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
     inFlight.add(eventId);
     (async () => {
       try {
-        // `preview=1` asks for a thinned line. The GET handler parses only req.params today,
-        // so an unknown query key is ignored — this is a no-op until the server learns it, and
-        // harmless either way, since the thumbnail thins whatever it is given.
-        const route = await apiRequest<EventRoute | null>(`/events/${eventId}/route?preview=1`);
+        // `preview=1` asks for the gallery's shape: a thinned line plus the reuse count. A
+        // server that does not know the parameter ignores it and answers with the ordinary
+        // full-geometry body, which is a perfectly good answer — the thumbnail thins whatever
+        // it is given and the card drops the count. So this is safe to ship ahead of the
+        // server, and gets better the moment the server catches up.
+        const route = await apiRequest<GalleryRoute | null>(`/events/${eventId}/route?preview=1`);
         routeCache.set(eventId, route ?? null);
         setRoutes((prev) => new Map(prev).set(eventId, route ?? null));
       } catch {

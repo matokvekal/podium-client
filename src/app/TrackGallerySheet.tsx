@@ -171,6 +171,7 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
                   key={event.id}
                   event={event}
                   route={routes.get(event.id)}
+                  usedByRides={routes.get(event.id)?.usedByRides}
                   onVisible={requestRoute}
                   onPick={onPick}
                 />

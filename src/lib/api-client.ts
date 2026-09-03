@@ -235,6 +235,42 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return body as T;
 }
 
+/** A page of a list endpoint, plus the server's own count of everything that matched. */
+export interface ApiPage<T> {
+  data: T[];
+  total: number;
+}
+
+/**
+ * Like apiRequest, but keeps `total` instead of throwing it away.
+ *
+ * apiRequest unwraps the `{ data }` envelope, which is right for every single-resource read
+ * and for a list nobody pages. It is why the two paged endpoints this app has are both used
+ * unpaged today: eventsStore asks for `limit=100` once and calls that the whole list, and
+ * tracksStore asks for `pageSize=60` and says in its own comment that real paging is a later
+ * job. Neither can page, because the count needed to know when to stop is discarded one line
+ * before they see it.
+ *
+ * So this is a sibling, not a change to apiRequest — every existing caller keeps its exact
+ * behaviour. `total` is only trustworthy from an endpoint that actually sends it
+ * (GET /events/public, GET /routes/public); anything else reports the page's own length,
+ * which makes "there is no more" the safe answer rather than an infinite scroll that never
+ * ends.
+ */
+export async function apiRequestPaged<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<ApiPage<T>> {
+  const response = await send(path, options, true);
+
+  if (!response.ok) throw await readError(response);
+
+  const body = (await response.json()) as { data?: T[]; total?: unknown };
+  const data = Array.isArray(body?.data) ? body.data : [];
+  const total = typeof body?.total === "number" ? body.total : data.length;
+  return { data, total };
+}
+
 /**
  * For mutations that were queued offline. A 409 means the server already applied this exact
  * action id — the rider's intent happened, so it is a success, not an error to show them.

@@ -1,0 +1,168 @@
+/*
+ * Full-screen track gallery.
+ *
+ * The z-index scale is the one every other sheet in this app uses: 1000 overlay, 1001 sheet.
+ * It has to clear Leaflet's panes (200-700) because the create form behind this can be showing
+ * a route map — see TracksPage.module.css, where the same reasoning is written out.
+ *
+ * Unlike the bottom sheets, this one is inset:0 with its own internal scroller: a list that
+ * pages forever cannot share the page's scrollbar, or "scrolled to the end" would mean two
+ * different things.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(15 23 42 / 0.55);
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+
+  /* Slides up rather than appearing: this replaces a bottom sheet, and arriving the same way
+     keeps the gesture continuous from the button that opened it. */
+  animation: gallery-in var(--beat-2) ease-out;
+}
+
+@keyframes gallery-in {
+  from {
+    opacity: 0;
+    transform: translateY(2%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- header --- */
+
+.header {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.subtitle {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.closeBtn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: var(--surface-sunken);
+}
+
+/* --- controls --- */
+
+.controls {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.sourceToggle {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-3);
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 16px);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* --- the scrolling grid --- */
+
+.scroller {
+  flex: 1;
+  padding: var(--space-4);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.grid {
+  /* The global .card-grid gives the 1/2/3-column breakpoints; this only caps the line length
+     so cards do not stretch to absurd widths on a desktop. */
+  max-width: var(--shell-max-width);
+  margin: 0 auto;
+  align-items: start;
+}
+
+.centered {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) 0;
+}
+
+.sentinel {
+  height: 1px;
+}

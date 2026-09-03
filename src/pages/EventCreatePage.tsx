@@ -61,16 +61,24 @@
  * `waiting_approval`, every self-joiner gets in regardless of what this says. See
  * plan/server-tasks.md for what real support needs.
  *
- * "Copy track from an existing event" (below the activity-type picker) is the same story:
- * picks any of the rider's own or other public events, shows its real saved route (via
- * GET /events/:eventId/route — the same source EventDetailPage uses; an event with no saved
- * route shows the missing-route state instead of a fabricated one) as a live map preview
- * (RouteMap, lazy-loaded), not just
- * distance/climb text, and goes no further than that. There is no `event_routes` attach
- * endpoint yet (plan/08-routes-and-maps.md has the table design, not built) so the picked
- * route is never sent in the POST body either. Uploading your own track file (GPX/TCX/Garmin
- * export, or points from a spreadsheet) is a distinct, bigger feature — deliberately not built
- * here, see plan/server-tasks.md Part C.
+ * THE TRACK STEP is the one that decides whether a ride happens, and it is two buttons rather
+ * than one. It used to be a single "Select map or upload track file" opening CopyTrackSheet,
+ * a bottom sheet where the real choice was made from a list of ride NAMES with a
+ * "Loading route…" line under each. That put the path almost nobody can use — having a Garmin
+ * GPX file to hand — in front of the path almost everybody needs, and presented the second as
+ * a file dialog when choosing a route is a visual decision.
+ *
+ *   Upload track   TrackUploadButton — opens the file picker directly. GPX or CSV, parsed
+ *                  client-side (lib/track-gpx.ts, lib/track-csv.ts; no FIT, no Excel, see
+ *                  those files). Small, because it serves the minority who have a file.
+ *   Browse tracks  TrackGallerySheet — a full-screen, infinitely-scrolling gallery of rides
+ *                  that already have a track, each card showing the route drawn, distance,
+ *                  climb, the organizer's stated duration and how many riders rode it.
+ *
+ * Both end in the same two handlers they always did (handleUploadRoute / pickEventToCopy), and
+ * a picked ride's route still comes from GET /events/:eventId/route — the same source
+ * EventDetailPage uses; a ride with no saved route shows the missing-route state rather than a
+ * fabricated one. CopyTrackSheet is untouched and still serves EventGroupsPage.
  *
  * Picking a track also copies the source event's Location/Level/organizing club over —
  * "copy all elements except the date," confirmed directly: the recurring-ride case (same
@@ -110,23 +118,23 @@ import {
   ImagePlus,
   LifeBuoy,
   Lock,
-  Map as MapIcon,
   MapPin,
   Mountain,
   Radio,
-  Route,
   Ruler,
   ShieldCheck,
   Target,
   Timer,
   Trash2,
   Truck,
+  Upload,
   Users
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { CopyTrackSheet, type UploadedTrack } from "../app/CopyTrackSheet";
 import { SafetySheet } from "../app/SafetySheet";
+import { TrackGallerySheet } from "../app/TrackGallerySheet";
+import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { effectiveLimits } from "../lib/entitlements";
@@ -422,7 +430,7 @@ export function EventCreatePage() {
   const [invalidStartsAt, setInvalidStartsAt] = useState(false);
   const [invalidRoute, setInvalidRoute] = useState(false);
 
-  const [copySheetOpen, setCopySheetOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [copiedFrom, setCopiedFrom] = useState<EventSummary | null>(null);
   const [copiedRoute, setCopiedRoute] = useState<EventRoute | null>(null);
   /**
@@ -643,7 +651,7 @@ export function EventCreatePage() {
     setCopiedFrom(event);
     setUploadedFileName(null);
     setUploadedRestStops([]);
-    setCopySheetOpen(false);
+    setGalleryOpen(false);
     setCopyLoading(true);
     setInvalidRoute(false);
 
@@ -707,7 +715,7 @@ export function EventCreatePage() {
   function handleUploadRoute(uploaded: UploadedTrack) {
     setCopiedFrom(null);
     setCopyLoading(false);
-    setCopySheetOpen(false);
+    setGalleryOpen(false);
     setCopiedRoute(uploaded.route);
     setUploadedFileName(uploaded.fileName);
     setUploadedRestStops(uploaded.restStops);
@@ -1256,29 +1264,46 @@ export function EventCreatePage() {
                 </Suspense>
               </div>
             )}
+            {/* Two ways to get a track, side by side and deliberately NOT equal in weight.
+                They used to be one button ("Select map or upload track file") that opened a
+                sheet where the choice was actually made — which put the path almost nobody can
+                use (having a Garmin GPX file to hand) in front of the path almost everybody
+                needs. Now the browser is the big one, and uploading is a small, honest button
+                next to it for the riders who do have a file. */}
             {!copiedFrom && !uploadedFileName && (
-              <button
-                type="button"
-                className={styles.trackBtn}
-                onClick={() => setCopySheetOpen(true)}
-              >
-                <span className={styles.trackBtnLabel}>
-                  <MapIcon
+              <div className={styles.trackChoices}>
+                <TrackUploadButton
+                  onUploadRoute={handleUploadRoute}
+                  className={styles.trackUploadBtn}
+                >
+                  <Upload aria-hidden="true" size={18} className={styles.trackBtnIcon} />
+                  <span className={styles.trackUploadLabel}>Upload track</span>
+                  <span className={styles.trackUploadHint}>GPX or CSV</span>
+                </TrackUploadButton>
+
+                <button
+                  type="button"
+                  className={styles.trackBrowseBtn}
+                  onClick={() => setGalleryOpen(true)}
+                >
+                  {/* A drawn route rather than an icon: this button's whole job is to say
+                      "there are maps behind here", and a generic pin does not. */}
+                  <svg
+                    className={styles.trackBrowsePreview}
+                    viewBox="0 0 120 52"
                     aria-hidden="true"
-                    size={18}
-                    className={styles.trackBtnIcon}
-                  />
-                  Select map or upload track file
-                </span>
-                {/* A bigger, second icon on its own — purely so this button reads as "the map
-                    picker" at a glance instead of blending into the rest of the form; asked
-                    for directly ("not seen ... add icon ... that its the map"). */}
-                <Route
-                  aria-hidden="true"
-                  size={30}
-                  className={styles.trackBtnAccent}
-                />
-              </button>
+                  >
+                    <polyline
+                      className={styles.trackBrowsePreviewLine}
+                      points="8,42 24,20 40,30 58,10 76,26 94,16 112,34"
+                    />
+                    <circle className={styles.trackBrowsePreviewStart} cx="8" cy="42" r="4" />
+                    <circle className={styles.trackBrowsePreviewEnd} cx="112" cy="34" r="4" />
+                  </svg>
+                  <span className={styles.trackBrowseLabel}>Browse tracks</span>
+                  <span className={styles.trackBrowseHint}>From rides people have ridden</span>
+                </button>
+              </div>
             )}
           </fieldset>
 
@@ -1878,12 +1903,8 @@ export function EventCreatePage() {
           </div>
         )}
 
-        {copySheetOpen && (
-          <CopyTrackSheet
-            onPick={pickEventToCopy}
-            onUploadRoute={handleUploadRoute}
-            onClose={() => setCopySheetOpen(false)}
-          />
+        {galleryOpen && (
+          <TrackGallerySheet onPick={pickEventToCopy} onClose={() => setGalleryOpen(false)} />
         )}
 
         {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}

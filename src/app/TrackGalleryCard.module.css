@@ -1,0 +1,169 @@
+/*
+ * One gallery card. Every colour comes from tokens.css — nothing here hardcodes a hex, so the
+ * card follows the viewer's light/dark preference and the competition display mode for free.
+ */
+
+.card {
+  display: flex;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--beat-1) ease,
+    box-shadow var(--beat-1) ease,
+    border-color var(--beat-1) ease;
+}
+
+.card:hover,
+.card:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* The whole card is the button — a rider picking a track should not have to find a small
+   target inside it. .useBtn below is the visible affordance, not a separate control. */
+.cardMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: stretch;
+  padding: var(--card-padding);
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.name {
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  color: var(--text);
+
+  /* Two lines then ellipsis: card heights stay comparable down a grid, and a long ride name
+     is still readable enough to recognise. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.place {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+  min-height: 1.2em;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.placeIcon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* --- the route picture --- */
+
+.thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 5 / 2;
+  width: 100%;
+  margin: var(--sp-2) 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.thumbSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.thumbPending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A wide, soft casing under the line. The thumbnail ground is a per-event gradient that can be
+   pale or dark, and a single-colour stroke reads on one and vanishes on the other. */
+.trackCasing {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.75);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trackLine {
+  fill: none;
+  stroke: #14243c;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.startDot {
+  fill: var(--status-live);
+  stroke: rgb(255 255 255 / 0.9);
+  stroke-width: 2;
+}
+
+.endDot {
+  fill: var(--status-danger);
+  stroke: rgb(255 255 255 / 0.9);
+  stroke-width: 2;
+}
+
+/* --- the numbers --- */
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: center;
+}
+
+.stat {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.statIcon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.useBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  margin-top: var(--sp-2);
+  font-weight: var(--weight-medium);
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.card:hover .useBtn,
+.card:focus-within .useBtn {
+  background: var(--accent-strong);
+}

@@ -36,6 +36,10 @@ import { useEffect, useRef, useState } from "react";
 import { config } from "../lib/config";
 import { bearingDeg, finishIcon, startIcon } from "./map-icons";
 import styles from "./TrackMiniMap.module.css";
+import { thinPoints } from "./track-thumbnail";
+
+/** Points kept per card map. See the thinning note in the effect for why this is not 3,000. */
+const MAP_POINT_TARGET = 400;
 
 interface TrackMiniMapProps {
   points: [number, number][];
@@ -50,6 +54,8 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
 
   useEffect(() => {
     if (!containerRef.current || points.length === 0) return;
+
+    const drawPoints = thinPoints(points, MAP_POINT_TARGET);
 
     const map = L.map(containerRef.current, {
       // Compact controls: a card is small, and a full zoom bar plus a long attribution line
@@ -71,19 +77,34 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       crossOrigin: true,
     }).addTo(map);
 
-    const line = L.polyline(points, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(map);
+    // THINNED before Leaflet ever sees it. A saved route here carries ~3,000 points, and
+    // Leaflet draws a polyline as a single SVG path with every one of them in its `d`
+    // attribute — on a card a couple of hundred pixels wide, where most land on a pixel that
+    // is already painted. With several maps alive at once that is megabytes of path data and a
+    // lot of geometry work for a difference nobody can see. 400 points keeps the shape at this
+    // size and cuts the per-map cost by roughly 8x.
+    const line = L.polyline(drawPoints, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(map);
     // A white casing under the line, so it reads over both pale fields and dark forest tiles.
-    L.polyline(points, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(map).bringToBack();
+    L.polyline(drawPoints, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(map).bringToBack();
 
-    const heading = points.length > 1 ? bearingDeg(points[0], points[1]) : 0;
-    L.marker(points[0], { icon: startIcon(heading), interactive: false }).addTo(map);
-    L.marker(points[points.length - 1], { icon: finishIcon(), interactive: false }).addTo(map);
+    const heading = drawPoints.length > 1 ? bearingDeg(drawPoints[0], drawPoints[1]) : 0;
+    L.marker(drawPoints[0], { icon: startIcon(heading), interactive: false }).addTo(map);
+    L.marker(drawPoints[drawPoints.length - 1], { icon: finishIcon(), interactive: false }).addTo(
+      map,
+    );
 
     map.fitBounds(line.getBounds(), { padding: [18, 18] });
-    // Leaflet mis-measures inside a flex/grid container until told to re-check its size.
-    requestAnimationFrame(() => map.invalidateSize());
+
+    // Leaflet mis-measures inside a flex/grid container until told to re-check its size, but
+    // the callback MUST be cancelled on unmount. These maps are windowed — they mount and
+    // unmount continuously as the gallery scrolls — so without this, a card scrolled past
+    // within one frame of mounting runs invalidateSize() on a map that map.remove() has
+    // already torn down, which throws out of a requestAnimationFrame callback where no error
+    // boundary can catch it.
+    const frame = requestAnimationFrame(() => map.invalidateSize());
 
     return () => {
+      cancelAnimationFrame(frame);
       map.remove();
       mapRef.current = null;
     };

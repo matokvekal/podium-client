@@ -33,6 +33,7 @@ import { apiRequest, apiRequestPaged } from "../lib/api-client";
 import type { EventRoute } from "../lib/event-route";
 import type { EventSummary } from "../lib/local-db";
 import { useEventsStore } from "../store/eventsStore";
+import { thinPoints } from "./track-thumbnail";
 
 /** One network page. Smaller than the server's max of 100 — this fills about two screens of
  * grid, and every row costs a follow-up geometry call, so a huge page just queues work the
@@ -48,6 +49,10 @@ export type GallerySource = "all" | "mine";
  * re-requested every time it scrolls past.
  */
 const routeCache = new Map<string, GalleryRoute | null>();
+
+/** Points kept per cached route. Comfortably above what either consumer can resolve — the card
+ * map thins again to 400, the thumbnail to 80 — and ~8x smaller than what the server sends. */
+const CACHED_POINT_TARGET = 600;
 const inFlight = new Set<string>();
 
 /**
@@ -223,8 +228,21 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
         const route = await apiRequest<GalleryRoute | null>(`/events/${eventId}/route?preview=1`, {
           anonymous: sourceRef.current === "all",
         });
-        routeCache.set(eventId, route ?? null);
-        setRoutes((prev) => new Map(prev).set(eventId, route ?? null));
+        // THINNED BEFORE IT IS CACHED, and this is the one that matters for memory. A saved
+        // route is ~3,000 points and about 116 KB of JSON; the cache is module-level and holds
+        // every ride the rider has scrolled past for the life of the tab, so at 300 rides the
+        // untrimmed version is tens of megabytes of JSON parsed into hundreds of thousands of
+        // tiny arrays. Nothing here needs that precision: the only consumers are a card-sized
+        // map and an 80-point SVG thumbnail.
+        //
+        // Safe because this copy is DISPLAY ONLY — picking a track re-fetches the full,
+        // untouched geometry in EventCreatePage.pickEventToCopy, so what gets saved onto a new
+        // ride is never the thinned line.
+        const stored: GalleryRoute | null = route
+          ? { ...route, points: thinPoints(route.points, CACHED_POINT_TARGET) }
+          : null;
+        routeCache.set(eventId, stored);
+        setRoutes((prev) => new Map(prev).set(eventId, stored));
       } catch {
         // A failed fetch is NOT "this ride has no track" — leaving it uncached lets it retry
         // the next time the card scrolls into view, rather than hiding a ride over one blip.

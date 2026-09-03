@@ -21,10 +21,15 @@
  *                     distance: lib/ride-duration.ts is explicit that inventing one needs an
  *                     assumed speed, which this app does not ship. Shown as "Not stated"
  *                     rather than omitted, so the rows stay aligned down the grid.
- *   downloads         how many rides have been built on this track, counted from event_routes
- *                     (server: usedByRides). A real reuse count, not a view counter. Absent on
- *                     a server that has not shipped it yet, in which case it does not render.
- *   riders            participantCount — how many people actually rode it.
+ *   downloads         how many rides have been built on this track (server: usedByRides). A
+ *                     real reuse count, not a view counter. Reads "soon" until the server
+ *                     sends it — never the rider count wearing a downloads label, which would
+ *                     be a confident wrong answer to a different question.
+ *   created by        the organizer the track comes from. Also "soon": the public list serves
+ *                     ownerId but no ownerName, so the name is missing from the payload rather
+ *                     than from the world.
+ *
+ * The rider count that used to sit here is gone, replaced by downloads — asked for directly.
  */
 
 import {

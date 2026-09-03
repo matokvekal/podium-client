@@ -49,6 +49,7 @@ import {
   Coffee,
   LifeBuoy,
   MapPin,
+  MapPinned,
   Mountain,
   Navigation,
   Pencil,
@@ -1612,7 +1613,10 @@ export function EventDetailPage() {
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
-            {(event.startsAt || event.location || event.participantCount != null) && (
+            {(event.startsAt ||
+              event.location ||
+              event.area ||
+              event.participantCount != null) && (
               <div className={styles.infoStrip}>
                 {event.startsAt && (
                   <div className={styles.infoCell}>
@@ -1623,6 +1627,15 @@ export function EventDetailPage() {
                     <span className={styles.infoCellValue}>
                       {formatLocalDateTime(event.startsAt)}
                     </span>
+                  </div>
+                )}
+                {event.area && (
+                  <div className={styles.infoCell}>
+                    <span className={styles.infoCellHead}>
+                      <MapPinned width={13} height={13} aria-hidden="true" />
+                      Area
+                    </span>
+                    <span className={styles.infoCellValue}>{event.area}</span>
                   </div>
                 )}
                 {event.location && (

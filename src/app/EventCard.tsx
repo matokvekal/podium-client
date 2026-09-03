@@ -34,6 +34,7 @@ import {
   Coffee,
   Heart,
   MapPin,
+  MapPinned,
   Mountain,
   Ruler,
   Timer,
@@ -304,6 +305,12 @@ export function EventCard({
             <MapPin className={styles.footerIcon} aria-hidden="true" />
             {event.location}
           </button>
+        )}
+        {event.area && (
+          <span className={styles.footerItem} title={`Area: ${event.area}`}>
+            <MapPinned className={styles.footerIcon} aria-hidden="true" />
+            Area: {event.area}
+          </span>
         )}
         {/* Rider count — approved + pending, from GET /events (server's toEventSummary). The
             capacity ("/ 50") is still detail-only, so the card shows just the count. Falls

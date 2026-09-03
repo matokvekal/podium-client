@@ -27,7 +27,15 @@
  *   riders            participantCount — how many people actually rode it.
  */
 
-import { ArrowDownToLine, Clock, MapPin, Mountain, Route as RouteIcon, Users } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Clock,
+  MapPin,
+  Mountain,
+  Route as RouteIcon,
+  Ruler,
+  User,
+} from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { EventRoute } from "../lib/event-route";
 import type { EventSummary } from "../lib/local-db";
@@ -48,6 +56,10 @@ const THUMB_PAD = 12;
 /** How far outside the viewport a card still keeps its live map. One screen of margin means
  * the map is ready before the card is looked at, without holding maps for the whole list. */
 const MAP_ROOT_MARGIN = "250px";
+
+/** What a real field reads as until the API can answer it. Same word EventCard uses, so the
+ * two surfaces say "not built yet" identically rather than inventing a second vocabulary. */
+const NOT_YET = "soon";
 
 interface TrackGalleryCardProps {
   event: EventSummary;
@@ -98,7 +110,6 @@ export function TrackGalleryCard({
   const distanceKm = route?.distanceKm ?? event.distanceKm;
   const climbM = route?.elevationM ?? event.elevationGain;
   const duration = formatDuration(event.durationMin);
-  const riders = event.participantCount;
   const place = event.location ?? event.area;
 
   return (
@@ -131,8 +142,6 @@ export function TrackGalleryCard({
             </Suspense>
           </div>
         )}
-
-        {distanceKm != null && <span className={styles.mediaBadge}>{distanceKm} km</span>}
       </div>
 
       <div className={styles.body}>
@@ -146,6 +155,16 @@ export function TrackGalleryCard({
         )}
 
         <dl className={styles.stats}>
+          <div className={styles.stat}>
+            <dt className={styles.statLabel}>
+              <Ruler className={styles.statIcon} aria-hidden="true" />
+              Distance
+            </dt>
+            <dd className={distanceKm != null ? styles.statValue : styles.statValueMuted}>
+              {distanceKm != null ? `${distanceKm} km` : NOT_YET}
+            </dd>
+          </div>
+
           <div className={styles.stat}>
             <dt className={styles.statLabel}>
               <Clock className={styles.statIcon} aria-hidden="true" />
@@ -166,26 +185,35 @@ export function TrackGalleryCard({
             </dd>
           </div>
 
-          {usedByRides != null && (
-            <div className={styles.stat}>
-              <dt className={styles.statLabel}>
-                <ArrowDownToLine className={styles.statIcon} aria-hidden="true" />
-                Downloads
-              </dt>
-              <dd className={styles.statValue}>{usedByRides}</dd>
-            </div>
-          )}
-
-          {riders != null && riders > 0 && (
-            <div className={styles.stat}>
-              <dt className={styles.statLabel}>
-                <Users className={styles.statIcon} aria-hidden="true" />
-                Riders
-              </dt>
-              <dd className={styles.statValue}>{riders}</dd>
-            </div>
-          )}
+          {/* Always shown, "soon" until the server can answer it — the same NOT_YET the event
+              card uses for a real field the API does not serve yet. Deliberately not swapped
+              for the rider count that used to sit here: how many people rode one particular
+              Saturday is a different question from how many rides were built on this track,
+              and quietly answering the second with the first would be a made-up number. */}
+          <div className={styles.stat}>
+            <dt className={styles.statLabel}>
+              <ArrowDownToLine className={styles.statIcon} aria-hidden="true" />
+              Downloads
+            </dt>
+            <dd className={usedByRides != null ? styles.statValue : styles.statValueMuted}>
+              {usedByRides ?? NOT_YET}
+            </dd>
+          </div>
         </dl>
+
+        {/* Who the track comes from — the person a rider is effectively taking it from.
+            "soon" for now, and NOT "Unknown": GET /events/public serves ownerId but no
+            ownerName (checked against production), so the name is missing from the PAYLOAD,
+            not from the world. The event detail endpoint already resolves it, so this is a
+            small server change, and until then saying "soon" is the truthful version —
+            "Unknown" would claim the organizer has no name on record. */}
+        <p className={styles.owner}>
+          <User className={styles.ownerIcon} aria-hidden="true" />
+          Created by{" "}
+          <span className={event.ownerName?.trim() ? styles.ownerName : styles.ownerPending}>
+            {event.ownerName?.trim() || NOT_YET}
+          </span>
+        </p>
 
         <button type="button" className={styles.useBtn} onClick={() => onPick(event)}>
           <RouteIcon width={16} height={16} aria-hidden="true" />

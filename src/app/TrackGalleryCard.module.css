@@ -88,23 +88,6 @@
   }
 }
 
-/* Distance sits on the map, top-left, where it reads as a label for what is shown rather than
-   as one more number in the table below. z-index clears Leaflet's own panes (200-700). */
-.mediaBadge {
-  position: absolute;
-  top: var(--sp-3);
-  left: var(--sp-3);
-  z-index: 800;
-  padding: 3px 9px;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--text);
-  background: rgb(255 255 255 / 0.92);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-  pointer-events: none;
-}
-
 /* --- the words --- */
 
 .body {
@@ -121,6 +104,7 @@
   font-weight: var(--weight-bold);
   line-height: 1.25;
   color: var(--text);
+  text-align: center;
 
   /* Two lines then ellipsis: card heights stay comparable down a grid, and a long ride name is
      still readable enough to recognise. */
@@ -131,10 +115,14 @@
   overflow: hidden;
 }
 
+/* Centred with the name above it: the two are one header block, and a centred title sitting
+   over a left-aligned subtitle reads as a mistake rather than a choice. justify-content, not
+   text-align, because this row is a flex container holding the pin icon. */
 .place {
   display: flex;
   gap: var(--sp-1);
   align-items: center;
+  justify-content: center;
   margin: 0;
   font-size: var(--text-sm);
   color: var(--text-muted);
@@ -192,6 +180,34 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-normal);
   color: var(--text-muted);
+}
+
+/* Sits between the numbers and the action, quieter than either: it is provenance, not a stat
+   a rider filters on. */
+.owner {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+  justify-content: center;
+  margin: var(--sp-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.ownerIcon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.ownerName {
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* Not styled as a name, because it is not one yet. */
+.ownerPending {
+  font-style: italic;
 }
 
 .useBtn {

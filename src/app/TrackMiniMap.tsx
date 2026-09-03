@@ -97,15 +97,33 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       crossOrigin: true,
     }).addTo(map);
 
+    // THE VIEW IS SET BEFORE ANY LAYER IS ADDED, and the order matters — getting it wrong is
+    // what threw "Cannot read properties of undefined (reading 'parentNode')" on every card.
+    //
+    // Map.addLayer calls layer.beforeAdd() SYNCHRONOUSLY (which sets layer._renderer) but then
+    // defers the actual onAdd through map.whenReady(). A map with no view is not "ready", so
+    // onAdd — and with it _initPath(), which creates layer._path — does not run yet. A layer in
+    // that half-added state has a _renderer but no _path, so Path.bringToBack() sails past its
+    // `if (this._renderer)` guard and hands undefined to the SVG renderer, which reads
+    // .parentNode off it. fitBounds first means every layer below is added to a loaded map and
+    // is fully initialised the moment addTo() returns.
+    //
+    // Bounds come from the points rather than from the polyline, precisely so no layer has to
+    // exist before the view is set.
+    map.fitBounds(L.latLngBounds(drawPoints), { padding: [18, 18] });
+
     // THINNED before Leaflet ever sees it. A saved route here carries ~3,000 points, and
     // Leaflet draws a polyline as a single SVG path with every one of them in its `d`
     // attribute — on a card a couple of hundred pixels wide, where most land on a pixel that
     // is already painted. With several maps alive at once that is megabytes of path data and a
     // lot of geometry work for a difference nobody can see. 400 points keeps the shape at this
     // size and cuts the per-map cost by roughly 8x.
-    const line = L.polyline(drawPoints, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(map);
-    // A white casing under the line, so it reads over both pale fields and dark forest tiles.
-    L.polyline(drawPoints, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(map).bringToBack();
+    //
+    // The white casing is added FIRST and the coloured line second, so SVG paint order puts the
+    // line on top on its own. That replaces a .bringToBack() call — the one that crashed — with
+    // insertion order, which cannot be in the wrong state because there is no state to be in.
+    L.polyline(drawPoints, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(map);
+    L.polyline(drawPoints, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(map);
 
     const heading = drawPoints.length > 1 ? bearingDeg(drawPoints[0], drawPoints[1]) : 0;
     L.marker(drawPoints[0], { icon: startIcon(heading), interactive: false }).addTo(map);
@@ -113,15 +131,18 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       map,
     );
 
-    map.fitBounds(line.getBounds(), { padding: [18, 18] });
-
     // Leaflet mis-measures inside a flex/grid container until told to re-check its size, but
     // the callback MUST be cancelled on unmount. These maps are windowed — they mount and
     // unmount continuously as the gallery scrolls — so without this, a card scrolled past
     // within one frame of mounting runs invalidateSize() on a map that map.remove() has
     // already torn down, which throws out of a requestAnimationFrame callback where no error
     // boundary can catch it.
-    const frame = requestAnimationFrame(() => map.invalidateSize());
+    const frame = requestAnimationFrame(() => {
+      map.invalidateSize();
+      // Re-fit once the container's real size is known. fitBounds above ran against whatever
+      // Leaflet measured at construction, which inside a grid cell can be nothing at all.
+      map.fitBounds(L.latLngBounds(drawPoints), { padding: [18, 18] });
+    });
 
     return () => {
       cancelAnimationFrame(frame);

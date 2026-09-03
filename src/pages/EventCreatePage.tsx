@@ -132,6 +132,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SafetySheet } from "../app/SafetySheet";
 import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
@@ -1903,8 +1904,16 @@ export function EventCreatePage() {
           </div>
         )}
 
+        {/* Boundaried: a crash in the gallery must not take the half-filled ride form
+            with it, and on a phone the error text rendered here is the only diagnostic
+            that can ever come back — there is no console to open. */}
         {galleryOpen && (
-          <TrackGallerySheet onPick={pickEventToCopy} onClose={() => setGalleryOpen(false)} />
+          <ErrorBoundary
+            title="The track browser hit a problem"
+            onDismiss={() => setGalleryOpen(false)}
+          >
+            <TrackGallerySheet onPick={pickEventToCopy} onClose={() => setGalleryOpen(false)} />
+          </ErrorBoundary>
         )}
 
         {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}

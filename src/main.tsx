@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
+import { ErrorBoundary } from "./app/ErrorBoundary";
 import { SplashScreen } from "./app/SplashScreen";
 import { AuthProvider } from "./auth/AuthContext";
 import { applyColorTheme, getInitialColorTheme } from "./lib/color-theme";
@@ -25,7 +26,15 @@ createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        {/* The app-wide safety net. React unmounts the ENTIRE tree when a render or an
+            effect throws with nothing to catch it, and this app had no boundary at all —
+            so one component's bug did not break that component, it blanked the whole PWA
+            to a white screen carrying no information. Screens and modals should still
+            carry their own closer boundary; this is the backstop, not the plan. Inside
+            AuthProvider so the fallback can still be themed and the session survives. */}
+        <ErrorBoundary title="The app hit a problem">
+          <App />
+        </ErrorBoundary>
         {/* Overlays everything above via z-index for 3s, then removes itself. The app
             underneath is already mounting and loading in parallel, not waiting on this. */}
         <SplashScreen />

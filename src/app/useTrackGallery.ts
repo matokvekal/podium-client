@@ -113,10 +113,24 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
   // page to the new list. Same one-request-wins pattern as tracksStore and eventsStore.
   const requestIdRef = useRef(0);
   const offsetRef = useRef(0);
+  // Read inside requestRoute so that callback can stay identity-stable — the cards' observers
+  // depend on it, and a new identity every time the toggle moves would rebuild all of them.
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
 
+  // Loaded ONLY when the rider actually asks for their own rides, not on open.
+  //
+  // This is authenticated, and the gallery is the one screen that fires a burst of requests the
+  // moment it opens — two here plus one per visible card. If the 15-minute access token has
+  // expired while the organizer was filling in the form, that burst is a wall of 401s, and a
+  // refused refresh ends in SESSION_EXPIRED, which AuthContext handles with a hard
+  // window.location.replace("/login"). The document blanks mid-navigation: the gallery paints,
+  // then the screen goes white. Nothing needs My Rides until the toggle is pressed, so it is
+  // not fetched until then.
   useEffect(() => {
+    if (source !== "mine") return;
     loadMyRides(status === "signed-in");
-  }, [status, loadMyRides]);
+  }, [source, status, loadMyRides]);
 
   const fetchPage = useCallback(
     async (offset: number, thisRequest: number) => {
@@ -201,7 +215,14 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
         // full-geometry body, which is a perfectly good answer — the thumbnail thins whatever
         // it is given and the card drops the count. So this is safe to ship ahead of the
         // server, and gets better the moment the server catches up.
-        const route = await apiRequest<GalleryRoute | null>(`/events/${eventId}/route?preview=1`);
+        // ANONYMOUS FOR THE PUBLIC LIST. The server serves a public ride's route without a
+        // token — verified against production — so sending the bearer token bought nothing and
+        // made every card one more 401 in the burst described above, which is what could take
+        // the whole session down. My Rides is the exception: it can contain a PRIVATE ride,
+        // whose route is only readable as its owner, so those stay authenticated.
+        const route = await apiRequest<GalleryRoute | null>(`/events/${eventId}/route?preview=1`, {
+          anonymous: sourceRef.current === "all",
+        });
         routeCache.set(eventId, route ?? null);
         setRoutes((prev) => new Map(prev).set(eventId, route ?? null));
       } catch {

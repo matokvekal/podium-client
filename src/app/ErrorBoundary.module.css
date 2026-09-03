@@ -1,0 +1,86 @@
+/*
+ * The fallback shown when the tree below the boundary has crashed.
+ *
+ * It is fixed and full-screen because its main use is wrapping a full-screen modal: if the
+ * modal died, something has to occupy that space, and a message the rider can dismiss is a
+ * much better answer than the white void that used to appear.
+ */
+
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 1100; /* above the sheets (1000/1001) — it replaces one */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--surface);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--card-padding);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.details {
+  padding: var(--space-2);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.summary {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.message {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--status-danger);
+  overflow-wrap: anywhere;
+}
+
+/* Scrolls on its own rather than stretching the card — a stack is long and a phone is narrow. */
+.stack {
+  max-height: 40vh;
+  margin: var(--space-2) 0 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}

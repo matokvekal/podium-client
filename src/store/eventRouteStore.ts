@@ -12,6 +12,7 @@ import type { EventRoute } from "../lib/event-route";
 interface EventRouteState {
   byEvent: Record<string, EventRoute>;
   setRoute(eventId: string, route: EventRoute): void;
+  clearRoute(eventId: string): void;
 }
 
 export const useEventRouteStore = create<EventRouteState>()(
@@ -23,6 +24,16 @@ export const useEventRouteStore = create<EventRouteState>()(
         set((state) => ({
           byEvent: { ...state.byEvent, [eventId]: route },
         }));
+      },
+
+      // The organizer removed the track on the edit form — drop the local copy too, so the
+      // detail page and results don't keep drawing a route the event no longer has.
+      clearRoute(eventId) {
+        set((state) => {
+          const next = { ...state.byEvent };
+          delete next[eventId];
+          return { byEvent: next };
+        });
       },
     }),
     { name: "podium.eventRoute" },

@@ -280,6 +280,7 @@ export function EventCreatePage() {
   const setEventCoverImage = useEventExtrasStore((s) => s.setCoverImage);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const setEventRoute = useEventRouteStore((s) => s.setRoute);
+  const clearEventRoute = useEventRouteStore((s) => s.clearRoute);
   const routerLocation = useLocation();
   const pickedTrack = (routerLocation.state ?? null) as {
     fromRouteId?: number;
@@ -450,6 +451,15 @@ export function EventCreatePage() {
   const [uploadedRestStops, setUploadedRestStops] = useState<
     [number, number][]
   >([]);
+  /**
+   * Edit mode: this event already has a route attached on the server, loaded below so the
+   * organizer sees it (with a Remove button) instead of a form that looks route-less and
+   * silently keeps the old track. Cleared the moment they upload/browse a replacement — the
+   * server's POST /events/:id/route is a full replace — or hit Remove. `removeExistingRoute`
+   * then remembers a Remove with no replacement so submit() fires DELETE /events/:id/route.
+   */
+  const [existingRouteAttached, setExistingRouteAttached] = useState(false);
+  const [removeExistingRoute, setRemoveExistingRoute] = useState(false);
 
   const [loadingEvent, setLoadingEvent] = useState(isEditing);
 
@@ -545,6 +555,23 @@ export function EventCreatePage() {
         if (!cancelled) setLoadingEvent(false);
       }
 
+      // The route already attached to this event, so the edit form shows it (with a Remove
+      // button) rather than an empty Upload / Browse choice that hides the real track. The
+      // organizer replaces it by uploading/browsing (server POST is a full replace) or drops
+      // it with Remove (submit() then fires DELETE). Best-effort — a failed fetch just leaves
+      // the choices showing, same as before this loaded anything.
+      try {
+        const attached = await apiRequest<EventRoute | null>(
+          `/events/${eventId}/route`
+        );
+        if (!cancelled && attached?.points?.length) {
+          setCopiedRoute(attached);
+          setExistingRouteAttached(true);
+        }
+      } catch {
+        // No route, offline, or an older server — the Upload / Browse choices show instead.
+      }
+
       // Read imperatively (not the reactive `extrasByEvent` above): this must stay out of
       // the effect's dependency array, see comment below.
       const existingExtras = useEventExtrasStore.getState().byEvent[eventId];
@@ -621,7 +648,7 @@ export function EventCreatePage() {
     area.trim(),
     startsAt,
     description.trim(),
-    copiedFrom || uploadedFileName ? "route" : ""
+    copiedFrom || uploadedFileName || existingRouteAttached ? "route" : ""
   ];
   const readinessCount = readinessFields.filter(Boolean).length;
   const readinessPct = Math.round(
@@ -650,6 +677,10 @@ export function EventCreatePage() {
 
   async function pickEventToCopy(event: EventSummary) {
     setCopiedFrom(event);
+    // A replacement track — the server POST is a full replace, so an already-attached route
+    // needs no separate detach.
+    setExistingRouteAttached(false);
+    setRemoveExistingRoute(false);
     // Whatever track was chosen before, this replaces it. Without this, a rider who arrived
     // from Find Tracks (fromRouteId set) and then picked a ride here would still SAVE the Find
     // Tracks route: saveExtras checks fromRouteId first, and nothing ever cleared it. They got
@@ -708,6 +739,11 @@ export function EventCreatePage() {
   }
 
   function clearCopiedTrack() {
+    // Edit mode: if the track being removed is the one already saved on the server, remember
+    // to detach it on Save (DELETE /events/:id/route). Picking a replacement afterwards clears
+    // this again — the replacement's POST is a full replace and needs no separate delete.
+    if (existingRouteAttached) setRemoveExistingRoute(true);
+    setExistingRouteAttached(false);
     setCopiedFrom(null);
     setCopiedRoute(null);
     // Removing the track has to remove ALL of it. Leaving fromRouteId set meant the ride still
@@ -722,6 +758,10 @@ export function EventCreatePage() {
   }
 
   function handleUploadRoute(uploaded: UploadedTrack) {
+    // A replacement track — the server POST is a full replace, so no separate detach is owed
+    // even if this event already had a route.
+    setExistingRouteAttached(false);
+    setRemoveExistingRoute(false);
     setCopiedFrom(null);
     // Same reason as pickEventToCopy: an uploaded file replaces any previously picked track,
     // and a stale fromRouteId would otherwise win in saveExtras and attach that route instead.
@@ -849,7 +889,17 @@ export function EventCreatePage() {
     const typedClimb =
       parsedClimbNum != null && !Number.isNaN(parsedClimbNum) ? parsedClimbNum : null;
 
-    if (fromRouteId != null) {
+    if (existingRouteAttached) {
+      // Edit mode, the saved track was left untouched — it is already on the server. Keep the
+      // local copy fresh for the detail page's instant preview, but never re-POST it: that
+      // would fork or needlessly rewrite the route on every save.
+      if (copiedRoute) setEventRoute(id, copiedRoute);
+    } else if (removeExistingRoute && !copiedRoute && fromRouteId == null) {
+      // Edit mode: the organizer removed the saved track and picked no replacement — detach it.
+      // A replacement instead falls into the branches below, whose POST is a full replace.
+      await apiRequest(`/events/${id}/route`, { method: "DELETE" });
+      clearEventRoute(id);
+    } else if (fromRouteId != null) {
       // A route picked from the public library: attach the EXISTING row by id. The server's
       // attachLibraryRouteToEvent links it, so the ride runs on the real route rather than on a
       // second copy of the same line — and a later fix to the original reaches every ride using
@@ -1274,13 +1324,15 @@ export function EventCreatePage() {
             className={styles.routeFieldset}
             data-invalid={invalidRoute}
           >
-            {copiedFrom || uploadedFileName ? (
+            {copiedFrom || uploadedFileName || existingRouteAttached ? (
               <div className={styles.trackPicked}>
                 <div>
                   <div className={styles.trackPickedName}>
                     {copiedFrom
                       ? `Copied from ${copiedFrom.name}`
-                      : `Uploaded ${uploadedFileName}`}
+                      : uploadedFileName
+                        ? `Uploaded ${uploadedFileName}`
+                        : "Current track"}
                   </div>
                   <div className={styles.trackPickedMeta}>
                     {copyLoading
@@ -1320,7 +1372,10 @@ export function EventCreatePage() {
                 use (having a Garmin GPX file to hand) in front of the path almost everybody
                 needs. Now the browser is the big one, and uploading is a small, honest button
                 next to it for the riders who do have a file. */}
-            {!copiedFrom && !uploadedFileName && (
+            {/* In edit mode a track already on the event shows above with its own Remove
+                button — the organizer removes it first, then these reappear to attach a new
+                one. Same "one active route, replace or remove" rule create mode already had. */}
+            {!copiedFrom && !uploadedFileName && !existingRouteAttached && (
               <div className={styles.trackChoices}>
                 <TrackUploadButton
                   onUploadRoute={handleUploadRoute}

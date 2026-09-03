@@ -48,16 +48,36 @@ interface TrackMiniMapProps {
 }
 
 export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [wheelEnabled, setWheelEnabled] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current || points.length === 0) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper || points.length === 0) return;
 
     const drawPoints = thinPoints(points, MAP_POINT_TARGET);
 
-    const map = L.map(containerRef.current, {
+    // LEAFLET GETS A NODE REACT DOES NOT OWN. This is the fix for
+    // "Cannot read properties of undefined (reading 'parentNode')", which crashed the gallery
+    // on a real phone.
+    //
+    // Handing L.map() the div from JSX means React and Leaflet both manage the same element.
+    // Leaflet fills it with panes, tile <img>s and control DOM; React, on unmount, detaches
+    // that whole subtree. Whichever runs second finds nodes its bookkeeping still refers to
+    // already gone, and Leaflet's teardown reads `.parentNode` off one of them. These maps
+    // unmount constantly — they are windowed to the visible cards — so a race that a
+    // page-lifetime map would hit approximately never happens here on every scroll.
+    //
+    // So React renders only the wrapper below and never looks inside it. The element Leaflet
+    // is given is created here, appended here, and removed here. Ownership is unambiguous and
+    // the two teardowns cannot interleave.
+    const host = document.createElement("div");
+    host.style.width = "100%";
+    host.style.height = "100%";
+    wrapper.appendChild(host);
+
+    const map = L.map(host, {
       // Compact controls: a card is small, and a full zoom bar plus a long attribution line
       // would cover the route they are there to show.
       zoomControl: true,
@@ -105,8 +125,18 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
 
     return () => {
       cancelAnimationFrame(frame);
-      map.remove();
       mapRef.current = null;
+      // Guarded, and NOT to paper over the ownership bug above — that is fixed by `host`.
+      // Leaflet's teardown touches tile images that may still be in flight, and a throw here
+      // is a throw inside an unmount cleanup, which React escalates by unmounting the whole
+      // tree. A map being disposed of is not worth the entire app, so it is logged and the
+      // node is dropped either way.
+      try {
+        map.remove();
+      } catch (err) {
+        console.warn("[TrackMiniMap] Leaflet teardown failed", err);
+      }
+      host.remove();
     };
   }, [points]);
 
@@ -120,7 +150,7 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
 
   return (
     <div
-      ref={containerRef}
+      ref={wrapperRef}
       className={styles.map}
       role="application"
       aria-label={`Map of ${label}`}

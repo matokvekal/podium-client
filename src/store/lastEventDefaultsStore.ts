@@ -27,6 +27,9 @@ export interface LastEventDefaults {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
+  /** Expected riders (sql/028) — a recurring ride tends to draw a similar turnout. Optional so
+   *  an older persisted blob still loads. */
+  expectedParticipants?: number | null;
 }
 
 interface LastEventDefaultsState {

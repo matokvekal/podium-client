@@ -1607,8 +1607,10 @@ export function EventDetailPage() {
                 An estimated finish on a group ride is the kind of number people plan pickups
                 around, so it is absent rather than guessed.
 
-                PARTICIPANTS shows the real count only. The mock's "1 / 25" implies a capacity;
-                no capacity column exists server-side, so there is nothing to divide by.
+                PARTICIPANTS shows the real count only, and — when the organizer set one — an
+                EXPECTED number they entered (events.expected_participants). It is never divided
+                by the plan's max-participants ceiling: that cap is the organizer's own limit,
+                not a figure to show every viewer.
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
@@ -1680,7 +1682,9 @@ export function EventDetailPage() {
                     Participants
                   </span>
                   <span className={styles.infoCellValue}>
-                    {participantCount} / {maxParticipants} participants
+                    {event.expectedParticipants
+                      ? `${participantCount} / ${event.expectedParticipants} participants`
+                      : `${participantCount} participants`}
                   </span>
                 </div>
               </div>

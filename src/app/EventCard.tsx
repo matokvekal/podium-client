@@ -312,12 +312,17 @@ export function EventCard({
             Area: {event.area}
           </span>
         )}
-        {/* Rider count — approved + pending, from GET /events (server's toEventSummary). The
-            capacity ("/ 50") is still detail-only, so the card shows just the count. Falls
-            back to "soon" only for an older server / cached row that omits it. */}
+        {/* Rider count — approved + pending, from GET /events (server's toEventSummary). Shows
+            "12 / 40" when the organizer stated an expected turnout (event.expectedParticipants),
+            otherwise just the count. Never the plan's capacity. Falls back to "soon" only for
+            an older server / cached row that omits the count. */}
         <span className={styles.footerItem} data-pending={riderCount == null || undefined}>
           <UsersRound className={styles.footerIcon} aria-hidden="true" />
-          {riderCount != null ? riderCount : NOT_YET}
+          {riderCount != null
+            ? event.expectedParticipants
+              ? `${riderCount} / ${event.expectedParticipants}`
+              : riderCount
+            : NOT_YET}
         </span>
         {restStops != null && (
           <span

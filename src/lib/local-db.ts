@@ -125,6 +125,12 @@ export interface EventSummary {
    * absent value means the same as false — no vehicle was promised.
    */
   hasSupportVehicle?: boolean;
+  /**
+   * How many riders the organizer expects (sql/028), or null/absent when they left it blank.
+   * The event page shows "12 / 40" only when this is set; otherwise just the count. It is NOT
+   * a capacity — the real cap is the organizer's plan limit and never comes down to the client.
+   */
+  expectedParticipants?: number | null;
 }
 
 /**

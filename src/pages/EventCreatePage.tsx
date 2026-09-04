@@ -202,6 +202,9 @@ interface ExistingEvent {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
+  /** The organizer's expected head-count (sql/028), or null when they left it blank. Prefills
+   *  the "Expected riders" field in edit mode. */
+  expectedParticipants?: number | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -363,6 +366,15 @@ export function EventCreatePage() {
   // actually ticked.
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false
+  );
+  // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
+  // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
+  // the real cap is this account's plan limit, which the server enforces and which the plan
+  // hint below the field shows the organizer.
+  const [expectedParticipants, setExpectedParticipants] = useState<string>(
+    !isEditing && lastDefaults?.expectedParticipants != null
+      ? String(lastDefaults.expectedParticipants)
+      : ""
   );
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
@@ -549,6 +561,9 @@ export function EventCreatePage() {
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
+        setExpectedParticipants(
+          found.expectedParticipants != null ? String(found.expectedParticipants) : ""
+        );
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -662,6 +677,9 @@ export function EventCreatePage() {
   // server's `eventsThisWeek` is "created in the last 7 days".
   const ridesUsed = weekRides?.used ?? profile?.usage?.eventsThisWeek ?? 0;
   const ridesMax = weekRides?.max ?? effectiveLimits(profile).maxEventsPerWeek;
+  // The organizer's own per-event rider cap — shown next to "Expected riders" so they know the
+  // ceiling, but it is never sent to viewers (it is not the "/ N" on the ride page).
+  const planMaxParticipants = effectiveLimits(profile).maxParticipantsPerEvent;
   const hasRidesUsage = weekRides != null || profile?.usage != null;
   const ridesLimitReached = !isEditing && hasRidesUsage && ridesUsed >= ridesMax;
   const weeklyLimitMessage = `You've reached your ${ridesMax} rides this week — it frees up 7 days after your earliest one.`;
@@ -707,6 +725,9 @@ export function EventCreatePage() {
     if (restStops === null && event.restStops != null) setRestStops(event.restStops);
     if (event.isAccessible) setIsAccessible(true);
     if (event.hasSupportVehicle) setHasSupportVehicle(true);
+    if (!expectedParticipants.trim() && event.expectedParticipants != null) {
+      setExpectedParticipants(String(event.expectedParticipants));
+    }
     const sourceExtras = extrasByEvent[event.id];
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
@@ -1007,6 +1028,15 @@ export function EventCreatePage() {
     const elevationGainM =
       Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
 
+    // Expected riders — a positive whole number, or null when the field is blank / not a
+    // sensible number. `null` on a PATCH clears it, so emptying the field on an edit removes
+    // the "/ N" from the event page.
+    const parsedExpected = expectedParticipants.trim()
+      ? Math.floor(Number(expectedParticipants))
+      : Number.NaN;
+    const expectedParticipantsValue =
+      Number.isFinite(parsedExpected) && parsedExpected > 0 ? parsedExpected : null;
+
     // Ride plan, all sent on the create/edit request itself so the server persists them
     // (events.duration_min / rest_stops / is_accessible). `null` = not stated. `durationMin` is
     // already whole minutes clamped to the server's bound (lib/ride-duration.ts), so there is
@@ -1044,7 +1074,10 @@ export function EventCreatePage() {
             isAccessible,
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
-            hasSupportVehicle
+            hasSupportVehicle,
+            // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
+            // the stored number too.
+            expectedParticipants: expectedParticipantsValue
           }
         });
         await saveExtras(eventId);
@@ -1098,6 +1131,8 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
+          // Expected riders (sql/028) — null when the organizer left the field blank.
+          expectedParticipants: expectedParticipantsValue,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1127,7 +1162,8 @@ export function EventCreatePage() {
         durationMin,
         restStops,
         isAccessible,
-        hasSupportVehicle
+        hasSupportVehicle,
+        expectedParticipants: expectedParticipantsValue
       });
       // Small delayed success state before redirecting home: requested as a short green
       // confirmation moment, not an instant route jump right after tapping Save.
@@ -1784,6 +1820,30 @@ export function EventCreatePage() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="expectedParticipants">
+                  <Users aria-hidden="true" />
+                  Expected riders
+                </label>
+                <input
+                  id="expectedParticipants"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  step="1"
+                  className={styles.input}
+                  value={expectedParticipants}
+                  placeholder="optional"
+                  onChange={(e) => setExpectedParticipants(e.target.value)}
+                />
+                <p className={styles.hint}>
+                  {expectedParticipants.trim()
+                    ? `Riders will see “… / ${expectedParticipants.trim()}” next to the count.`
+                    : "How many riders you expect. Optional — leave blank to show just the count."}{" "}
+                  Your plan allows up to {planMaxParticipants} riders per ride.
+                </p>
               </div>
 
               <fieldset className={styles.panel} style={{ border: "none" }}>

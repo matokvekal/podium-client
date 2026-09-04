@@ -65,6 +65,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
+import { DescriptionSheet } from "../app/DescriptionSheet";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { SafetySheet } from "../app/SafetySheet";
@@ -372,7 +373,7 @@ export function EventDetailPage() {
   // for "leave", the rider's own sticky bottom bar) swaps to a small message + Cancel/Confirm
   // pair for that one action.
   const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
-  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   // The invitation this rider arrived on, if they got here from a link or a QR — recorded by
   // JoinPage when the code resolved (store/invitedEventsStore.ts). Persisted rather than passed
@@ -1496,20 +1497,18 @@ export function EventDetailPage() {
         )}
 
         {/* --- description ------------------------------------------------------------------
-            Collapsed to a few lines with a "… more" toggle, as in the mock, but only when the
-            text is actually long enough to need it. */}
+            A few clamped lines inline; when the text is longer, "Read more" opens the full
+            description in a scrollable sheet rather than pushing the rest of the page down. */}
         {event.description && (
           <div className={styles.description}>
-            <p className={styles.descriptionText} data-expanded={descriptionOpen}>
-              {event.description}
-            </p>
+            <p className={styles.descriptionText}>{event.description}</p>
             {event.description.length > DESCRIPTION_CLAMP_CHARS && (
               <button
                 type="button"
                 className={styles.descriptionToggle}
-                onClick={() => setDescriptionOpen((open) => !open)}
+                onClick={() => setDescriptionSheetOpen(true)}
               >
-                {descriptionOpen ? "less" : "… more"}
+                Read more
               </button>
             )}
           </div>
@@ -1995,6 +1994,13 @@ export function EventDetailPage() {
       )}
 
       {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
+
+      {descriptionSheetOpen && event.description && (
+        <DescriptionSheet
+          text={event.description}
+          onClose={() => setDescriptionSheetOpen(false)}
+        />
+      )}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

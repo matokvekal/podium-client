@@ -1101,20 +1101,19 @@
   color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.descriptionText[data-expanded="false"] {
+  /* Always a short preview on the page — the full text lives in the sheet behind "Read more". */
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .descriptionToggle {
-  align-self: flex-end;
-  padding: 0;
-  font-size: 0.82rem;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 4px 0;
+  font-size: 0.85rem;
   font-weight: var(--weight-medium);
   color: var(--accent-strong);
   background: none;

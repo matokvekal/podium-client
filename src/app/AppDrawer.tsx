@@ -29,6 +29,8 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import type { ColorTheme } from "../lib/color-theme";
+import type { ContactTopicId } from "../lib/contact";
+import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
 import { Avatar } from "./Avatar";
 import { useMyIdentity } from "./useMyIdentity";
@@ -47,16 +49,23 @@ interface AppDrawerProps {
 }
 
 export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: AppDrawerProps) {
-  const { status, signOut } = useAuth();
+  const { status, signOut, profile } = useAuth();
   const isOrganizer = useIsOrganizer();
   const setUserMode = useUserModeStore((state) => state.setMode);
   const navigate = useNavigate();
+
+  // The server decides whether this account may create rides at all. When it hasn't been
+  // enabled, the "I also organize events" switch stays visible but disabled, with a link to
+  // ask for it — see lib/user-mode.ts and the "organize" contact topic.
+  const canToggleOrganizer = organizerSwitchEnabled(profile?.canOrganize);
 
   // Name and avatar both come from useMyIdentity so the drawer, the header and the account
   // page always agree about who this is.
   const me = useMyIdentity();
   const displayName = me.displayName;
-  const [contactOpen, setContactOpen] = useState(false);
+  // `null` = closed. A topic id opens the sheet focused on that topic (the organizer-access
+  // request); `"any"` opens the plain "Contact us" list.
+  const [contactTopic, setContactTopic] = useState<ContactTopicId | "any" | null>(null);
 
   function go(path: string) {
     onClose();
@@ -123,16 +132,34 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             Join with a code
           </NavLink>
 
-          {/* Mode + View live in the menu list, no bordered panels — asked for directly. */}
-          <label className="drawer__nav-item drawer__nav-item--toggle">
+          {/* Mode + View live in the menu list, no bordered panels — asked for directly.
+              The switch is interactive only once the server has enabled ride creation for
+              this account; until then it shows disabled with an "ask to organize" link. */}
+          <label
+            className={
+              canToggleOrganizer
+                ? "drawer__nav-item drawer__nav-item--toggle"
+                : "drawer__nav-item drawer__nav-item--toggle is-locked"
+            }
+          >
             <Megaphone aria-hidden="true" />I also organize events
             <input
               type="checkbox"
               className="drawer__nav-check"
-              checked={isOrganizer}
+              checked={canToggleOrganizer && isOrganizer}
+              disabled={!canToggleOrganizer}
               onChange={(event) => setUserMode(event.target.checked ? "organizer" : "rider")}
             />
           </label>
+          {!canToggleOrganizer && (
+            <button
+              type="button"
+              className="drawer__nav-subaction"
+              onClick={() => setContactTopic("organize")}
+            >
+              Want to create rides? Ask us to turn it on →
+            </button>
+          )}
 
           <button
             type="button"
@@ -149,7 +176,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               this is the one item that leaves the app. Open to everyone — a rider hitting a
               bug before they have an account is exactly who most needs to be able to say so.
               The drawer stays open behind the sheet so closing it returns them to the menu. */}
-          <button type="button" className="drawer__nav-item" onClick={() => setContactOpen(true)}>
+          <button type="button" className="drawer__nav-item" onClick={() => setContactTopic("any")}>
             <MessageCircleHeart aria-hidden="true" />
             Contact us
           </button>
@@ -183,9 +210,12 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
         </div>
       </div>
 
-      {contactOpen && (
+      {contactTopic !== null && (
         <Suspense fallback={null}>
-          <ContactSheet onClose={() => setContactOpen(false)} />
+          <ContactSheet
+            onClose={() => setContactTopic(null)}
+            initialTopicId={contactTopic === "any" ? undefined : contactTopic}
+          />
         </Suspense>
       )}
     </>

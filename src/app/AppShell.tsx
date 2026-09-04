@@ -28,6 +28,7 @@ import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { AppDrawer } from "./AppDrawer";
 import { Avatar } from "./Avatar";
+import { useEnforceOrganizerEligibility } from "./useEnforceOrganizerEligibility";
 import { useMyIdentity } from "./useMyIdentity";
 
 // The event detail page ("/events/:eventId", but not the "new"/"edit"/sub-route variants)
@@ -64,6 +65,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [serverReachable]);
   const { status } = useAuth();
+  // Drop a stale "organizer" preference if the server says this account can't create rides.
+  useEnforceOrganizerEligibility();
   const me = useMyIdentity();
   const navigate = useNavigate();
   const location = useLocation();

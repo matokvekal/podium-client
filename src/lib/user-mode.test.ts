@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_USER_MODE, normalizeUserMode } from "./user-mode";
+import {
+  DEFAULT_USER_MODE,
+  normalizeUserMode,
+  organizerSwitchEnabled,
+  shouldForceRiderMode,
+} from "./user-mode";
 
 describe("normalizeUserMode", () => {
   it("keeps a real organizer value", () => {
@@ -23,5 +28,24 @@ describe("normalizeUserMode", () => {
 
   it("defaults to rider", () => {
     expect(DEFAULT_USER_MODE).toBe("rider");
+  });
+});
+
+describe("shouldForceRiderMode", () => {
+  it("forces rider only on an explicit server 'false'", () => {
+    expect(shouldForceRiderMode(false)).toBe(true);
+  });
+
+  it("leaves the stored preference alone when the server allows it, or when unknown", () => {
+    expect(shouldForceRiderMode(true)).toBe(false);
+    expect(shouldForceRiderMode(undefined)).toBe(false);
+  });
+});
+
+describe("organizerSwitchEnabled", () => {
+  it("is interactive only when the server has affirmatively said yes", () => {
+    expect(organizerSwitchEnabled(true)).toBe(true);
+    expect(organizerSwitchEnabled(false)).toBe(false);
+    expect(organizerSwitchEnabled(undefined)).toBe(false);
   });
 });

@@ -55,10 +55,17 @@ function RequireAuth({ children }: { children: ReactNode }) {
  * have no entry point in the UI at all — this guard is only for a stale bookmark or a typed
  * URL, sending it back home instead of onto an organizer screen. The components and routes
  * themselves are untouched; switching to Organizer mode restores access with no reload.
+ *
+ * Also bounces an account the server has NOT enabled for ride creation
+ * (`profile.canOrganize === false`), even if a stale "organizer" preference is still in
+ * localStorage — AppShell's useEnforceOrganizerEligibility clears that too, but this closes
+ * the render-before-effect gap for a directly-typed URL. `undefined` (offline / cached
+ * profile) is not a denial, so it still falls through to the mode check.
  */
 function RequireOrganizer({ children }: { children: ReactNode }) {
   const mode = useUserModeStore((state) => state.mode);
-  if (mode === "rider") return <Navigate to="/" replace />;
+  const canOrganize = useAuth().profile?.canOrganize;
+  if (mode === "rider" || canOrganize === false) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

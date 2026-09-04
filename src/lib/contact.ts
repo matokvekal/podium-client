@@ -5,7 +5,7 @@
 /** Where feedback goes. One address, one place to look. */
 export const CONTACT_EMAIL = "tipusharim@gmail.com";
 
-export type ContactTopicId = "bug" | "idea" | "question";
+export type ContactTopicId = "bug" | "idea" | "question" | "organize";
 
 export interface ContactTopic {
   id: ContactTopicId;
@@ -50,6 +50,21 @@ export const CONTACT_TOPICS: ContactTopic[] = [
     note: "Anything at all — how something works, or something that isn't clear.",
     subject: "Question",
     prompts: ["Your question:"],
+  },
+  {
+    id: "organize",
+    // The one topic that asks us to change something on the account, not just to read a
+    // message: ride creation is enabled per account, and this is how someone requests it until
+    // there's a self-serve path. The drawer / account page open the sheet straight to this
+    // topic when the "I also organize events" switch is disabled.
+    label: "I want to organize rides",
+    note: "Ask us to turn on ride creation for your account.",
+    subject: "Organizer access request",
+    prompts: [
+      "Your name or riding group:",
+      "What kind of rides you organize (route, area, how often):",
+      "Anything else we should know:",
+    ],
   },
 ];
 

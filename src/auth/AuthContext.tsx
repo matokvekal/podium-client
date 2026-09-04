@@ -73,6 +73,17 @@ export interface Profile {
     eventsThisWeek: number;
     teamsOwned: number;
   };
+  /**
+   * Whether this account may create rides at all. The server gates ride creation to accounts
+   * it has enabled (a per-user grant or a paid organizer tier); the client only uses this to
+   * enable the "I also organize events" switch and to keep organizer-only UI out of reach
+   * otherwise — the server still enforces it (403 on POST /events).
+   *
+   * Optional and tri-state on purpose: `true` / `false` are real answers from a fresh
+   * GET /users/me; `undefined` is "we don't know yet" (a cached v1 profile, an offline cold
+   * start) and must NOT be treated as a denial — see lib/user-mode.ts `shouldForceRiderMode`.
+   */
+  canOrganize?: boolean;
 }
 
 interface AuthResponse {

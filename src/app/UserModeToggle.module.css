@@ -35,3 +35,8 @@
 .option[data-active="true"] svg {
   color: var(--accent);
 }
+
+.option:disabled {
+  cursor: default;
+  opacity: 0.45;
+}

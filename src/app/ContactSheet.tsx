@@ -15,7 +15,15 @@
  * Escape to close.
  */
 
-import { Bug, Check, Copy, Lightbulb, Mail, MessageCircleQuestion } from "lucide-react";
+import {
+  Bug,
+  Check,
+  Copy,
+  Lightbulb,
+  Mail,
+  Megaphone,
+  MessageCircleQuestion,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { config } from "../lib/config";
@@ -33,6 +41,7 @@ const TOPIC_ICON: Record<ContactTopicId, typeof Bug> = {
   bug: Bug,
   idea: Lightbulb,
   question: MessageCircleQuestion,
+  organize: Megaphone,
 };
 
 /** Read at click time, not at mount: the sheet can sit open while nothing else changes, but
@@ -47,8 +56,28 @@ function currentContext(): ContactContext {
   };
 }
 
-export function ContactSheet({ onClose }: { onClose: () => void }) {
+export function ContactSheet({
+  onClose,
+  initialTopicId,
+}: {
+  onClose: () => void;
+  /** Open the sheet "about" one topic — it is pulled to the top, highlighted, and the intro
+   *  line names it. Used when the sheet is opened from a disabled control (the organizer
+   *  switch) rather than the generic "Contact us" menu item. */
+  initialTopicId?: ContactTopicId;
+}) {
   const [copied, setCopied] = useState(false);
+
+  // Stable order: the opened-for topic first (if any), then the rest in their declared order.
+  const orderedTopics = initialTopicId
+    ? [
+        ...CONTACT_TOPICS.filter((t) => t.id === initialTopicId),
+        ...CONTACT_TOPICS.filter((t) => t.id !== initialTopicId),
+      ]
+    : CONTACT_TOPICS;
+  const openedForTopic = initialTopicId
+    ? CONTACT_TOPICS.find((t) => t.id === initialTopicId)
+    : undefined;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -94,20 +123,23 @@ export function ContactSheet({ onClose }: { onClose: () => void }) {
 
         <div className={styles.body}>
           <p className={styles.intro}>
-            This app is built by riders, and it gets better every time someone tells us what isn't
-            working. Pick what fits and we'll open a draft — a real person reads every one.
+            {openedForTopic
+              ? `${openedForTopic.note} We'll open a draft — a real person reads every one.`
+              : `This app is built by riders, and it gets better every time someone tells us what isn't working. Pick what fits and we'll open a draft — a real person reads every one.`}
           </p>
 
           <ul className={styles.list}>
-            {CONTACT_TOPICS.map((topic) => {
+            {orderedTopics.map((topic) => {
               const Icon = TOPIC_ICON[topic.id];
+              const highlighted = topic.id === initialTopicId;
               return (
                 <li key={topic.id}>
                   {/* A real link, so it gets link behaviour: middle-click, long-press, and a
                       focus ring. href is built at render; the context it embeds is read fresh
                       on click. */}
                   <a
-                    className={styles.topic}
+                    className={highlighted ? `${styles.topic} ${styles.topicHighlight}` : styles.topic}
+                    aria-current={highlighted ? "true" : undefined}
                     href={buildContactMailto(topic, currentContext())}
                     onClick={onClose}
                   >

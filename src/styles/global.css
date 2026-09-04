@@ -394,6 +394,37 @@ textarea {
   accent-color: var(--accent);
 }
 
+/* Organizer switch the server has not enabled for this account: the row stays visible (so the
+   capability is discoverable) but reads as unavailable, with the request path just below it. */
+.drawer__nav-item--toggle.is-locked {
+  cursor: default;
+}
+
+.drawer__nav-check:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.drawer__nav-subaction {
+  display: block;
+  width: 100%;
+  margin-top: calc(var(--space-1) * -1);
+  margin-bottom: var(--space-1);
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  padding-left: calc(18px + var(--space-3) * 2);
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.drawer__nav-subaction:hover {
+  text-decoration: underline;
+}
+
 .card {
   padding: var(--card-padding);
   background: var(--surface);

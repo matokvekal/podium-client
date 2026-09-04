@@ -85,8 +85,17 @@ describe("buildContactMailto", () => {
 });
 
 describe("CONTACT_TOPICS", () => {
-  it("offers the three genuinely different kinds of message", () => {
-    expect(CONTACT_TOPICS.map((t) => t.id)).toEqual(["bug", "idea", "question"]);
+  it("offers the genuinely different kinds of message", () => {
+    expect(CONTACT_TOPICS.map((t) => t.id)).toEqual(["bug", "idea", "question", "organize"]);
+  });
+
+  it("the organizer-access request carries no diagnostics and asks what enabling it needs", () => {
+    const body = bodyOf(buildContactMailto(topic("organize"), CONTEXT));
+    expect(body).not.toContain("App version:");
+    expect(body).toContain("Your name or riding group:");
+    expect(subjectOf(buildContactMailto(topic("organize"), CONTEXT))).toBe(
+      "El Niño Move — Organizer access request",
+    );
   });
 
   it("gives every topic something to say and something to ask", () => {

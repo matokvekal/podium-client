@@ -21,7 +21,7 @@
  * still happens, and the session dies on its own when the refresh token expires.
  */
 
-import { type ChangeEvent, lazy, Suspense, useRef, useState } from "react";
+import { type ChangeEvent, useRef, useState } from "react";
 import { Avatar } from "../app/Avatar";
 import { UserModeToggle } from "../app/UserModeToggle";
 import { useMyIdentity } from "../app/useMyIdentity";
@@ -50,11 +50,6 @@ import {
 import { useUserIdentityStore } from "../store/userIdentityStore";
 import styles from "./AccountPage.module.css";
 
-// Most sessions never open it — same lazy treatment the drawer gives it.
-const ContactSheet = lazy(() =>
-  import("../app/ContactSheet").then((m) => ({ default: m.ContactSheet })),
-);
-
 const SPEC: Record<IdentityAssetType, ImageSpec> = { avatar: AVATAR_SPEC, cover: COVER_SPEC };
 
 const SPEC_LABEL: Record<IdentityAssetType, string> = {
@@ -66,10 +61,9 @@ export function AccountPage() {
   const { profile, signOut } = useAuth();
   const me = useMyIdentity();
   const [busy, setBusy] = useState(false);
-  const [askOrganizeOpen, setAskOrganizeOpen] = useState(false);
 
-  // The server gates ride creation per account; Organizer mode is only selectable once it has
-  // been enabled. See lib/user-mode.ts and the "organize" contact topic.
+  // The server gates ride creation per account; the Mode card is shown only once it has been
+  // enabled (a manual user_entitlements.can_organize flag). See lib/user-mode.ts.
   const canToggleOrganizer = organizerSwitchEnabled(profile?.canOrganize);
 
   const avatar = resolveUserAvatar(
@@ -89,31 +83,21 @@ export function AccountPage() {
     <section className="stack">
       <h1>Account</h1>
 
-      <div className="card stack">
-        <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
-          Mode
-        </p>
-        <p className="muted" style={{ margin: 0 }}>
-          Rider mode keeps things simple. Organizer mode adds the tools to create and manage events.
-          You can switch any time.
-        </p>
-        <UserModeToggle disabled={!canToggleOrganizer} />
-        {!canToggleOrganizer && (
-          <>
-            <p className="muted" style={{ margin: 0 }}>
-              Ride creation isn't enabled for your account yet.
-            </p>
-            <button
-              type="button"
-              className="button button--quiet"
-              style={{ alignSelf: "flex-start" }}
-              onClick={() => setAskOrganizeOpen(true)}
-            >
-              Ask us to turn it on
-            </button>
-          </>
-        )}
-      </div>
+      {/* Only shown once the server has enabled ride creation for this account (a manual
+          user_entitlements.can_organize flag). A rider who was never granted it sees nothing
+          about organizing — no switch, no "ask us" path. */}
+      {canToggleOrganizer && (
+        <div className="card stack">
+          <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
+            Mode
+          </p>
+          <p className="muted" style={{ margin: 0 }}>
+            Rider mode keeps things simple. Organizer mode adds the tools to create and manage
+            events. You can switch any time.
+          </p>
+          <UserModeToggle />
+        </div>
+      )}
 
       <div className="card stack">
         <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
@@ -195,12 +179,6 @@ export function AccountPage() {
       >
         Sign out
       </button>
-
-      {askOrganizeOpen && (
-        <Suspense fallback={null}>
-          <ContactSheet onClose={() => setAskOrganizeOpen(false)} initialTopicId="organize" />
-        </Suspense>
-      )}
     </section>
   );
 }

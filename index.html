@@ -49,6 +49,9 @@
 
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- iOS has no favicon.svg / manifest-icon support for "Add to Home Screen" — it reads only
+         this tag, so the bike mark needs its own explicit entry here too. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <!-- Abel: the event card typeface in the Figma design (Tomer-Design / new-commissaire).
          Preconnect keeps the first paint from stalling on the font request. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App icon: a bike, on the app's own navy and accent-blue brand colors (see tokens.css
+       accent / accent-strong, and manifest.webmanifest background_color). Full-bleed navy
+       background so a maskable crop (Android's circle, squircle, or rounded-square) never
+       shows a hard edge or a transparent corner; the badge and glyph stay inside the roughly
+       80 percent "safe zone" so nothing meaningful is cropped. Source for icon-192.png,
+       icon-512.png, icon-512-maskable.png and favicon.svg; regenerate with sharp-cli. -->
+  <rect width="512" height="512" fill="#0f172a" />
+  <circle cx="256" cy="256" r="200" fill="#3f86e7" />
+  <g transform="translate(124,118.5) scale(11)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="18.5" cy="17.5" r="3.5" />
+    <circle cx="5.5" cy="17.5" r="3.5" />
+    <circle cx="15" cy="5" r="1" />
+    <path d="M12 17.5V14l-3-3 4-3 2 3h2" />
+  </g>
+</svg>

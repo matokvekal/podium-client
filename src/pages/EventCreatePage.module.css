@@ -6,7 +6,7 @@
  */
 
 .page {
-  max-width: 40rem;
+  max-width: 48rem;
   margin: 0 auto;
 }
 
@@ -206,9 +206,13 @@
   gap: var(--space-4);
 }
 
-@media (min-width: 768px) {
+/* Two columns only once the container is genuinely wide enough for both to be comfortable.
+   Below this the form is a single column — the .page cap is 48rem, and splitting a ~640px
+   card into 1.1fr / 1fr gave the right column ~295px, which the difficulty picker (192px of
+   fixed-width bars + an un-wrappable "Intermediate") overflowed straight out of the card. */
+@media (min-width: 820px) {
   .grid {
-    grid-template-columns: 1.1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     align-items: start;
   }
 }
@@ -218,6 +222,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* Grid items default to min-width: auto, so a wide child (the datetime widget, a long
+     hint line) would push the track past 1fr and overflow the card. Force the track to win. */
+  min-width: 0;
 }
 
 /* --- fields ------------------------------------------------------------- */
@@ -360,10 +367,15 @@
 
 /* --- difficulty signal bars (cellular-reception style) -------------------- */
 
+/* flex-wrap: the bars are a fixed 192px and never shrink; if the column is too tight for the
+   "Intermediate"/"World Tour" label beside them, it drops to its own line under the bars
+   rather than spilling out of the card (the bug at ~768–820px before the single-column
+   fallback took over). */
 .levelRow {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: 6px var(--space-3);
 }
 
 .levelBars {
@@ -402,6 +414,8 @@
   font-weight: var(--weight-bold);
   font-size: 18px;
   color: var(--text-muted);
+  /* Stays one unit when .levelRow wraps it below the bars — never splits "World Tour". */
+  white-space: nowrap;
 }
 
 .levelName svg {

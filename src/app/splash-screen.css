@@ -109,7 +109,7 @@
   position: relative;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   /* Big — asked for directly, then "20% bigger". clamp() so it fills the top of the frame on
-     a phone without wrapping "El Niño Move" on the narrowest screens or blowing up on desktop. */
+     a phone without wrapping "El Niño Ride" on the narrowest screens or blowing up on desktop. */
   font-size: clamp(2.3rem, 9.6vw, 3.4rem);
   font-weight: 800;
   line-height: 1.05;

@@ -124,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             width={22}
             height={22}
           />
-          El Niño Move
+          El Niño Ride
         </NavLink>
 
         <button
@@ -178,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="app-main">{children}</main>
 
       <footer className="app-footer">
-        <span>© {new Date().getFullYear()} El Niño Move. All rights reserved.</span>
+        <span>© {new Date().getFullYear()} El Niño Ride. All rights reserved.</span>
       </footer>
     </div>
   );

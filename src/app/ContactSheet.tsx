@@ -104,7 +104,7 @@ export function ContactSheet({
       <div
         className={`${styles.sheet} ${styles.sheetOpen}`}
         role="dialog"
-        aria-label="Contact the El Niño Move team"
+        aria-label="Contact the El Niño Ride team"
       >
         <div className={styles.header}>
           <span className={styles.headerTitle}>

@@ -21,7 +21,7 @@ describe("shareInviteMessage", () => {
     expect(lines[3]).toMatch(/^🗓️ Saturday, 5 Sep · /);
     expect(lines[4]).toBe("📍 Modi'in");
     expect(message).toContain("Tap to join 👉 https://el-nino.site/join/31082026A");
-    expect(message.endsWith("See you on the road,\nEl Niño Move")).toBe(true);
+    expect(message.endsWith("See you on the road,\nEl Niño Ride")).toBe(true);
   });
 
   it("puts every fact on its own line", () => {

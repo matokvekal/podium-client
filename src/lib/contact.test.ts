@@ -30,9 +30,9 @@ describe("buildContactMailto", () => {
   });
 
   it("names the app in the subject, so it is sortable in an inbox", () => {
-    expect(subjectOf(buildContactMailto(topic("bug"), CONTEXT))).toBe("El Niño Move — Bug report");
+    expect(subjectOf(buildContactMailto(topic("bug"), CONTEXT))).toBe("El Niño Ride — Bug report");
     expect(subjectOf(buildContactMailto(topic("idea"), CONTEXT))).toBe(
-      "El Niño Move — Feature request",
+      "El Niño Ride — Feature request",
     );
   });
 
@@ -40,7 +40,7 @@ describe("buildContactMailto", () => {
     // An unencoded "—" or "#" in a mailto truncates the draft at that character in some
     // clients — the reason both fields go through encodeURIComponent.
     const raw = buildContactMailto(topic("bug"), CONTEXT);
-    expect(raw).not.toContain("El Niño Move — Bug report");
+    expect(raw).not.toContain("El Niño Ride — Bug report");
     expect(subjectOf(raw)).toContain("—");
   });
 
@@ -94,7 +94,7 @@ describe("CONTACT_TOPICS", () => {
     expect(body).not.toContain("App version:");
     expect(body).toContain("Your name or riding group:");
     expect(subjectOf(buildContactMailto(topic("organize"), CONTEXT))).toBe(
-      "El Niño Move — Organizer access request",
+      "El Niño Ride — Organizer access request",
     );
   });
 

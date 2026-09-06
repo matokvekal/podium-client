@@ -90,7 +90,7 @@ function diagnosticsBlock(context: ContactContext): string[] {
   return [
     "",
     "---",
-    "Sent from El Niño Move. The lines below help us track the problem down:",
+    "Sent from El Niño Ride. The lines below help us track the problem down:",
     `App version: ${context.appVersion}`,
     `Screen: ${context.page}`,
     `Window: ${context.viewport}`,
@@ -116,6 +116,6 @@ export function buildContactMailto(topic: ContactTopic, context: ContactContext)
     ...(topic.withDiagnostics ? diagnosticsBlock(context) : []),
   ].join("\n");
 
-  const subject = encodeURIComponent(`El Niño Move — ${topic.subject}`);
+  const subject = encodeURIComponent(`El Niño Ride — ${topic.subject}`);
   return `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${encodeURIComponent(body)}`;
 }

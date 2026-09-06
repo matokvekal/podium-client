@@ -119,7 +119,7 @@ export function TeamDetailPage() {
   }
 
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(
-    `You're invited to ride with ${team.name}! Download El Niño Move to join.`,
+    `You're invited to ride with ${team.name}! Download El Niño Ride to join.`,
   )}`;
 
   return (

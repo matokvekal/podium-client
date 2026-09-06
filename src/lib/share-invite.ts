@@ -65,7 +65,7 @@ export function shareInviteMessage({
   if (when) lines.push(`🗓️ ${when}`);
   if (place) lines.push(`📍 ${place}`);
   if (url) lines.push("", `Tap to join 👉 ${url}`);
-  lines.push("", "See you on the road,", "El Niño Move");
+  lines.push("", "See you on the road,", "El Niño Ride");
 
   return lines.join("\n");
 }

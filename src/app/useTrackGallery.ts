@@ -32,6 +32,12 @@ import { useAuth } from "../auth/AuthContext";
 import { apiRequest, apiRequestPaged } from "../lib/api-client";
 import type { EventRoute } from "../lib/event-route";
 import type { EventSummary } from "../lib/local-db";
+import {
+  applyTrackGalleryCriteria,
+  buildTrackGalleryQuery,
+  type TrackGalleryCriteria,
+  type TrackGallerySort,
+} from "../lib/track-gallery-filter";
 import { useEventsStore } from "../store/eventsStore";
 import { thinPoints } from "./track-thumbnail";
 
@@ -82,9 +88,16 @@ interface UseTrackGalleryResult {
   requestRoute: (eventId: string) => void;
   /** Resolved geometry by event id. `undefined` = not asked yet, `null` = asked, none exists. */
   routes: ReadonlyMap<string, GalleryRoute | null>;
+  /** Distinct areas on public rides, for the Area filter. Empty until the facet call lands. */
+  areas: string[];
 }
 
-export function useTrackGallery(source: GallerySource, search: string): UseTrackGalleryResult {
+export function useTrackGallery(
+  source: GallerySource,
+  search: string,
+  criteria: TrackGalleryCriteria,
+  sort: TrackGallerySort,
+): UseTrackGalleryResult {
   const { status } = useAuth();
   const myRides = useEventsStore((s) => s.myRides);
   const myRidesLoading = useEventsStore((s) => s.myRidesLoading);
@@ -104,6 +117,7 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
   const [publicLoading, setPublicLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [areas, setAreas] = useState<string[]>([]);
   /**
    * Resolved geometry, mirrored out of the module cache into state so React actually re-renders
    * when an answer lands — the cache alone is a mutable Map and nothing would notice it change.
@@ -145,14 +159,13 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
       // from next Saturday — filtering to upcoming would hide the richest source of them.
       // Omitting the parameter is a real "no filter" server-side ($5 IS NULL), not a default.
       //
-      // sort=newest is created_at DESC: most recently added track first, and a stable key to
-      // page against, so a ride cannot shuffle between pages while the rider scrolls.
-      const params = new URLSearchParams({
-        sort: "newest",
-        limit: String(PAGE_SIZE),
-        offset: String(offset),
-      });
-      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      // The rider's filters + sort + search go on the query string here — the server does the
+      // narrowing (the list is paged, so filtering the 24 loaded rows client-side would be
+      // wrong). buildTrackGalleryQuery always sends `sort` (default "newest" = created_at DESC,
+      // the stable paging key) and omits any filter left at its default.
+      const params = buildTrackGalleryQuery(criteria, sort, debouncedSearch);
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(offset));
 
       const page = await apiRequestPaged<EventSummary>(`/events/public?${params.toString()}`, {
         anonymous: true,
@@ -169,7 +182,7 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
         return [...prev, ...page.data.filter((e) => !seen.has(e.id))];
       });
     },
-    [debouncedSearch],
+    [debouncedSearch, criteria, sort],
   );
 
   // First page, and a fresh one whenever the search text changes. Only the public list pages;
@@ -192,6 +205,25 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
       }
     })();
   }, [fetchPage, source]);
+
+  // The Area filter's options — distinct areas across public rides. One anonymous call, once
+  // per mount; a server that has not shipped the endpoint just leaves the filter empty.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const body = await apiRequest<{ areas?: string[] }>("/events/public/areas", {
+          anonymous: true,
+        });
+        if (!cancelled && Array.isArray(body?.areas)) setAreas(body.areas);
+      } catch {
+        // Non-fatal: the filter sheet simply shows no Area group.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadMore = useCallback(() => {
     if (source !== "all" || publicLoading || loadingMore) return;
@@ -252,25 +284,18 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
     })();
   }, []);
 
-  const searchQ = search.trim().toLowerCase();
-
   const rides = useMemo(() => {
+    // "All rides" is already filtered AND sorted by the server (buildTrackGalleryQuery). "My
+    // rides" is one fully-loaded page from the store, so the identical criteria + sort are
+    // applied here in memory instead — same helper, so the two sources behave the same.
     const base =
-      source === "mine"
-        ? searchQ
-          ? myRides.filter(
-              (e) =>
-                e.name.toLowerCase().includes(searchQ) ||
-                (e.location ?? "").toLowerCase().includes(searchQ),
-            )
-          : myRides
-        : publicRides;
+      source === "mine" ? applyTrackGalleryCriteria(myRides, criteria, sort, search) : publicRides;
     // Hidden only once the answer is known. A ride still being fetched stays in the grid
     // showing its placeholder, so cards do not flicker in and out while scrolling. A ride
     // already proven routeless in an earlier opening of the modal is filtered on first paint,
     // because `routes` is seeded from the cache that outlives this component.
     return base.filter((e) => !isRouteless(routes.get(e.id)));
-  }, [source, myRides, publicRides, searchQ, routes]);
+  }, [source, myRides, publicRides, criteria, sort, search, routes]);
 
   const loading = source === "mine" ? myRidesLoading && myRides.length === 0 : publicLoading;
   const total = source === "mine" ? rides.length : publicTotal;
@@ -286,5 +311,6 @@ export function useTrackGallery(source: GallerySource, search: string): UseTrack
     loadMore,
     requestRoute,
     routes,
+    areas,
   };
 }

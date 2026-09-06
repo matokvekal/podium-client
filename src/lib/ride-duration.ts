@@ -33,6 +33,47 @@ export const DURATION_MINUTE_OPTIONS: readonly number[] = Array.from(
   (_, i) => i * 5,
 );
 
+/**
+ * Ride-time ranges for the "Browse tracks" filter. A range picker, not a free number: an
+ * organizer's estimate is coarse, so "2–3h" is the honest granularity. Half-open — `[minMin,
+ * maxMin)` — so the buckets tile without overlap. Keys match the server's DURATION_BUCKET_KEYS
+ * (event.schemas.ts) and its OR-group over events.duration_min.
+ */
+export type DurationBucketKey = "lt1" | "1to2" | "2to3" | "3to5" | "gt5";
+
+export const DURATION_BUCKETS: {
+  key: DurationBucketKey;
+  label: string;
+  minMin?: number;
+  maxMin?: number;
+}[] = [
+  { key: "lt1", label: "< 1h", maxMin: 60 },
+  { key: "1to2", label: "1–2h", minMin: 60, maxMin: 120 },
+  { key: "2to3", label: "2–3h", minMin: 120, maxMin: 180 },
+  { key: "3to5", label: "3–5h", minMin: 180, maxMin: 300 },
+  { key: "gt5", label: "5h+", minMin: 300 },
+];
+
+/**
+ * Does a stored ride time fall in ANY of the selected buckets? Empty selection = no filter
+ * (everything passes). A ride with no stated duration never matches a bucket — you cannot say
+ * a blank is "under an hour" — which mirrors the server's `duration_min IS NOT NULL` guard.
+ */
+export function matchesDurationBuckets(
+  minutes: number | null | undefined,
+  keys: DurationBucketKey[],
+): boolean {
+  if (keys.length === 0) return true;
+  if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) return false;
+  return keys.some((key) => {
+    const bucket = DURATION_BUCKETS.find((b) => b.key === key);
+    if (!bucket) return false;
+    if (bucket.minMin != null && minutes < bucket.minMin) return false;
+    if (bucket.maxMin != null && minutes >= bucket.maxMin) return false;
+    return true;
+  });
+}
+
 /** "2h 45m" / "2h" / "45m". Empty string for null / non-positive — callers render a dash. */
 export function formatDuration(minutes: number | null | undefined): string {
   if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) return "";

@@ -189,14 +189,17 @@ export interface EventDetail extends EventSummary {
   showLiveLocations: boolean;
   myParticipant: MyParticipant | null;
   /**
-   * Start-list capacity, all resolved server-side and always present on a real
-   * GET /events/:eventId response. `maxParticipants` is the event OWNER's entitlement;
-   * `participantCount` is approved + pending; `isFull` is `participantCount >= maxParticipants`.
-   * Client validation is UX only — the server 409s (EVENT_FULL) when a join hits the cap.
-   * detailFromCachedSummary supplies honest fallbacks until the real fetch resolves.
+   * Start-list capacity. `participantCount` (approved + pending) and `isFull` are sent to every
+   * viewer; the server 409s (EVENT_FULL) when a join hits the cap, so client checks are UX only.
+   *
+   * `maxParticipants` is the OWNER's account cap and is **null for everyone else** — the server
+   * redacts it (event.controller.ts), because an organizer's plan ceiling is not a figure other
+   * riders should see. The organizer reads "6 / 50" on their own ride; everyone else reads "7".
+   * null therefore means "not mine to know", NOT "unknown, pick a default" — never substitute
+   * FALLBACK_LIMITS here, or a viewer with no cap silently gets a made-up one.
    */
   participantCount: number;
-  maxParticipants: number;
+  maxParticipants: number | null;
   isFull: boolean;
   /** Ride-groups count + the owner's per-event group entitlement. Optional: ride groups are a
    * client-only concept today (store/eventGroupsStore.ts), so a response may omit these. */

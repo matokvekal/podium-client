@@ -22,10 +22,11 @@
  *                       values win; nothing is invented when neither exists.
  *   client-only         the favourite heart (lib/local-db.ts's toggleFavorite — no server
  *                       column for it)
- *   NOT AVAILABLE       est. time, the participant CAPACITY ("/ 50"), and "Approval Required"
- *                       on a list card. The list endpoint returns no duration, no capacity and
- *                       no requiresApproval. They render as "soon" / are omitted rather than
- *                       being computed, guessed, or silently dropped — see NOT_YET below.
+ *   NOT AVAILABLE       est. time and "Approval Required" on a list card — the list endpoint
+ *                       returns neither. They render as "soon" / are omitted rather than being
+ *                       computed, guessed, or silently dropped — see NOT_YET below. The
+ *                       participant CAPACITY ("/ 50") is shown only on a card you own, and
+ *                       comes from your own profile, not from the list response.
  */
 
 import {
@@ -44,6 +45,8 @@ import {
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { effectiveLimits } from "../lib/entitlements";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
 import { formatDuration } from "../lib/ride-duration";
@@ -116,6 +119,14 @@ export function EventCard({
   const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
   const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const riderCount = event.participantCount ?? null;
+  // "the creator himself can see register/total ... all other riders ... will see just
+  // registers". The list endpoint sends no capacity, but it does not need to: the only card
+  // that shows a denominator is one the VIEWER owns, so the ceiling is the viewer's own
+  // (GET /users/me → entitlements), the same figure AccountPage prints. Everyone else's card
+  // shows the bare count.
+  const { profile } = useAuth();
+  const isMyRide = profile != null && event.ownerId != null && event.ownerId === profile.id;
+  const myMaxParticipants = effectiveLimits(profile).maxParticipantsPerEvent;
   // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
   // slot that read a hard-coded "soon" until now.
   const durationText = formatDuration(event.durationMin);
@@ -312,15 +323,16 @@ export function EventCard({
             Area: {event.area}
           </span>
         )}
-        {/* Rider count — approved + pending, from GET /events (server's toEventSummary). Shows
-            "12 / 40" when the organizer stated an expected turnout (event.expectedParticipants),
-            otherwise just the count. Never the plan's capacity. Falls back to "soon" only for
-            an older server / cached row that omits the count. */}
+        {/* Rider count — approved + pending, from GET /events (server's toEventSummary). On
+            YOUR OWN ride it is shown over your account cap ("6 / 50"); on anyone else's, the
+            bare count ("7") — an organizer's ceiling, and their expected turnout, are not for
+            other riders. Falls back to "soon" only for an older server / cached row that omits
+            the count. */}
         <span className={styles.footerItem} data-pending={riderCount == null || undefined}>
           <UsersRound className={styles.footerIcon} aria-hidden="true" />
           {riderCount != null
-            ? event.expectedParticipants
-              ? `${riderCount} / ${event.expectedParticipants}`
+            ? isMyRide
+              ? `${riderCount} / ${myMaxParticipants}`
               : riderCount
             : NOT_YET}
         </span>

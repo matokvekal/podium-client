@@ -91,7 +91,6 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
-import { FALLBACK_LIMITS } from "../lib/plan-limits";
 import { formatDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
@@ -338,10 +337,11 @@ function detailFromCachedSummary(summary: EventSummary, viewerId: number | null)
     showLiveLocations: rich.showLiveLocations ?? true,
     myParticipant: rich.myParticipant ?? null,
     // A list summary carries no capacity — honest "not full, count unknown" until the real
-    // GET /events/:eventId (which always sends all three) replaces this. The cap falls back to
-    // the server's own default so "N / 50" doesn't flash a wrong ceiling.
+    // GET /events/:eventId replaces this. The cap stays null rather than falling back to a
+    // default: it is owner-only server-side, so a guessed 50 would flash a ceiling that is
+    // both wrong for a raised account and shown to people who must not see one at all.
     participantCount: rich.participantCount ?? 0,
-    maxParticipants: rich.maxParticipants ?? FALLBACK_LIMITS.maxParticipantsPerEvent,
+    maxParticipants: rich.maxParticipants ?? null,
     isFull: rich.isFull ?? false,
   };
 }
@@ -1085,8 +1085,12 @@ export function EventDetailPage() {
   // is the event owner's entitlement, also server-resolved. All capacity math is UX only — the
   // server enforces it and 409s (EVENT_FULL) on a join that would overflow.
   const participantCount = event.participantCount || riderCount || 0;
-  const maxParticipants = event.maxParticipants || FALLBACK_LIMITS.maxParticipantsPerEvent;
-  const eventFull = event.isFull || participantCount >= maxParticipants;
+  // Owner-only, and null for every other viewer (the server redacts it). Deliberately NOT
+  // defaulted: substituting FALLBACK_LIMITS here would have declared a 60-rider ride "full"
+  // for a non-owner whenever the organizer's real cap was above 50.
+  const maxParticipants = event.maxParticipants;
+  const eventFull =
+    event.isFull || (maxParticipants != null && participantCount >= maxParticipants);
   const bucket = figmaStatus(displayStatus);
   // Only a ride someone can still turn up to is worth handing out a link to — see the share
   // button below. figmaStatus folds cancelled in with finished, which is right here: both are
@@ -1607,10 +1611,11 @@ export function EventDetailPage() {
                 An estimated finish on a group ride is the kind of number people plan pickups
                 around, so it is absent rather than guessed.
 
-                PARTICIPANTS shows the real count only, and — when the organizer set one — an
-                EXPECTED number they entered (events.expected_participants). It is never divided
-                by the plan's max-participants ceiling: that cap is the organizer's own limit,
-                not a figure to show every viewer.
+                PARTICIPANTS is viewer-dependent. The ORGANIZER sees the real count over their
+                own account cap — "6 / 50", where 50 is user_limits.participants_per_event, the
+                ceiling the server enforces on join. EVERY OTHER VIEWER sees the bare count —
+                "7" — with no denominator at all: neither the cap nor the organizer's expected
+                turnout (events.expected_participants) is theirs to see.
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
@@ -1681,9 +1686,14 @@ export function EventDetailPage() {
                     <Users width={13} height={13} aria-hidden="true" />
                     Participants
                   </span>
+                  {/* "the creator himself can see register/total he can for example 6/50, all
+                      other riders when see the page will see just registers like 7 that all."
+                      The denominator is the organizer's ACCOUNT CAP
+                      (user_limits.participants_per_event, default 50) — sent only to them —
+                      not the expected-turnout figure, which no viewer sees any more. */}
                   <span className={styles.infoCellValue}>
-                    {event.expectedParticipants
-                      ? `${participantCount} / ${event.expectedParticipants} participants`
+                    {event.isOwner && maxParticipants != null
+                      ? `${participantCount} / ${maxParticipants} participants`
                       : `${participantCount} participants`}
                   </span>
                 </div>

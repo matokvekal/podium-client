@@ -11,14 +11,15 @@
 //
 // API responses are never cached. A stale rider position on a live map is worse than none.
 
-// Bumped for the new favicon: favicon.svg is served cache-first (below) with a URL that never
-// changes, so once a client had cached the old swirl icon it would keep it FOREVER — this is
-// the "I see the old icon/splash, then the new one" report. Bumping VERSION changes every cache
-// name, so `activate` below throws the old caches away and every client refetches the app shell
-// (including the new favicon) on its next visit. Bump this again any time a SHELL_URLS or
-// cache-first asset needs to reach existing installs immediately rather than ageing out
-// naturally by its own hashed filename.
-const VERSION = "v2";
+// Bump this whenever a shell asset (the precached "/" / index.html, favicon.svg, or any
+// cache-first CSS/JS an existing install has already cached) needs to reach existing installs
+// NOW rather than ageing out on its own. A new VERSION renames every cache, so `activate`
+// deletes the old ones and `install` re-fetches the shell — index.html included, which then
+// points every client at the current hashed bundle.
+//   v2 — new bike favicon
+//   v3 — desktop create-form layout fix: the CSS was live but installed PWAs kept serving the
+//        old bundle from the shell cache, so the difficulty picker still overflowed the card.
+const VERSION = "v3";
 const SHELL_CACHE = `podium-shell-${VERSION}`;
 const ASSET_CACHE = `podium-assets-${VERSION}`;
 const TILE_CACHE = `podium-tiles-${VERSION}`;

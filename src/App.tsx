@@ -9,6 +9,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
+import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { EventCreatePage } from "./pages/EventCreatePage";
 import { EventDetailPage } from "./pages/EventDetailPage";
 import { EventGroupsPage } from "./pages/EventGroupsPage";
@@ -267,6 +268,18 @@ export function App() {
           <OpenHome>
             <JoinPage />
           </OpenHome>
+        }
+      />
+
+      {/* Private analytics — not in any nav, reached by typing the URL. RequireAuth handles a
+          missing/expired session (401 -> /login); the page itself handles the server's 403 for
+          anyone who is not the configured admin. The URL is not the security — the server is. */}
+      <Route
+        path="/admin2026"
+        element={
+          <RequireAuth>
+            <AdminAnalyticsPage />
+          </RequireAuth>
         }
       />
 

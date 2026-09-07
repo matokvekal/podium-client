@@ -88,8 +88,6 @@ interface UseTrackGalleryResult {
   requestRoute: (eventId: string) => void;
   /** Resolved geometry by event id. `undefined` = not asked yet, `null` = asked, none exists. */
   routes: ReadonlyMap<string, GalleryRoute | null>;
-  /** Distinct areas on public rides, for the Area filter. Empty until the facet call lands. */
-  areas: string[];
 }
 
 export function useTrackGallery(
@@ -117,7 +115,6 @@ export function useTrackGallery(
   const [publicLoading, setPublicLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [areas, setAreas] = useState<string[]>([]);
   /**
    * Resolved geometry, mirrored out of the module cache into state so React actually re-renders
    * when an answer lands — the cache alone is a mutable Map and nothing would notice it change.
@@ -206,25 +203,6 @@ export function useTrackGallery(
     })();
   }, [fetchPage, source]);
 
-  // The Area filter's options — distinct areas across public rides. One anonymous call, once
-  // per mount; a server that has not shipped the endpoint just leaves the filter empty.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const body = await apiRequest<{ areas?: string[] }>("/events/public/areas", {
-          anonymous: true,
-        });
-        if (!cancelled && Array.isArray(body?.areas)) setAreas(body.areas);
-      } catch {
-        // Non-fatal: the filter sheet simply shows no Area group.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const loadMore = useCallback(() => {
     if (source !== "all" || publicLoading || loadingMore) return;
     if (offsetRef.current >= publicTotal) return;
@@ -311,6 +289,5 @@ export function useTrackGallery(
     loadMore,
     requestRoute,
     routes,
-    areas,
   };
 }

@@ -34,23 +34,30 @@ const crit = (over: Partial<TrackGalleryCriteria> = {}): TrackGalleryCriteria =>
 });
 
 describe("buildTrackGalleryQuery", () => {
-  it("sends only sort when nothing is narrowed", () => {
+  it("always sends sort + uniqueTracks, nothing else when unnarrowed", () => {
     const p = buildTrackGalleryQuery(crit(), "newest", "  ");
     expect(p.get("sort")).toBe("newest");
-    expect([...p.keys()].sort()).toEqual(["sort"]);
+    expect(p.get("uniqueTracks")).toBe("1");
+    expect([...p.keys()].sort()).toEqual(["sort", "uniqueTracks"]);
   });
 
-  it("joins multi-selects as CSV and trims the search", () => {
+  it("emits country, region, surface CSV and trims the search", () => {
     const p = buildTrackGalleryQuery(
-      crit({ surface: ["road", "gravel"], level: ["elite"], areas: ["Galilee", "Negev"] }),
+      crit({ country: "IL", region: "north", surface: ["road", "gravel"] }),
       "distance_asc",
       "  hills ",
     );
     expect(p.get("q")).toBe("hills");
     expect(p.get("sort")).toBe("distance_asc");
+    expect(p.get("country")).toBe("IL");
+    expect(p.get("region")).toBe("north");
     expect(p.get("activityType")).toBe("road,gravel");
-    expect(p.get("level")).toBe("elite");
-    expect(p.get("areas")).toBe("Galilee,Negev");
+  });
+
+  it("omits country / region when null", () => {
+    const p = buildTrackGalleryQuery(crit({ country: null, region: null }), "newest", "");
+    expect(p.has("country")).toBe(false);
+    expect(p.has("region")).toBe(false);
   });
 
   it("omits a range at its extremes and includes it once moved", () => {
@@ -75,19 +82,24 @@ describe("buildTrackGalleryQuery", () => {
 });
 
 describe("trackGalleryActiveFilterCount", () => {
-  it("counts each value and each narrowed range once", () => {
-    expect(trackGalleryActiveFilterCount(crit())).toBe(0);
+  it("does not count country when it equals the rider default", () => {
+    expect(trackGalleryActiveFilterCount(crit({ country: "IL" }), "IL")).toBe(0);
+  });
+
+  it("counts a changed country, a widened country, and every other filter", () => {
     expect(
       trackGalleryActiveFilterCount(
         crit({
-          areas: ["Galilee"],
+          country: null, // widened away from "IL"
+          region: "north",
           surface: ["road", "mtb"],
           durationBuckets: ["lt1"],
           distanceKm: [10, DISTANCE_MAX],
           climbM: [0, CLIMB_MAX],
         }),
+        "IL",
       ),
-    ).toBe(1 + 2 + 1 + 1);
+    ).toBe(1 + 1 + 2 + 1 + 1);
   });
 });
 
@@ -96,26 +108,32 @@ describe("applyTrackGalleryCriteria (My rides)", () => {
     ev({
       id: "a",
       name: "Alps",
-      area: "Galilee",
+      country: "IL",
+      region: "north",
       activityType: "road",
       distanceKm: 30,
       durationMin: 90,
+      downloads: 2,
     }),
     ev({
       id: "b",
       name: "Beach",
-      area: "Negev",
+      country: "IL",
+      region: "negev",
       activityType: "gravel",
       distanceKm: 120,
       durationMin: 240,
+      downloads: 9,
     }),
     ev({
       id: "c",
       name: "Carmel",
-      area: "Galilee",
+      country: "US",
+      region: "north",
       activityType: "mtb",
       distanceKm: null,
       durationMin: null,
+      downloads: null,
     }),
   ];
 
@@ -124,8 +142,13 @@ describe("applyTrackGalleryCriteria (My rides)", () => {
     expect(out.map((e) => e.id)).toEqual(["a"]);
   });
 
-  it("filters by area (exact)", () => {
-    const out = applyTrackGalleryCriteria(rows, crit({ areas: ["Galilee"] }), "name_asc", "");
+  it("filters by country", () => {
+    const out = applyTrackGalleryCriteria(rows, crit({ country: "IL" }), "name_asc", "");
+    expect(out.map((e) => e.id)).toEqual(["a", "b"]);
+  });
+
+  it("filters by region", () => {
+    const out = applyTrackGalleryCriteria(rows, crit({ region: "north" }), "name_asc", "");
     expect(out.map((e) => e.id)).toEqual(["a", "c"]);
   });
 
@@ -144,18 +167,20 @@ describe("applyTrackGalleryCriteria (My rides)", () => {
     expect(out.map((e) => e.id)).toEqual(["b"]);
   });
 
-  it("matches the search against name and area", () => {
+  it("matches the search against name", () => {
     expect(applyTrackGalleryCriteria(rows, crit(), "newest", "carmel").map((e) => e.id)).toEqual([
       "c",
-    ]);
-    expect(applyTrackGalleryCriteria(rows, crit(), "newest", "negev").map((e) => e.id)).toEqual([
-      "b",
     ]);
   });
 
   it("sorts by distance ascending with missing distances last", () => {
     const out = applyTrackGalleryCriteria(rows, crit(), "distance_asc", "");
     expect(out.map((e) => e.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("sorts by downloads (most used first), nulls last", () => {
+    const out = applyTrackGalleryCriteria(rows, crit(), "downloads_desc", "");
+    expect(out.map((e) => e.id)).toEqual(["b", "a", "c"]);
   });
 
   it("sorts by name A–Z", () => {

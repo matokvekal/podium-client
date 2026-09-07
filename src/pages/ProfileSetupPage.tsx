@@ -34,18 +34,16 @@ export function ProfileSetupPage() {
   const [lastName, setLastName] = useState(profile?.lastName ?? "");
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergencyPhone ?? "");
-  // TEMPORARY: kept out of the updateProfile() call below until the server has a `country`
-  // column on users — see BUGS.md / the country-filter feature. Saved on the device instead
-  // (store/countryStore.ts) so the field, its validation and the picker are all in place for
-  // when that lands.
-  //
-  // The starting value follows a strict priority (computed once, on mount):
-  //   1. a country the rider already saved      — a real choice, never overridden
-  //   2. the device/browser locale region       — e.g. he-IL -> Israel, en-US -> United States
-  //   3. Israel                                  — the app fallback for an unknown locale
+  // The country goes to the server now (users.country, sql/030-country.sql). The starting
+  // value, computed once on mount:
+  //   1. the country the server already has for this rider   — a real value, never overridden
+  //   2. a country still sitting in the on-device store       — a pre-server pick, migrated up
+  //   3. the device/browser locale region                     — he-IL -> Israel, en-US -> US
+  //   4. Israel                                                — the app fallback
   const savedCountry = useCountryStore((state) => state.code);
-  const saveCountry = useCountryStore((state) => state.setCountry);
-  const [defaultCountry] = useState(() => savedCountry ?? detectDefaultCountryCode());
+  const [defaultCountry] = useState(
+    () => profile?.country ?? savedCountry ?? detectDefaultCountryCode(),
+  );
   const [country, setCountry] = useState(defaultCountry);
   // Client-only UI preference (store/userModeStore.ts) — NOT part of the profile sent to the
   // server. Unchecked by default: a new user is a rider unless they say otherwise.
@@ -64,9 +62,10 @@ export function ProfileSetupPage() {
         lastName,
         nickname,
         ...(emergencyPhone ? { emergencyPhone } : {}),
+        ...(country ? { country } : {}),
       });
-      // Device-local until the server has a country column — see the note by the useState above.
-      saveCountry(country);
+      // countryStore is reconciled from the server response by AuthContext now — nothing to
+      // write here.
       setUserMode(organizes ? "organizer" : "rider");
       navigate(from && from !== "/account/setup" ? from : "/", { replace: true });
     } catch (err) {

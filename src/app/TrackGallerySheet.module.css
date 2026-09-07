@@ -303,6 +303,28 @@
   font-weight: var(--weight-bold);
 }
 
+.panelCount {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.panelSelect {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.panelSelect:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .panelBody {
   display: flex;
   flex-direction: column;

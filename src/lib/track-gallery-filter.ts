@@ -4,15 +4,17 @@
 // 24 rows at a time, so filtering in the client would only ever see the current page. The job
 // here is to turn the rider's choices into the query string the server already understands
 // (event.schemas.ts publicEventsQuerySchema), and — for the "My rides" toggle, which is one
-// fully-loaded page — to apply the exact same criteria in memory so both sources agree.
+// fully-loaded page — to apply the same criteria in memory so both sources agree.
 //
-// Every field on these criteria maps to data the server already stores and serialises
-// (toEventSummary): area, activity_type, level, duration_min, and the attached route's
-// distance / effective climb. Nothing here needs a new column.
+// Filters map to data the server serialises on toEventSummary: country, region, activity_type,
+// duration_min, the attached route's distance / effective climb, and the route reuse count.
+// The picker always sends `uniqueTracks=1` so a track reused by many rides shows once.
+//
+// NOT here: Difficulty. It is a property of the RIDE, not the track — the organiser is only
+// looking for a line to reuse. (Find Rides keeps its difficulty filter.)
 
 import type { EventSummary } from "./local-db";
 import { type DurationBucketKey, matchesDurationBuckets } from "./ride-duration";
-import type { RiderLevel } from "./rider-level";
 import type { SurfaceType } from "./surface-types";
 import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "./track-types";
 
@@ -25,6 +27,8 @@ export type TrackGallerySort =
   | "elevation_desc"
   | "duration_asc"
   | "duration_desc"
+  | "downloads_desc"
+  | "downloads_asc"
   | "name_asc";
 
 export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
@@ -36,6 +40,8 @@ export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
   elevation_desc: "Climb: high → low",
   duration_asc: "Duration: short → long",
   duration_desc: "Duration: long → short",
+  downloads_desc: "Most used",
+  downloads_asc: "Least used",
   name_asc: "Name (A–Z)",
 };
 
@@ -43,11 +49,12 @@ export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
 export const DEFAULT_TRACK_GALLERY_SORT: TrackGallerySort = "newest";
 
 export interface TrackGalleryCriteria {
-  /** Exact-match against events.area — values come from GET /events/public/areas. */
-  areas: string[];
+  /** events.country (2-letter), or null for "Any country". Seeded from the rider's profile. */
+  country: string | null;
+  /** events.region key (src/lib/regions.ts), or null for "All areas". */
+  region: string | null;
   /** events.activity_type — the ride's discipline (road / gravel / mtb / running / hiking). */
   surface: SurfaceType[];
-  level: RiderLevel[];
   /** Attached route distance, km. At [DISTANCE_MIN, DISTANCE_MAX] = "any". */
   distanceKm: [number, number];
   /** Effective climb, m. At [CLIMB_MIN, CLIMB_MAX] = "any". */
@@ -56,9 +63,9 @@ export interface TrackGalleryCriteria {
 }
 
 export const DEFAULT_TRACK_GALLERY_CRITERIA: TrackGalleryCriteria = {
-  areas: [],
+  country: null,
+  region: null,
   surface: [],
-  level: [],
   distanceKm: [DISTANCE_MIN, DISTANCE_MAX],
   climbM: [CLIMB_MIN, CLIMB_MAX],
   durationBuckets: [],
@@ -67,13 +74,20 @@ export const DEFAULT_TRACK_GALLERY_CRITERIA: TrackGalleryCriteria = {
 const distanceNarrowed = (r: [number, number]) => r[0] > DISTANCE_MIN || r[1] < DISTANCE_MAX;
 const climbNarrowed = (r: [number, number]) => r[0] > CLIMB_MIN || r[1] < CLIMB_MAX;
 
-/** How many filter GROUPS are narrowing the list — the badge on the Filter button. A range
- *  counts as one no matter how many handles moved. */
-export function trackGalleryActiveFilterCount(c: TrackGalleryCriteria): number {
+/**
+ * How many filter GROUPS are narrowing the list — the badge on the Filter button. Country is
+ * counted only when it is NOT the rider's own default (the default is not a "filter", the same
+ * way Find Rides does not badge its default "Upcoming"); "Any country" IS a deliberate widening
+ * and counts. A range counts as one however many handles moved.
+ */
+export function trackGalleryActiveFilterCount(
+  c: TrackGalleryCriteria,
+  defaultCountry: string | null = null,
+): number {
   return (
-    c.areas.length +
+    (c.country !== defaultCountry ? 1 : 0) +
+    (c.region ? 1 : 0) +
     c.surface.length +
-    c.level.length +
     c.durationBuckets.length +
     (distanceNarrowed(c.distanceKm) ? 1 : 0) +
     (climbNarrowed(c.climbM) ? 1 : 0)
@@ -82,9 +96,8 @@ export function trackGalleryActiveFilterCount(c: TrackGalleryCriteria): number {
 
 /**
  * The query string for one page of GET /events/public. `limit` / `offset` / paging are the
- * hook's job; this adds `q`, `sort` and every active filter, and OMITS anything at its default
- * (an untouched range, an empty multi-select) so the URL only carries real narrowing —
- * the same rule TracksPage uses for its sliders.
+ * hook's job; this adds `q`, `sort`, `uniqueTracks` and every active filter, and OMITS anything
+ * at its default so the URL only carries real narrowing.
  */
 export function buildTrackGalleryQuery(
   criteria: TrackGalleryCriteria,
@@ -96,13 +109,14 @@ export function buildTrackGalleryQuery(
   const q = search.trim();
   if (q) params.set("q", q);
 
-  // sort=newest is sent explicitly: it is the gallery's paging key, not merely the server
-  // default (which flips with the bucket, and the gallery sends no bucket).
+  // sort is sent explicitly (it is the gallery's paging key, not merely the server default),
+  // and uniqueTracks always — the picker wants one row per track, not one per ride.
   params.set("sort", sort);
+  params.set("uniqueTracks", "1");
 
-  if (criteria.areas.length > 0) params.set("areas", criteria.areas.join(","));
+  if (criteria.country) params.set("country", criteria.country);
+  if (criteria.region) params.set("region", criteria.region);
   if (criteria.surface.length > 0) params.set("activityType", criteria.surface.join(","));
-  if (criteria.level.length > 0) params.set("level", criteria.level.join(","));
   if (criteria.durationBuckets.length > 0) {
     params.set("durationBuckets", criteria.durationBuckets.join(","));
   }
@@ -132,8 +146,7 @@ function compareForSort(a: EventSummary, b: EventSummary, sort: TrackGallerySort
     return dir * ((va as number) - (vb as number));
   };
   // The event summary carries no created_at, so the in-memory ("My rides") ordering uses the
-  // start time as its recency proxy. The server path never comes through here — it orders by
-  // the real created_at.
+  // start time as its recency proxy. The server path never comes through here.
   const recency = (e: EventSummary) => (e.startsAt ? Date.parse(e.startsAt) : null);
 
   switch (sort) {
@@ -153,6 +166,10 @@ function compareForSort(a: EventSummary, b: EventSummary, sort: TrackGallerySort
       return byNum((e) => e.durationMin, 1) || byNum(recency, -1);
     case "duration_desc":
       return byNum((e) => e.durationMin, -1) || byNum(recency, -1);
+    case "downloads_desc":
+      return byNum((e) => e.downloads, -1) || byNum(recency, -1);
+    case "downloads_asc":
+      return byNum((e) => e.downloads, 1) || byNum(recency, -1);
     case "name_asc":
       return a.name.localeCompare(b.name);
     default:
@@ -162,8 +179,8 @@ function compareForSort(a: EventSummary, b: EventSummary, sort: TrackGallerySort
 
 /**
  * Apply the criteria + sort in memory. Used ONLY for the "My rides" toggle (already one full
- * page); the "All rides" list is filtered and sorted by the server. `search` matches name,
- * location, area and ride code, case-insensitive — the same fields the server's `q` covers.
+ * page); "All rides" is filtered and sorted by the server. `search` matches name, location,
+ * area and ride code — the same fields the server's `q` covers.
  */
 export function applyTrackGalleryCriteria(
   rows: EventSummary[],
@@ -187,11 +204,11 @@ export function applyTrackGalleryCriteria(
     ) {
       return false;
     }
-    if (c.areas.length > 0 && !(e.area != null && c.areas.includes(e.area.trim()))) return false;
+    if (c.country && e.country !== c.country) return false;
+    if (c.region && e.region !== c.region) return false;
     if (c.surface.length > 0 && !(e.activityType != null && c.surface.includes(e.activityType))) {
       return false;
     }
-    if (c.level.length > 0 && !(e.level != null && c.level.includes(e.level))) return false;
 
     if (dNarrow) {
       const dist = e.distanceKm;

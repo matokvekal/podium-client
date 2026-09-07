@@ -128,7 +128,7 @@ import {
   Trash2,
   Truck,
   Upload,
-  Users
+  Users,
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -138,6 +138,7 @@ import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { detectDefaultCountryCode } from "../lib/countries";
 import { effectiveLimits } from "../lib/entitlements";
 import type { EventRoute } from "../lib/event-route";
 import {
@@ -148,30 +149,26 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import {
+  nextUpcomingSaturdayStart,
+  parseQuickAdd,
+  toDatetimeLocalValue,
+} from "../lib/quick-add-parser";
+import { classifyRegion, IL_REGIONS } from "../lib/regions";
+import {
   DURATION_HOUR_OPTIONS,
   DURATION_MINUTE_OPTIONS,
   formatDuration,
   joinDuration,
-  splitDuration
+  splitDuration,
 } from "../lib/ride-duration";
+import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
-import {
-  nextUpcomingSaturdayStart,
-  parseQuickAdd,
-  toDatetimeLocalValue
-} from "../lib/quick-add-parser";
-import {
-  LEVEL_ICON,
-  LEVEL_LABEL,
-  LEVELS,
-  type RiderLevel
-} from "../lib/rider-level";
-import { validateCreateEventForm } from "../validation/forms";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useTeamsStore } from "../store/teamsStore";
+import { validateCreateEventForm } from "../validation/forms";
 import styles from "./EventCreatePage.module.css";
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
@@ -185,6 +182,8 @@ interface ExistingEvent {
   location: string | null;
   /** Optional — not yet in the frozen API contract; older/unmigrated events won't have it. */
   area?: string | null;
+  /** Coarse region key (sql/030-country.sql), or null. Prefills the Area dropdown in edit. */
+  region?: string | null;
   description: string | null;
   requiresApproval: boolean;
   showParticipants: boolean;
@@ -210,10 +209,7 @@ interface ExistingEvent {
 const EVENT_ROUTE_MAX_POINTS = 5000;
 const EVENT_ROUTE_MAX_PAYLOAD_BYTES = 900_000;
 
-function downsampleRoutePoints(
-  points: [number, number][],
-  maxPoints: number
-): [number, number][] {
+function downsampleRoutePoints(points: [number, number][], maxPoints: number): [number, number][] {
   if (points.length <= maxPoints) return points;
   if (maxPoints <= 2) return [points[0], points[points.length - 1]];
 
@@ -233,7 +229,7 @@ function downsampleRoutePoints(
 function routePayloadBytes(
   points: [number, number][],
   distanceKm: number,
-  elevationM: number | null
+  elevationM: number | null,
 ): number {
   const body = JSON.stringify({ points, distanceKm, elevationM });
   return new TextEncoder().encode(body).length;
@@ -242,18 +238,14 @@ function routePayloadBytes(
 function capRoutePayload(
   points: [number, number][],
   distanceKm: number,
-  elevationM: number | null
+  elevationM: number | null,
 ): [number, number][] {
   let reduced = downsampleRoutePoints(points, EVENT_ROUTE_MAX_POINTS);
   while (
     reduced.length > 2 &&
-    routePayloadBytes(reduced, distanceKm, elevationM) >
-      EVENT_ROUTE_MAX_PAYLOAD_BYTES
+    routePayloadBytes(reduced, distanceKm, elevationM) > EVENT_ROUTE_MAX_PAYLOAD_BYTES
   ) {
-    reduced = downsampleRoutePoints(
-      reduced,
-      Math.max(2, Math.floor(reduced.length / 2))
-    );
+    reduced = downsampleRoutePoints(reduced, Math.max(2, Math.floor(reduced.length / 2)));
   }
   return reduced;
 }
@@ -262,7 +254,7 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   { value: "road", label: "Road" },
   { value: "mtb", label: "MTB" },
   { value: "gravel", label: "Gravel" },
-  { value: "running", label: "Running" }
+  { value: "running", label: "Running" },
   // "hiking" intentionally hidden from the create/edit picker for now; the
   // SurfaceType and display mappings keep it so existing events still render.
 ];
@@ -307,31 +299,23 @@ export function EventCreatePage() {
     profile?.nickname?.trim() ||
     null;
 
-  const myTeams = Object.values(teams).filter(
-    (t) => profile != null && t.createdBy === profile.id
-  );
+  const myTeams = Object.values(teams).filter((t) => profile != null && t.createdBy === profile.id);
 
   // Pre-fill from the last event this organizer created — "all data from my previous will
   // auto fill again but i can change" — so a recurring ride doesn't start from a blank form.
   // Only for create mode; edit mode prefills from the event being edited instead (see effect
   // below). Read once via getState() (not a subscribed hook) since this is only ever used to
   // seed initial state on mount, not to react to later changes.
-  const lastDefaults = isEditing
-    ? null
-    : useLastEventDefaultsStore.getState().defaults;
+  const lastDefaults = isEditing ? null : useLastEventDefaultsStore.getState().defaults;
   const initialTeamId =
     searchParams.get("team") ??
-    (lastDefaults?.teamId && teams[lastDefaults.teamId]
-      ? lastDefaults.teamId
-      : "");
+    (lastDefaults?.teamId && teams[lastDefaults.teamId] ? lastDefaults.teamId : "");
 
   const [name, setName] = useState("");
   const [activityType, setActivityType] = useState<SurfaceType>(
-    lastDefaults?.activityType ?? "mtb"
+    lastDefaults?.activityType ?? "mtb",
   );
-  const [level, setLevel] = useState<RiderLevel | null>(
-    lastDefaults?.level ?? "intermediate"
-  );
+  const [level, setLevel] = useState<RiderLevel | null>(lastDefaults?.level ?? "intermediate");
   // Distance/climb — near the difficulty picker below, same "no server column, persisted via
   // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
   // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
@@ -351,21 +335,21 @@ export function EventCreatePage() {
   // stated). Accessible is a marker the organizer sets for riders who need assistance /
   // adaptive equipment.
   const [durationMin, setDurationMin] = useState<number | null>(
-    !isEditing ? (lastDefaults?.durationMin ?? null) : null
+    !isEditing ? (lastDefaults?.durationMin ?? null) : null,
   );
   const [durationEdited, setDurationEdited] = useState(false);
   const [restStops, setRestStops] = useState<number | null>(
-    !isEditing ? (lastDefaults?.restStops ?? null) : null
+    !isEditing ? (lastDefaults?.restStops ?? null) : null,
   );
   const [isAccessible, setIsAccessible] = useState(
-    !isEditing ? (lastDefaults?.isAccessible ?? false) : false
+    !isEditing ? (lastDefaults?.isAccessible ?? false) : false,
   );
   // Support / sag vehicle following the ride (sql/024). Same shape as isAccessible: a plain
   // boolean the organizer sets, false by default, and false means "none promised" — never a
   // maybe. Riders plan long and remote rides around this, so it is only ever what the organizer
   // actually ticked.
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
-    !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false
+    !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false,
   );
   // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
   // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
@@ -374,30 +358,33 @@ export function EventCreatePage() {
   const [expectedParticipants, setExpectedParticipants] = useState<string>(
     !isEditing && lastDefaults?.expectedParticipants != null
       ? String(lastDefaults.expectedParticipants)
-      : ""
+      : "",
   );
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
   const [organizerGroup, setOrganizerGroupInput] = useState(
-    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : ""
+    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : "",
   );
-  const [requiresApproval, setRequiresApproval] = useState(
-    lastDefaults?.requiresApproval ?? false
-  );
+  const [requiresApproval, setRequiresApproval] = useState(lastDefaults?.requiresApproval ?? false);
   const [ridersListVisible, setRidersListVisible] = useState(
-    lastDefaults?.ridersListVisible ?? true
+    lastDefaults?.ridersListVisible ?? true,
   );
   const [visibility, setVisibility] = useState<"public" | "private">(
-    lastDefaults?.visibility ?? "private"
+    lastDefaults?.visibility ?? "private",
   );
   const [startsAt, setStartsAt] = useState(() =>
-    isEditing ? "" : toDatetimeLocalValue(nextUpcomingSaturdayStart())
+    isEditing ? "" : toDatetimeLocalValue(nextUpcomingSaturdayStart()),
   );
   const [startsAtEdited, setStartsAtEdited] = useState(false);
   const [dateHint, setDateHint] = useState<string | null>(null);
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
   const [area, setArea] = useState(lastDefaults?.area ?? "");
+  // A coarse region key (src/lib/regions.ts) — the "Area" dropdown. Auto-suggested from the
+  // route's start point once one is attached (see the effect below), then editable; the flag
+  // stops that suggestion overwriting a choice the organiser made.
+  const [region, setRegion] = useState<string>("");
+  const [regionEdited, setRegionEdited] = useState(false);
   const [description, setDescription] = useState("");
   // Create: stays null → the event falls back to the organizer's own profile cover (see
   // app/useOwnerCover.ts). Edit: an event that already has a custom cover keeps it (the effect
@@ -460,9 +447,7 @@ export function EventCreatePage() {
   const [fromRouteId, setFromRouteId] = useState<number | null>(null);
   const [copyLoading, setCopyLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [uploadedRestStops, setUploadedRestStops] = useState<
-    [number, number][]
-  >([]);
+  const [uploadedRestStops, setUploadedRestStops] = useState<[number, number][]>([]);
   /**
    * Edit mode: this event already has a route attached on the server, loaded below so the
    * organizer sees it (with a Remove button) instead of a form that looks route-less and
@@ -502,8 +487,7 @@ export function EventCreatePage() {
         setLocation(cached.location ?? "");
         setArea(cached.area ?? "");
         setVisibility(cached.visibility);
-        if (cached.startsAt)
-          setStartsAt(toDatetimeLocalValue(new Date(cached.startsAt)));
+        if (cached.startsAt) setStartsAt(toDatetimeLocalValue(new Date(cached.startsAt)));
       }
       try {
         const found = await apiRequest<ExistingEvent>(`/events/${eventId}`);
@@ -518,8 +502,8 @@ export function EventCreatePage() {
               message:
                 found.status === "live"
                   ? "This event is live — use Manage to add/remove riders or stop it."
-                  : "This event has finished and can no longer be edited."
-            }
+                  : "This event has finished and can no longer be edited.",
+            },
           });
           return;
         }
@@ -527,10 +511,13 @@ export function EventCreatePage() {
         setName(found.name);
         setLocation(found.location ?? "");
         setArea(found.area ?? "");
+        if (found.region) {
+          setRegion(found.region);
+          setRegionEdited(true);
+        }
         setDescription(found.description ?? "");
         setVisibility(found.visibility);
-        if (found.startsAt)
-          setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
+        if (found.startsAt) setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
         setRequiresApproval(found.requiresApproval);
         setRidersListVisible(found.showParticipants);
         // Server value wins for difficulty / activity type — it is the same for every device
@@ -562,7 +549,7 @@ export function EventCreatePage() {
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
         setExpectedParticipants(
-          found.expectedParticipants != null ? String(found.expectedParticipants) : ""
+          found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
@@ -576,9 +563,7 @@ export function EventCreatePage() {
       // it with Remove (submit() then fires DELETE). Best-effort — a failed fetch just leaves
       // the choices showing, same as before this loaded anything.
       try {
-        const attached = await apiRequest<EventRoute | null>(
-          `/events/${eventId}/route`
-        );
+        const attached = await apiRequest<EventRoute | null>(`/events/${eventId}/route`);
         if (!cancelled && attached?.points?.length) {
           setCopiedRoute(attached);
           setExistingRouteAttached(true);
@@ -663,12 +648,10 @@ export function EventCreatePage() {
     area.trim(),
     startsAt,
     description.trim(),
-    copiedFrom || uploadedFileName || existingRouteAttached ? "route" : ""
+    copiedFrom || uploadedFileName || existingRouteAttached ? "route" : "",
   ];
   const readinessCount = readinessFields.filter(Boolean).length;
-  const readinessPct = Math.round(
-    (readinessCount / readinessFields.length) * 100
-  );
+  const readinessPct = Math.round((readinessCount / readinessFields.length) * 100);
   const armed = readinessPct === 100;
 
   // "Rides used this week" — the fresh server fetch wins; the cached profile is the fallback,
@@ -689,8 +672,14 @@ export function EventCreatePage() {
   // value" rule startsAtEdited already follows for the quick-add date guess.
   function applyRouteDistanceClimb(route: EventRoute) {
     if (!distanceEdited) setDistanceKmInput(String(route.distanceKm));
-    if (!climbEdited)
-      setClimbMInput(route.elevationM != null ? String(route.elevationM) : "");
+    if (!climbEdited) setClimbMInput(route.elevationM != null ? String(route.elevationM) : "");
+    // Same rule for the Area dropdown: classify the route's start point into a region and
+    // pre-select it, unless the organiser has already chosen one.
+    if (!regionEdited) {
+      const start = route.points?.[0];
+      const guess = start ? classifyRegion(start[0], start[1]) : null;
+      if (guess) setRegion(guess);
+    }
   }
 
   async function pickEventToCopy(event: EventSummary) {
@@ -732,18 +721,12 @@ export function EventCreatePage() {
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
       setTeamId(sourceExtras.teamId);
-    } else if (
-      !teamId &&
-      !organizerGroup.trim() &&
-      sourceExtras?.organizerGroup
-    ) {
+    } else if (!teamId && !organizerGroup.trim() && sourceExtras?.organizerGroup) {
       setOrganizerGroupInput(sourceExtras.organizerGroup);
     }
 
     try {
-      const route = await apiRequest<EventRoute | null>(
-        `/events/${event.id}/route`
-      );
+      const route = await apiRequest<EventRoute | null>(`/events/${event.id}/route`);
       if (!route) {
         // The source event has no saved route — never fabricate one (BUGS.md: never show
         // mock/fake route). The invalidRoute flag surfaces the missing-route state.
@@ -816,7 +799,7 @@ export function EventCreatePage() {
     setDateHint(
       `Detected "${found.label}" → ${found.date.toLocaleDateString()} at ${found.date
         .toTimeString()
-        .slice(0, 5)}. Edit Start time above to change it.`
+        .slice(0, 5)}. Edit Start time above to change it.`,
     );
   }
 
@@ -847,9 +830,11 @@ export function EventCreatePage() {
     if (picked.fromRouteSurface) setActivityType(picked.fromRouteSurface);
     // Full geometry for the preview map. Best-effort: the attach below works from the id
     // alone, so a failed preview fetch costs a thumbnail, not the route.
-    void apiRequest<{ trackPoints?: [number, number][]; distanceKm: number | null; elevationM: number | null }>(
-      `/routes/${picked.fromRouteId}`,
-    )
+    void apiRequest<{
+      trackPoints?: [number, number][];
+      distanceKm: number | null;
+      elevationM: number | null;
+    }>(`/routes/${picked.fromRouteId}`)
       .then((route) => {
         if (route.trackPoints?.length && route.distanceKm != null) {
           setCopiedRoute({
@@ -881,7 +866,7 @@ export function EventCreatePage() {
     id: string,
     route: EventRoute,
     typedDistance: number | null,
-    typedClimb: number | null
+    typedClimb: number | null,
   ) {
     const points = capRoutePayload(route.points, route.distanceKm, route.elevationM);
     await apiRequest(`/events/${id}/route`, {
@@ -889,8 +874,8 @@ export function EventCreatePage() {
       body: {
         points,
         distanceKm: typedDistance ?? route.distanceKm,
-        elevationM: typedClimb ?? route.elevationM
-      }
+        elevationM: typedClimb ?? route.elevationM,
+      },
     });
   }
 
@@ -928,7 +913,7 @@ export function EventCreatePage() {
       if (copiedRoute) setEventRoute(id, copiedRoute);
       await apiRequest(`/events/${id}/route`, {
         method: "POST",
-        body: { routeId: fromRouteId }
+        body: { routeId: fromRouteId },
       });
     } else if (copiedFrom && copiedRoute) {
       // A track copied from another RIDE. Send the source ride's id and let the server attach
@@ -946,7 +931,7 @@ export function EventCreatePage() {
       try {
         await apiRequest(`/events/${id}/route`, {
           method: "POST",
-          body: { sourceEventId: copiedFrom.id }
+          body: { sourceEventId: copiedFrom.id },
         });
       } catch {
         // A server that predates the { sourceEventId } body rejects it. Fall back to the old
@@ -982,10 +967,7 @@ export function EventCreatePage() {
   // form natively and jump the page — asked to require an explicit button click instead.
   // Textarea is exempt: Enter there is just a newline, never a submit trigger to begin with.
   function blockEnterSubmit(keyEvent: KeyboardEvent<HTMLFormElement>) {
-    if (
-      keyEvent.key === "Enter" &&
-      (keyEvent.target as HTMLElement).tagName !== "TEXTAREA"
-    ) {
+    if (keyEvent.key === "Enter" && (keyEvent.target as HTMLElement).tagName !== "TEXTAREA") {
       keyEvent.preventDefault();
     }
   }
@@ -1025,8 +1007,7 @@ export function EventCreatePage() {
     // the create/edit request itself so the server persists it as the authoritative value
     // (events.elevation_gain_m); `null` when the field is empty — never a fabricated number.
     const parsedClimb = climbM.trim() ? Number(climbM) : Number.NaN;
-    const elevationGainM =
-      Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
+    const elevationGainM = Number.isFinite(parsedClimb) && parsedClimb >= 0 ? parsedClimb : null;
 
     // Expected riders — a positive whole number, or null when the field is blank / not a
     // sensible number. `null` on a PATCH clears it, so emptying the field on an edit removes
@@ -1055,6 +1036,9 @@ export function EventCreatePage() {
             name,
             location: location || undefined,
             area: area || undefined,
+            // Coarse region key (sql/030-country.sql) — the "Area" dropdown. Sent so an edit
+            // that changes it reaches every viewer and the "Browse tracks" filter.
+            region: region || null,
             description: description || undefined,
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
@@ -1077,8 +1061,8 @@ export function EventCreatePage() {
             hasSupportVehicle,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
-            expectedParticipants: expectedParticipantsValue
-          }
+            expectedParticipants: expectedParticipantsValue,
+          },
         });
         await saveExtras(eventId);
         // Same id, mutated in place — never a new event. Merge the server's updated fields
@@ -1109,6 +1093,10 @@ export function EventCreatePage() {
           startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
           location: location || undefined,
           area: area || undefined,
+          // The ride's coarse region key + the organiser's country (sql/030-country.sql) —
+          // stamps events.region / events.country, which the "Browse tracks" picker filters on.
+          ...(region ? { region } : {}),
+          country: profile?.country ?? detectDefaultCountryCode(),
           description: description || undefined,
           requiresApproval,
           showParticipants: ridersListVisible,
@@ -1136,8 +1124,8 @@ export function EventCreatePage() {
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
-          joinAsRider: imRiding
-        }
+          joinAsRider: imRiding,
+        },
       });
       // The server's response is the authoritative state for this event — file it into both
       // My Rides and the IndexedDB cache before anything else, so the home screen and an
@@ -1147,7 +1135,11 @@ export function EventCreatePage() {
       // The POST /events reply is a full EventDetail (owner, isOwner, myParticipant, capacity).
       // Cache it as the detail too — not just the list summary — so opening the new event
       // paints it immediately as the owner's own event, before any refetch.
-      void putCachedEventDetail(created.id, viewerKey(profile?.id), created as unknown as EventDetail);
+      void putCachedEventDetail(
+        created.id,
+        viewerKey(profile?.id),
+        created as unknown as EventDetail,
+      );
       await saveExtras(created.id);
       setLastDefaults({
         location,
@@ -1163,7 +1155,7 @@ export function EventCreatePage() {
         restStops,
         isAccessible,
         hasSupportVehicle,
-        expectedParticipants: expectedParticipantsValue
+        expectedParticipants: expectedParticipantsValue,
       });
       // Small delayed success state before redirecting home: requested as a short green
       // confirmation moment, not an instant route jump right after tapping Save.
@@ -1176,7 +1168,7 @@ export function EventCreatePage() {
       // straight at it (a banner linking to it) instead of making the organizer hunt for it
       // in the list.
       navigate("/", {
-        state: { createdEventId: created.id, createdEventName: name }
+        state: { createdEventId: created.id, createdEventName: name },
       });
     } catch (err) {
       // A 409 naming the weekly plan limit (PLAN_LIMIT / a "week" token) → show the same
@@ -1190,7 +1182,7 @@ export function EventCreatePage() {
           ? weeklyLimitMessage
           : err instanceof ApiError
             ? err.message
-            : "Could not save. Try again."
+            : "Could not save. Try again.",
       );
       setCreateSuccess(false);
     } finally {
@@ -1213,9 +1205,7 @@ export function EventCreatePage() {
       await apiRequest(`/events/${eventId}`, { method: "DELETE" });
       navigate("/");
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Could not delete this event."
-      );
+      setError(err instanceof ApiError ? err.message : "Could not delete this event.");
       setConfirmDelete(false);
     } finally {
       setDeleteBusy(false);
@@ -1242,9 +1232,7 @@ export function EventCreatePage() {
             })()}
           </div>
           <div>
-            <h1 className={styles.title}>
-              {isEditing ? "Manage Ride" : "Create new event"}
-            </h1>
+            <h1 className={styles.title}>{isEditing ? "Manage Ride" : "Create new event"}</h1>
             <p className={styles.subtitle}>
               {isEditing
                 ? "Change anything, then save."
@@ -1289,11 +1277,7 @@ export function EventCreatePage() {
         )}
 
         {createSuccess && (
-          <div
-            className={styles.successBanner}
-            role="status"
-            aria-live="polite"
-          >
+          <div className={styles.successBanner} role="status" aria-live="polite">
             <Check aria-hidden="true" />
             <p>Event created successfully.</p>
           </div>
@@ -1301,11 +1285,7 @@ export function EventCreatePage() {
 
         {loadingEvent && (
           <p className={styles.hint}>
-            <span
-              className="spinner"
-              aria-hidden="true"
-              style={{ marginRight: 6 }}
-            />
+            <span className="spinner" aria-hidden="true" style={{ marginRight: 6 }} />
             Loading event…
           </p>
         )}
@@ -1335,10 +1315,7 @@ export function EventCreatePage() {
             </div>
           </fieldset>
 
-          <div
-            className={styles.field}
-            style={{ marginBottom: "var(--space-4)" }}
-          >
+          <div className={styles.field} style={{ marginBottom: "var(--space-4)" }}>
             <label className={styles.fieldLabel} htmlFor="name">
               <Target aria-hidden="true" />
               Event name
@@ -1356,10 +1333,7 @@ export function EventCreatePage() {
             />
           </div>
 
-          <fieldset
-            className={styles.routeFieldset}
-            data-invalid={invalidRoute}
-          >
+          <fieldset className={styles.routeFieldset} data-invalid={invalidRoute}>
             {copiedFrom || uploadedFileName || existingRouteAttached ? (
               <div className={styles.trackPicked}>
                 <div>
@@ -1389,11 +1363,7 @@ export function EventCreatePage() {
             ) : null}
             {copiedRoute && (
               <div className={styles.mapFrame}>
-                <Suspense
-                  fallback={
-                    <div className={styles.mapLoading}>Scanning route…</div>
-                  }
-                >
+                <Suspense fallback={<div className={styles.mapLoading}>Scanning route…</div>}>
                   <RouteMap
                     points={copiedRoute.points}
                     heightPx={160}
@@ -1581,12 +1551,24 @@ export function EventCreatePage() {
                   <MapPin aria-hidden="true" />
                   Area
                 </label>
-                <input
+                <select
                   id="area"
                   className={styles.input}
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                />
+                  value={region}
+                  onChange={(e) => {
+                    setRegion(e.target.value);
+                    setRegionEdited(true);
+                    const label = IL_REGIONS.find((r) => r.key === e.target.value)?.he ?? "";
+                    setArea(label);
+                  }}
+                >
+                  <option value="">Select an area</option>
+                  {IL_REGIONS.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.he}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className={styles.field}>
@@ -1598,16 +1580,12 @@ export function EventCreatePage() {
                   id="description"
                   rows={3}
                   className={styles.textarea}
-                  placeholder={
-                    'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'
-                  }
+                  placeholder={'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'}
                   value={description}
                   onChange={(e) => handleDescriptionChange(e.target.value)}
                 />
                 {dateHint && (
-                  <p className={`${styles.hint} ${styles["hint--active"]}`}>
-                    {dateHint}
-                  </p>
+                  <p className={`${styles.hint} ${styles["hint--active"]}`}>{dateHint}</p>
                 )}
               </div>
             </div>
@@ -1626,11 +1604,7 @@ export function EventCreatePage() {
                     clears back to "not specified," same escape hatch the old dropdown's blank
                     option gave. */}
                 <div className={styles.levelRow}>
-                  <div
-                    className={styles.levelBars}
-                    role="group"
-                    aria-labelledby="levelLabel"
-                  >
+                  <div className={styles.levelBars} role="group" aria-labelledby="levelLabel">
                     {LEVELS.map((l, i) => (
                       <button
                         key={l.value}
@@ -1642,16 +1616,11 @@ export function EventCreatePage() {
                         data-level={l.value}
                         data-filled={level === l.value}
                         style={{ height: `${10 + i * 6}px` }}
-                        onClick={() =>
-                          setLevel(level === l.value ? null : l.value)
-                        }
+                        onClick={() => setLevel(level === l.value ? null : l.value)}
                       />
                     ))}
                   </div>
-                  <span
-                    className={styles.levelName}
-                    data-level={level ?? undefined}
-                  >
+                  <span className={styles.levelName} data-level={level ?? undefined}>
                     {level ? (
                       <>
                         {(() => {
@@ -1847,10 +1816,7 @@ export function EventCreatePage() {
               </div>
 
               <fieldset className={styles.panel} style={{ border: "none" }}>
-                <legend
-                  className={styles.fieldLabel}
-                  style={{ marginBottom: 4 }}
-                >
+                <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
                   <Radio aria-hidden="true" />
                   Visibility
                 </legend>
@@ -1904,9 +1870,7 @@ export function EventCreatePage() {
                     checked={ridersListVisible}
                     onChange={(e) => setRidersListVisible(e.target.checked)}
                   />
-                  <span
-                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
-                  >
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
                     <span className={styles.switchThumb} />
                   </span>
                   <span
@@ -1929,9 +1893,7 @@ export function EventCreatePage() {
                     checked={isAccessible}
                     onChange={(e) => setIsAccessible(e.target.checked)}
                   />
-                  <span
-                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
-                  >
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
                     <span className={styles.switchThumb} />
                   </span>
                   <span
@@ -1957,9 +1919,7 @@ export function EventCreatePage() {
                     checked={hasSupportVehicle}
                     onChange={(e) => setHasSupportVehicle(e.target.checked)}
                   />
-                  <span
-                    className={`${styles.switchTrack} ${styles.switchTrackPositive}`}
-                  >
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
                     <span className={styles.switchThumb} />
                   </span>
                   <span
@@ -1979,11 +1939,7 @@ export function EventCreatePage() {
           {/* Safety checklist — a small link, opens a sheet with the basic pre-ride kit. Not a
               form field: it disturbs nothing, it's just there for the organizer (and shown
               again on the event page for riders). */}
-          <button
-            type="button"
-            className={styles.safetyLink}
-            onClick={() => setSafetyOpen(true)}
-          >
+          <button type="button" className={styles.safetyLink} onClick={() => setSafetyOpen(true)}>
             <LifeBuoy aria-hidden="true" size={15} />
             Safety checklist
           </button>
@@ -2042,8 +1998,8 @@ export function EventCreatePage() {
             ) : (
               <div className={styles.dangerZoneConfirm}>
                 <p>
-                  Are you sure? This removes it for every rider — it stops
-                  showing up anywhere the next time anyone's app checks.
+                  Are you sure? This removes it for every rider — it stops showing up anywhere the
+                  next time anyone's app checks.
                 </p>
                 <div className={styles.dangerZoneConfirmRow}>
                   <button

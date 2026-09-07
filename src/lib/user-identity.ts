@@ -247,3 +247,14 @@ export function serverSupportsVisualIdentity(profile: object | null | undefined)
   if (!profile) return false;
   return "avatar" in profile || "cover" in profile;
 }
+
+/**
+ * Does this server return a country on the profile? Same "presence of the key" test — a server
+ * with sql/030-country.sql applied sends `country: null` for a rider who has not synced one,
+ * which is a different fact from a server that has never heard of the field. Until this is true
+ * the account screen hides the country control and nothing PATCHes a country.
+ */
+export function serverSupportsCountry(profile: object | null | undefined): boolean {
+  if (!profile) return false;
+  return "country" in profile;
+}

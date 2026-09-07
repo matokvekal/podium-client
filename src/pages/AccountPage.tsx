@@ -26,8 +26,8 @@ import { Avatar } from "../app/Avatar";
 import { UserModeToggle } from "../app/UserModeToggle";
 import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
+import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
 import { effectiveLimits } from "../lib/entitlements";
-import { organizerSwitchEnabled } from "../lib/user-mode";
 import {
   AVATAR_DIMENSIONS,
   COVER_DIMENSIONS,
@@ -45,8 +45,10 @@ import {
 import {
   resolveUserAvatar,
   resolveUserCover,
+  serverSupportsCountry,
   serverSupportsVisualIdentity,
 } from "../lib/user-identity";
+import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useUserIdentityStore } from "../store/userIdentityStore";
 import styles from "./AccountPage.module.css";
 
@@ -121,6 +123,8 @@ export function AccountPage() {
         )}
       </div>
 
+      {serverSupportsCountry(profile) && <CountryCard />}
+
       <div className={`card ${styles.identityCard}`}>
         <div
           className={styles.previewCover}
@@ -180,6 +184,57 @@ export function AccountPage() {
         Sign out
       </button>
     </section>
+  );
+}
+
+/**
+ * The rider's country. It defaults the "Browse tracks" filter, so an Israeli isn't shown US
+ * tracks — a rider who travels or was set to the wrong locale corrects it here. Rendered only
+ * when the server actually carries the field (serverSupportsCountry).
+ */
+function CountryCard() {
+  const { profile, updateProfile } = useAuth();
+  const current = profile?.country ?? detectDefaultCountryCode();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function onChange(event: ChangeEvent<HTMLSelectElement>) {
+    const next = event.target.value;
+    if (!next || next === profile?.country) return;
+    setBusy(true);
+    setError(null);
+    void updateProfile({ country: next })
+      .catch(() => setError("Could not save. Try again."))
+      .finally(() => setBusy(false));
+  }
+
+  return (
+    <div className="card stack">
+      <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
+        Country
+      </p>
+      <p className="muted" style={{ margin: 0 }}>
+        Used to show you rides near you first. Change it if you're riding elsewhere.
+      </p>
+      <select
+        value={current}
+        onChange={onChange}
+        disabled={busy}
+        aria-label="Country"
+        style={{ minHeight: "var(--tap-target)" }}
+      >
+        {orderedCountries(current).map((c) => (
+          <option key={c.code} value={c.code}>
+            {flagEmoji(c.code)} {c.name}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p className="banner banner--error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

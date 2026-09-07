@@ -106,6 +106,19 @@ export interface EventSummary {
   elevationGain?: number | null;
   /** Approved + pending riders (rejected / left excluded), from the list response. */
   participantCount?: number | null;
+  /**
+   * The ride's country (2-letter) and coarse region key (src/lib/regions.ts), from
+   * toEventSummary (sql/030-country.sql). The "Browse tracks" picker filters on both; a card
+   * shows the region label. Optional: a cached row or an older server omits them.
+   */
+  country?: string | null;
+  region?: string | null;
+  /**
+   * How many rides have been built on this ride's attached route (route_copies count). ONLY
+   * GET /events/public fills this in; absent elsewhere, and the track card then falls back to
+   * its own per-card `?preview=1` fetch. Optional / nullable for the same reasons.
+   */
+  downloads?: number | null;
   /** @deprecated device-local mirror of climb (store/eventExtrasStore.ts) — read
    *  `elevationGain` first. Kept so an older cached row still resolves. */
   climbM?: number;

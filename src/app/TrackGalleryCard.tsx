@@ -44,6 +44,7 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { EventRoute } from "../lib/event-route";
 import type { EventSummary } from "../lib/local-db";
+import { regionLabel } from "../lib/regions";
 import { formatDuration } from "../lib/ride-duration";
 import { placeholderCoverGradient } from "./event-visuals";
 import styles from "./TrackGalleryCard.module.css";
@@ -115,7 +116,9 @@ export function TrackGalleryCard({
   const distanceKm = route?.distanceKm ?? event.distanceKm;
   const climbM = route?.elevationM ?? event.elevationGain;
   const duration = formatDuration(event.durationMin);
-  const place = event.location ?? event.area;
+  const place = regionLabel(event.region) || event.location || event.area;
+  // The list carries the reuse count on GET /events/public; the per-card fetch is the fallback.
+  const downloads = event.downloads ?? usedByRides;
 
   return (
     <div className={styles.card} ref={cardRef}>
@@ -200,8 +203,8 @@ export function TrackGalleryCard({
               <ArrowDownToLine className={styles.statIcon} aria-hidden="true" />
               Downloads
             </dt>
-            <dd className={usedByRides != null ? styles.statValue : styles.statValueMuted}>
-              {usedByRides ?? NOT_YET}
+            <dd className={downloads != null ? styles.statValue : styles.statValueMuted}>
+              {downloads ?? NOT_YET}
             </dd>
           </div>
         </dl>

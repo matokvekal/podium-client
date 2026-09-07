@@ -25,9 +25,11 @@ import { ArrowUpDown, Search, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAuth } from "../auth/AuthContext";
+import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
 import type { EventSummary } from "../lib/local-db";
+import { IL_REGIONS, regionLabel } from "../lib/regions";
 import { DURATION_BUCKETS } from "../lib/ride-duration";
-import { LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import {
   TRACK_SORT_LABEL,
@@ -61,25 +63,27 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  const { profile } = useAuth();
+  const defaultCountry = profile?.country ?? detectDefaultCountryCode();
+
   const criteria = useTrackGalleryFiltersStore((s) => s.criteria);
   const sort = useTrackGalleryFiltersStore((s) => s.sort);
   const setCriteria = useTrackGalleryFiltersStore((s) => s.setCriteria);
   const setSort = useTrackGalleryFiltersStore((s) => s.setSort);
-  const clearFilters = useTrackGalleryFiltersStore((s) => s.clearFilters);
-  const activeCount = trackGalleryActiveFilterCount(criteria);
+  const seedCountry = useTrackGalleryFiltersStore((s) => s.seedCountry);
+  const clearFiltersAction = useTrackGalleryFiltersStore((s) => s.clearFilters);
+  const clearFilters = () => clearFiltersAction(defaultCountry);
+  const activeCount = trackGalleryActiveFilterCount(criteria, defaultCountry);
 
-  const {
-    rides,
-    total,
-    loading,
-    loadingMore,
-    error,
-    hasMore,
-    loadMore,
-    requestRoute,
-    routes,
-    areas,
-  } = useTrackGallery(source, search, criteria, sort);
+  // Seed the country filter from the rider's country once — an Israeli opens the picker scoped
+  // to Israel without touching anything. seedCountry is a no-op after the first call / a
+  // persisted choice.
+  useEffect(() => {
+    seedCountry(defaultCountry);
+  }, [seedCountry, defaultCountry]);
+
+  const { rides, total, loading, loadingMore, error, hasMore, loadMore, requestRoute, routes } =
+    useTrackGallery(source, search, criteria, sort);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -142,7 +146,7 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
   }
 
   const showCount = loading ? "…" : String(total);
-  const activeChips = buildActiveChips(criteria, patch);
+  const activeChips = buildActiveChips(criteria, patch, defaultCountry);
 
   return createPortal(
     <>
@@ -308,6 +312,9 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
         >
           <div className={styles.panelHeader}>
             <h3 className={styles.panelTitle}>Filter</h3>
+            <span className={styles.panelCount}>
+              {loading ? "…" : `${total} match${total === 1 ? "" : "es"}`}
+            </span>
             <button type="button" className="button button--quiet" onClick={clearFilters}>
               Clear
             </button>
@@ -321,19 +328,39 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
             </button>
           </div>
           <div className={styles.panelBody}>
-            {areas.length > 0 && (
-              <FilterGroup label="Area">
-                {areas.map((area) => (
-                  <ChipButton
-                    key={area}
-                    on={criteria.areas.includes(area)}
-                    onClick={() => patch({ areas: toggle(criteria.areas, area) })}
-                  >
-                    {area}
-                  </ChipButton>
+            <div className={styles.panelGroup}>
+              <span className={styles.panelGroupLabel}>Country</span>
+              <select
+                className={styles.panelSelect}
+                value={criteria.country ?? ""}
+                onChange={(e) => patch({ country: e.target.value || null })}
+                aria-label="Country"
+              >
+                <option value="">Any country</option>
+                {orderedCountries(defaultCountry).map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {flagEmoji(c.code)} {c.name}
+                  </option>
                 ))}
-              </FilterGroup>
-            )}
+              </select>
+            </div>
+
+            <div className={styles.panelGroup}>
+              <span className={styles.panelGroupLabel}>Area</span>
+              <select
+                className={styles.panelSelect}
+                value={criteria.region ?? ""}
+                onChange={(e) => patch({ region: e.target.value || null })}
+                aria-label="Area"
+              >
+                <option value="">All areas</option>
+                {IL_REGIONS.map((r) => (
+                  <option key={r.key} value={r.key}>
+                    {r.he}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <FilterGroup label="Ride type">
               {(Object.keys(SURFACE_TYPE_LABEL) as SurfaceType[]).map((s) => {
@@ -349,18 +376,6 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
                   </ChipButton>
                 );
               })}
-            </FilterGroup>
-
-            <FilterGroup label="Difficulty">
-              {LEVELS.map((l) => (
-                <ChipButton
-                  key={l.value}
-                  on={criteria.level.includes(l.value)}
-                  onClick={() => patch({ level: toggle(criteria.level, l.value) })}
-                >
-                  {l.label}
-                </ChipButton>
-              ))}
             </FilterGroup>
 
             <div className={styles.panelGroup}>
@@ -487,14 +502,22 @@ interface ActiveChip {
 function buildActiveChips(
   c: TrackGalleryCriteria,
   patch: (next: Partial<TrackGalleryCriteria>) => void,
+  defaultCountry: string | null,
 ): ActiveChip[] {
   const chips: ActiveChip[] = [];
 
-  for (const area of c.areas) {
+  if (c.country !== defaultCountry) {
     chips.push({
-      key: `area:${area}`,
-      label: area,
-      clear: () => patch({ areas: c.areas.filter((a) => a !== area) }),
+      key: "country",
+      label: c.country ? `${flagEmoji(c.country)} ${c.country}` : "Any country",
+      clear: () => patch({ country: defaultCountry }),
+    });
+  }
+  if (c.region) {
+    chips.push({
+      key: "region",
+      label: regionLabel(c.region),
+      clear: () => patch({ region: null }),
     });
   }
   for (const s of c.surface) {
@@ -502,14 +525,6 @@ function buildActiveChips(
       key: `surface:${s}`,
       label: SURFACE_TYPE_LABEL[s],
       clear: () => patch({ surface: c.surface.filter((v) => v !== s) }),
-    });
-  }
-  for (const lvl of c.level) {
-    const meta = LEVELS.find((l) => l.value === lvl);
-    chips.push({
-      key: `level:${lvl}`,
-      label: meta?.label ?? lvl,
-      clear: () => patch({ level: c.level.filter((v) => v !== lvl) }),
     });
   }
   for (const key of c.durationBuckets) {

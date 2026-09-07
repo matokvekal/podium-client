@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { ApiError, apiRequest, SESSION_EXPIRED_EVENT } from "../lib/api-client";
@@ -22,8 +23,10 @@ import {
   saveProfile,
   saveTokens,
 } from "../lib/auth-storage";
+import { detectDefaultCountryCode, isKnownCountryCode } from "../lib/countries";
 import { clearLocalUserData } from "../lib/logout-cleanup";
-import type { UserVisualAsset } from "../lib/user-identity";
+import { serverSupportsCountry, type UserVisualAsset } from "../lib/user-identity";
+import { useCountryStore } from "../store/countryStore";
 import { useEventsStore } from "../store/eventsStore";
 import { reconcileUserIdentity } from "../store/userIdentityStore";
 import { forgetGoogleSession } from "./google-signin";
@@ -36,6 +39,13 @@ export interface Profile {
   nickname: string | null;
   emergencyPhone: string | null;
   requiresProfile: boolean;
+  /**
+   * The rider's country, ISO 3166-1 alpha-2 — or null when their client has not synced one
+   * yet. Presence of the key is how the app detects the server supports country at all (see
+   * serverSupportsCountry). Set automatically from the browser locale on first login and
+   * changeable on AccountPage; defaults the "Browse tracks" country filter.
+   */
+  country?: string | null;
   /**
    * The Google profile photo, straight from the sign-in token — the same flat field every
    * event/participant endpoint already sends for OTHER people (see EventOwner.avatarUrl in
@@ -210,6 +220,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // Country: the server is the source of truth now (sql/030-country.sql). Once /users/me
+  // carries the field, keep countryStore in step with it — and if the server has no country
+  // for this rider yet, push one up FOR them (their old on-device pick, else the browser
+  // locale) so they never see a country form.
+  //
+  // The push is attempted ONCE per session (countryPushedRef): if the migration has not been
+  // applied yet the server keeps answering `country: null`, and without the guard this effect
+  // would PATCH /users/me on a loop.
+  const countryPushedRef = useRef(false);
+  useEffect(() => {
+    if (!profile || !serverSupportsCountry(profile)) return;
+    const serverCountry = profile.country ?? null;
+    const localCountry = useCountryStore.getState().code;
+    if (serverCountry) {
+      if (serverCountry !== localCountry) useCountryStore.getState().setCountry(serverCountry);
+      return;
+    }
+    if (countryPushedRef.current) return;
+    countryPushedRef.current = true;
+    const guess =
+      localCountry && isKnownCountryCode(localCountry) ? localCountry : detectDefaultCountryCode();
+    void updateProfile({ country: guess }).catch(() => undefined);
+  }, [profile, updateProfile]);
 
   const signOut = useCallback(async () => {
     // Full local reset — see lib/logout-cleanup.ts. Every step is best-effort and independently

@@ -191,6 +191,17 @@ function Dashboard({ data, rangeKey }: { data: AnalyticsResponse; rangeKey: Anal
       </section>
 
       <section className={styles.block}>
+        <h2 className={styles.blockTitle}>Routes</h2>
+        <div className={styles.routeGrid}>
+          <RouteStat label="Created" value={data.routes.created} />
+          <RouteStat label="From GPX" value={data.routes.fromGpx} />
+          <RouteStat label="Other methods" value={data.routes.otherMethods} />
+          <RouteStat label="Copies / reuses" value={data.routes.copies} accent />
+          <RouteStat label="Distinct copiers" value={data.routes.distinctCopiers} accent />
+        </div>
+      </section>
+
+      <section className={styles.block}>
         <h2 className={styles.blockTitle}>
           Countries
           {data.totals.countries === 0 && (
@@ -252,6 +263,23 @@ function VisStat({
         <div className={styles.visBar} style={{ width: `${pct}%` }} />
       </div>
       <div className={styles.visPct}>{pct}%</div>
+    </div>
+  );
+}
+
+function RouteStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className={styles.routeStat} data-accent={accent || undefined}>
+      <div className={styles.routeValue}>{formatCount(value)}</div>
+      <div className={styles.routeLabel}>{label}</div>
     </div>
   );
 }

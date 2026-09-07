@@ -39,6 +39,13 @@ export interface AnalyticsResponse {
     countries: number;
   };
   rides: { public: number; registered: number; private: number };
+  routes: {
+    created: number;
+    fromGpx: number;
+    otherMethods: number;
+    copies: number;
+    distinctCopiers: number;
+  };
   daily: DailyRow[];
   countries: CountryRow[];
 }

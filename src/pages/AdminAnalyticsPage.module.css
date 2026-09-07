@@ -228,6 +228,41 @@
   color: var(--text-muted);
 }
 
+/* --- routes ---------------------------------------------------------------- */
+
+.routeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--space-3);
+}
+
+.routeStat {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.routeStat[data-accent] {
+  background: var(--accent-soft);
+}
+
+.routeValue {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.routeStat[data-accent] .routeValue {
+  color: var(--accent-strong);
+}
+
+.routeLabel {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 /* --- countries ------------------------------------------------------------ */
 
 .countryList {

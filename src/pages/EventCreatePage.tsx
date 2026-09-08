@@ -1808,10 +1808,9 @@ export function EventCreatePage() {
                   onChange={(e) => setExpectedParticipants(e.target.value)}
                 />
                 <p className={styles.hint}>
-                  {expectedParticipants.trim()
-                    ? `Riders will see “… / ${expectedParticipants.trim()}” next to the count.`
-                    : "How many riders you expect. Optional — leave blank to show just the count."}{" "}
-                  Your plan allows up to {planMaxParticipants} riders per ride.
+                  How many riders you expect — for your own planning. Optional, and never shown on
+                  the ride: riders (you included) only ever see the joined count, with no “out of”
+                  figure next to it. Your plan allows up to {planMaxParticipants} riders per ride.
                 </p>
               </div>
 

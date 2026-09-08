@@ -1611,11 +1611,11 @@ export function EventDetailPage() {
                 An estimated finish on a group ride is the kind of number people plan pickups
                 around, so it is absent rather than guessed.
 
-                PARTICIPANTS is viewer-dependent. The ORGANIZER sees the real count over their
-                own account cap — "6 / 50", where 50 is user_limits.participants_per_event, the
-                ceiling the server enforces on join. EVERY OTHER VIEWER sees the bare count —
-                "7" — with no denominator at all: neither the cap nor the organizer's expected
-                turnout (events.expected_participants) is theirs to see.
+                PARTICIPANTS is the bare joined count for EVERY viewer, organizer included —
+                "7", never "7 / 300". No denominator is shown here at all: not the organizer's
+                account cap (user_limits.participants_per_event, which the server still enforces
+                on join), and not their expected turnout (events.expected_participants). The cap
+                belongs on the account/plan screens, not on the ride.
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
@@ -1686,16 +1686,10 @@ export function EventDetailPage() {
                     <Users width={13} height={13} aria-hidden="true" />
                     Participants
                   </span>
-                  {/* "the creator himself can see register/total he can for example 6/50, all
-                      other riders when see the page will see just registers like 7 that all."
-                      The denominator is the organizer's ACCOUNT CAP
-                      (user_limits.participants_per_event, default 50) — sent only to them —
-                      not the expected-turnout figure, which no viewer sees any more. */}
-                  <span className={styles.infoCellValue}>
-                    {event.isOwner && maxParticipants != null
-                      ? `${participantCount} / ${maxParticipants} participants`
-                      : `${participantCount} participants`}
-                  </span>
+                  {/* "at ride page we will see participants only and not how many from total
+                      places" — so the count stands alone for the organizer too. maxParticipants
+                      is still read above for the full/join gating; it is just never printed. */}
+                  <span className={styles.infoCellValue}>{`${participantCount} participants`}</span>
                 </div>
               </div>
             )}

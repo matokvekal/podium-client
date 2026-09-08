@@ -10,7 +10,7 @@
 // where that column contains "rest", "break", or "stop" marks a rest point. No header row at
 // all falls back to "column 0 = lat, column 1 = lon."
 
-import { elevationGainFromSeries } from "./elevation";
+import { elevationGainFromSeries, elevationSeriesOrNull } from "./elevation";
 
 export interface ParsedTrack {
   points: [number, number][];
@@ -22,6 +22,14 @@ export interface ParsedTrack {
    * (GPX <ele>, or a CSV elevation/altitude column). null when the file has no elevation data
    * — never a guess. See lib/elevation.ts. */
   elevationGainM: number | null;
+  /** The per-point elevation the climb figure was computed FROM — one entry per point in
+   * `points`, null where that point had no readable value. null for the whole series when the
+   * file carried no elevation at all.
+   *
+   * This is what draws the elevation profile under a route map (lib/elevation-profile.ts). It
+   * is a parallel array rather than a third number on each point because [lat, lng] is a frozen
+   * API shape — see lib/event-route.ts. */
+  elevations: (number | null)[] | null;
 }
 
 function toRad(deg: number): number {
@@ -96,5 +104,6 @@ export function parseTrackCsv(text: string): ParsedTrack | null {
     restStopIndices,
     distanceKm: Math.round(haversineKm(points) * 10) / 10,
     elevationGainM: elevationGainFromSeries(elevations),
+    elevations: elevationSeriesOrNull(elevations),
   };
 }

@@ -6,7 +6,7 @@
 // waypoint whose name/cmt/desc/sym mentions "rest", "break", or "stop" gets snapped to the
 // closest point on the track.
 
-import { elevationGainFromSeries } from "./elevation";
+import { elevationGainFromSeries, elevationSeriesOrNull } from "./elevation";
 import type { ParsedTrack } from "./track-csv";
 
 function nearestPointIndex(points: [number, number][], target: [number, number]): number {
@@ -108,5 +108,6 @@ export function parseTrackGpx(text: string): ParsedTrack | null {
     restStopIndices: Array.from(restStopIndices).sort((a, b) => a - b),
     distanceKm: Math.round(haversineKm(points) * 10) / 10,
     elevationGainM: elevationGainFromSeries(elevations),
+    elevations: elevationSeriesOrNull(elevations),
   };
 }

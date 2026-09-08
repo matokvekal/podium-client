@@ -1,0 +1,68 @@
+/* Sits directly under a route map and reads as part of it: same full width, no card of its
+   own, no header. Colours come from tokens.css, so it follows light/dark with everything else. */
+
+.wrap {
+  position: relative;
+  width: 100%;
+  /* A horizontal drag drives the readout, but the page must still scroll vertically under a
+     thumb — the whole app is used one-handed on a phone. */
+  touch-action: pan-y;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  /* Behind the route, never competing with it. */
+  opacity: 0.6;
+}
+
+.label {
+  fill: var(--text-muted);
+  font-size: 0.625rem;
+  dominant-baseline: middle;
+}
+
+.area {
+  fill: var(--accent);
+  opacity: 0.18;
+}
+
+.line {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cursor {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.cursorDot {
+  fill: var(--accent-strong);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.readout {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}

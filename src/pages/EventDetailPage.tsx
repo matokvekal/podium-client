@@ -66,6 +66,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { DescriptionSheet } from "../app/DescriptionSheet";
+import { ElevationProfile } from "../app/ElevationProfile";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { SafetySheet } from "../app/SafetySheet";
@@ -1597,6 +1598,10 @@ export function EventDetailPage() {
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={results.route.points} />
                 </Suspense>
+                <ElevationProfile
+                  points={results.route.points}
+                  elevations={results.route.elevations}
+                />
                 {event.copiedFromEventId && (
                   <CopiedFromCredit sourceEventId={event.copiedFromEventId} />
                 )}

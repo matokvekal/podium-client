@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elevationGainFromSeries } from "./elevation";
+import { elevationGainFromSeries, elevationSeriesOrNull } from "./elevation";
 
 // The GPX/CSV parsers that feed this need a DOM (DOMParser) which this repo deliberately has
 // no jsdom for — see lib/image-processing.test.ts. The gain algorithm itself is pure, and it
@@ -26,5 +26,33 @@ describe("elevationGainFromSeries", () => {
 
   it("skips gaps (null elevations) rather than treating them as zero", () => {
     expect(elevationGainFromSeries([0, null, 40, null, 80])).toBe(80);
+  });
+});
+
+// The same values, kept rather than summed — this is what the elevation profile is drawn from.
+describe("elevationSeriesOrNull", () => {
+  it("returns the series when the file carried elevation", () => {
+    expect(elevationSeriesOrNull([10, 20, 30])).toEqual([10, 20, 30]);
+  });
+
+  it("keeps gaps as nulls, in place, so the series stays aligned with its points", () => {
+    expect(elevationSeriesOrNull([10, null, 30])).toEqual([10, null, 30]);
+    expect(elevationSeriesOrNull([10, undefined, 30])).toEqual([10, null, 30]);
+  });
+
+  it("normalizes an unusable value to a gap rather than passing NaN on to be drawn", () => {
+    expect(elevationSeriesOrNull([10, Number.NaN, Number.POSITIVE_INFINITY, 40])).toEqual([
+      10,
+      null,
+      null,
+      40,
+    ]);
+  });
+
+  it("returns null when there is nothing to draw — no elevation is not a flat route", () => {
+    expect(elevationSeriesOrNull([])).toBeNull();
+    expect(elevationSeriesOrNull([null, null, null])).toBeNull();
+    expect(elevationSeriesOrNull([100])).toBeNull();
+    expect(elevationSeriesOrNull([100, null])).toBeNull();
   });
 });

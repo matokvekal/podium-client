@@ -11,4 +11,13 @@ export interface EventRoute {
   points: [number, number][];
   distanceKm: number;
   elevationM: number | null;
+  /** Per-point elevation in metres, one entry per point in `points`, null where a point had no
+   * readable value. Absent/null when the route carries no elevation at all — which is the case
+   * for every route saved before the server started keeping the series, and for any GPX that
+   * never had <ele> tags.
+   *
+   * Additive and optional on purpose: `points` is a frozen response shape, so the series rides
+   * alongside it rather than widening the tuple. Drives the elevation profile under the map
+   * (app/ElevationProfile.tsx); when it is missing the profile simply does not render. */
+  elevations?: (number | null)[] | null;
 }

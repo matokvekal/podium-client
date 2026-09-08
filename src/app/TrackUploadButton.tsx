@@ -62,6 +62,9 @@ export function TrackUploadButton({ onUploadRoute, className, children }: TrackU
           // organizer can still type a value in on the create form. Never invented.
           distanceKm: parsed.distanceKm,
           elevationM: parsed.elevationGainM,
+          // The series behind that climb figure, which draws the elevation profile. Null when
+          // the file had no <ele> at all, and then no profile is drawn.
+          elevations: parsed.elevations,
         },
         restStops: parsed.restStopIndices.map((i) => parsed.points[i]),
         fileName: file.name,

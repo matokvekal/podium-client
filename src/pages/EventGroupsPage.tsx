@@ -39,6 +39,7 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CopyTrackSheet } from "../app/CopyTrackSheet";
+import { ElevationProfile } from "../app/ElevationProfile";
 import { ParticipantFormSheet, type ParticipantFormValues } from "../app/ParticipantFormSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -258,7 +259,10 @@ export function EventGroupsPage() {
     );
   }
 
-  const mapPoints = currentGroup?.route?.points ?? mainRoute?.points ?? null;
+  // The group's own track when it has one, otherwise the event's — the profile must come from
+  // the SAME route as the line, so both are read off one value rather than two lookups.
+  const mapRoute = currentGroup?.route ?? mainRoute ?? null;
+  const mapPoints = mapRoute?.points ?? null;
 
   return (
     <section className="stack">
@@ -438,9 +442,12 @@ export function EventGroupsPage() {
 
           {viewMode === "map" ? (
             mapPoints ? (
-              <Suspense fallback={<div className="row muted">Loading the map…</div>}>
-                <RouteMap points={mapPoints} />
-              </Suspense>
+              <>
+                <Suspense fallback={<div className="row muted">Loading the map…</div>}>
+                  <RouteMap points={mapPoints} />
+                </Suspense>
+                <ElevationProfile points={mapPoints} elevations={mapRoute?.elevations} />
+              </>
             ) : (
               <p className="muted">No track set for this group yet.</p>
             )

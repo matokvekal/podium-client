@@ -36,6 +36,7 @@ import { parseTrackGpx } from "../lib/track-gpx";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import styles from "./CopyTrackSheet.module.css";
+import { ElevationProfile } from "./ElevationProfile";
 
 const RouteMap = lazy(() => import("./RouteMap"));
 
@@ -144,6 +145,9 @@ export function CopyTrackSheet({
           // From the file's own <ele> / elevation column when it has one, else null — the
           // organizer can still type a value in on the create/edit form. Never invented.
           elevationM: parsed.elevationGainM,
+          // The series behind that climb figure, which draws the elevation profile. Null when
+          // the file had no <ele> at all, and then no profile is drawn.
+          elevations: parsed.elevations,
         },
         restStops: parsed.restStopIndices.map((i) => parsed.points[i]),
         fileName: file.name,
@@ -382,6 +386,10 @@ export function CopyTrackSheet({
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={previewRoute.points} heightPx={200} />
                 </Suspense>
+                <ElevationProfile
+                  points={previewRoute.points}
+                  elevations={previewRoute.elevations}
+                />
                 <div className={styles.previewFooter}>
                   <span className="muted" style={{ fontSize: "0.85rem" }}>
                     {previewRoute.distanceKm} km

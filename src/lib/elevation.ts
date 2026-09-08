@@ -13,6 +13,27 @@
 
 const NOISE_THRESHOLD_M = 5;
 
+/**
+ * The per-point series itself, or null when the file carried no usable elevation at all. Kept
+ * next to elevationGainFromSeries because the two answer the same question about the same data:
+ * this one feeds the elevation profile chart, that one the single climb figure.
+ *
+ * A route where every value is missing is not a flat route, it is a route with no elevation
+ * data — the caller must draw nothing rather than a line along the bottom of the chart.
+ */
+export function elevationSeriesOrNull(
+  values: readonly (number | null | undefined)[],
+): (number | null)[] | null {
+  let usable = 0;
+  const series: (number | null)[] = [];
+  for (const value of values) {
+    const ok = typeof value === "number" && Number.isFinite(value);
+    if (ok) usable++;
+    series.push(ok ? (value as number) : null);
+  }
+  return usable >= 2 ? series : null;
+}
+
 export function elevationGainFromSeries(
   values: readonly (number | null | undefined)[],
 ): number | null {

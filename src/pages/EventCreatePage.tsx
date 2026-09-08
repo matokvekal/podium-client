@@ -140,6 +140,7 @@ import {
   useState,
 } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ElevationProfile } from "../app/ElevationProfile";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SafetySheet } from "../app/SafetySheet";
 import { TrackGallerySheet } from "../app/TrackGallerySheet";
@@ -217,43 +218,78 @@ interface ExistingEvent {
 const EVENT_ROUTE_MAX_POINTS = 5000;
 const EVENT_ROUTE_MAX_PAYLOAD_BYTES = 900_000;
 
-function downsampleRoutePoints(points: [number, number][], maxPoints: number): [number, number][] {
-  if (points.length <= maxPoints) return points;
-  if (maxPoints <= 2) return [points[0], points[points.length - 1]];
+/**
+ * The geometry actually sent to the server: the line, plus the per-point elevation series when
+ * the file carried one. The two are kept together through every reduction below because they
+ * MUST stay index-aligned — an elevation array that no longer matches its points would draw a
+ * profile of the wrong ride, so lib/elevation-profile.ts rejects a mismatched pair outright.
+ */
+interface RoutePayloadGeometry {
+  points: [number, number][];
+  elevations: (number | null)[] | null;
+}
 
-  const result: [number, number][] = [points[0]];
-  const interior = points.length - 2;
+/** Which point indices survive a reduction to `maxPoints`. Picked ONCE, then applied to both
+ *  arrays, so the line and its elevation series can never drift apart. Same even-stride maths
+ *  the points-only version used before the elevation series existed. */
+function downsampleIndices(length: number, maxPoints: number): number[] {
+  if (maxPoints <= 2) return [0, length - 1];
+
+  const indices: number[] = [0];
+  const interior = length - 2;
   const slots = maxPoints - 2;
 
   for (let i = 1; i <= slots; i += 1) {
-    const idx = Math.round((i * interior) / (slots + 1));
-    result.push(points[idx]);
+    indices.push(Math.round((i * interior) / (slots + 1)));
   }
 
-  result.push(points[points.length - 1]);
-  return result;
+  indices.push(length - 1);
+  return indices;
+}
+
+function downsampleRouteGeometry(
+  geometry: RoutePayloadGeometry,
+  maxPoints: number,
+): RoutePayloadGeometry {
+  if (geometry.points.length <= maxPoints) return geometry;
+
+  const indices = downsampleIndices(geometry.points.length, maxPoints);
+  return {
+    points: indices.map((i) => geometry.points[i]),
+    elevations: geometry.elevations ? indices.map((i) => geometry.elevations?.[i] ?? null) : null,
+  };
 }
 
 function routePayloadBytes(
-  points: [number, number][],
+  geometry: RoutePayloadGeometry,
   distanceKm: number,
   elevationM: number | null,
 ): number {
-  const body = JSON.stringify({ points, distanceKm, elevationM });
+  const body = JSON.stringify({
+    points: geometry.points,
+    distanceKm,
+    elevationM,
+    elevations: geometry.elevations ?? undefined,
+  });
   return new TextEncoder().encode(body).length;
 }
 
 function capRoutePayload(
   points: [number, number][],
+  elevations: (number | null)[] | null | undefined,
   distanceKm: number,
   elevationM: number | null,
-): [number, number][] {
-  let reduced = downsampleRoutePoints(points, EVENT_ROUTE_MAX_POINTS);
+): RoutePayloadGeometry {
+  // A series that does not match the line is unusable — send the line alone rather than a
+  // pairing the server would have to reject.
+  const aligned = elevations && elevations.length === points.length ? elevations : null;
+
+  let reduced = downsampleRouteGeometry({ points, elevations: aligned }, EVENT_ROUTE_MAX_POINTS);
   while (
-    reduced.length > 2 &&
+    reduced.points.length > 2 &&
     routePayloadBytes(reduced, distanceKm, elevationM) > EVENT_ROUTE_MAX_PAYLOAD_BYTES
   ) {
-    reduced = downsampleRoutePoints(reduced, Math.max(2, Math.floor(reduced.length / 2)));
+    reduced = downsampleRouteGeometry(reduced, Math.max(2, Math.floor(reduced.points.length / 2)));
   }
   return reduced;
 }
@@ -891,13 +927,21 @@ export function EventCreatePage() {
     typedDistance: number | null,
     typedClimb: number | null,
   ) {
-    const points = capRoutePayload(route.points, route.distanceKm, route.elevationM);
+    const geometry = capRoutePayload(
+      route.points,
+      route.elevations,
+      route.distanceKm,
+      route.elevationM,
+    );
     await apiRequest(`/events/${id}/route`, {
       method: "POST",
       body: {
-        points,
+        points: geometry.points,
         distanceKm: typedDistance ?? route.distanceKm,
         elevationM: typedClimb ?? route.elevationM,
+        // Omitted entirely for a route with no elevation, so the body stays exactly what it
+        // was before the profile existed.
+        ...(geometry.elevations ? { elevations: geometry.elevations } : {}),
       },
     });
   }
@@ -1393,6 +1437,7 @@ export function EventCreatePage() {
                     restStops={uploadedRestStops}
                   />
                 </Suspense>
+                <ElevationProfile points={copiedRoute.points} elevations={copiedRoute.elevations} />
               </div>
             )}
             {/* Two ways to get a track, side by side and deliberately NOT equal in weight.

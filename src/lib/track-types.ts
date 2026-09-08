@@ -66,11 +66,14 @@ export interface PublicRoute {
   placeName: string | null;
   isPublic: boolean;
   distanceKm: number | null;
-  /** Total climb. There is no per-point elevation series — see EventDetailPage's route card. */
+  /** Total climb. The per-point series that draws the profile is `previewElevations`. */
   elevationM: number | null;
   pointCount: number | null;
   /** A thinned line for the card thumbnail, not the full route. */
   previewPoints: [number, number][] | null;
+  /** Per-point elevation for `previewPoints`, thinned by the same stride so the two stay
+   * aligned. Null for a route stored without elevation. */
+  previewElevations?: (number | null)[] | null;
   markers: unknown;
   startLat: number | null;
   startLon: number | null;

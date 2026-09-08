@@ -29,6 +29,7 @@ import {
   ROUTE_TYPE_TO_SURFACE,
 } from "../lib/track-types";
 import { useIsOrganizer } from "../store/userModeStore";
+import { ElevationProfile } from "./ElevationProfile";
 import styles from "./TrackCard.module.css";
 
 const RouteMap = lazy(() => import("./RouteMap"));
@@ -80,6 +81,8 @@ export function TrackCard({ track, favorite, onToggleFavorite }: TrackCardProps)
           <RouteMap points={preview} />
         </Suspense>
       )}
+
+      {preview && <ElevationProfile points={preview} elevations={track.previewElevations} />}
 
       {(track.distanceKm != null || track.elevationM != null) && (
         <div className={styles.stats}>

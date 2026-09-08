@@ -130,7 +130,15 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, lazy, Suspense, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SafetySheet } from "../app/SafetySheet";
@@ -457,6 +465,12 @@ export function EventCreatePage() {
    */
   const [existingRouteAttached, setExistingRouteAttached] = useState(false);
   const [removeExistingRoute, setRemoveExistingRoute] = useState(false);
+  /**
+   * Set the moment the organizer uploads / browses / removes a track, so the edit-mode prefill
+   * effect below — which is still finishing its fetches after the form goes interactive — can't
+   * land on top of that choice and put the old distance/climb back.
+   */
+  const trackChoiceTouchedRef = useRef(false);
 
   const [loadingEvent, setLoadingEvent] = useState(isEditing);
 
@@ -532,13 +546,13 @@ export function EventCreatePage() {
           serverHasActivity = true;
         }
         // Server-persisted effective elevation wins — it survives logout/login and is the
-        // same on every device. Marked "edited" so re-picking a route (or a stale local
-        // extras value below) never silently overwrites what the organizer saved. Replacing
-        // the GPX explicitly is still allowed to repopulate it — see handleUploadRoute.
+        // same on every device, and `serverHasElevation` keeps the stale local extras below
+        // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
+        // something the organizer typed this session, and latching it here was what left the
+        // old climb standing after the track it came from was replaced or removed.
         if (found.elevationGain != null) {
-          setClimbMInput(String(found.elevationGain));
-          setClimbEdited(true);
           serverHasElevation = true;
+          if (!trackChoiceTouchedRef.current) setClimbMInput(String(found.elevationGain));
         }
         // Ride plan — server is the only source (no local-extras fallback for these).
         if (found.durationMin != null) {
@@ -582,13 +596,17 @@ export function EventCreatePage() {
         if (existingExtras.teamId) setTeamId(existingExtras.teamId);
         else if (existingExtras.organizerGroup)
           setOrganizerGroupInput(existingExtras.organizerGroup);
-        if (existingExtras.distanceKm != null) {
+        // Same rule as the server values above: prefilled, not hand-typed, so an explicit
+        // track action can still replace or clear them.
+        if (existingExtras.distanceKm != null && !trackChoiceTouchedRef.current) {
           setDistanceKmInput(String(existingExtras.distanceKm));
-          setDistanceEdited(true);
         }
-        if (!serverHasElevation && existingExtras.climbM != null) {
+        if (
+          !serverHasElevation &&
+          existingExtras.climbM != null &&
+          !trackChoiceTouchedRef.current
+        ) {
           setClimbMInput(String(existingExtras.climbM));
-          setClimbEdited(true);
         }
         if (existingExtras.coverImageDataUrl) {
           setCoverImageDataUrl(existingExtras.coverImageDataUrl);
@@ -683,6 +701,7 @@ export function EventCreatePage() {
   }
 
   async function pickEventToCopy(event: EventSummary) {
+    trackChoiceTouchedRef.current = true;
     setCopiedFrom(event);
     // A replacement track — the server POST is a full replace, so an already-attached route
     // needs no separate detach.
@@ -743,6 +762,7 @@ export function EventCreatePage() {
   }
 
   function clearCopiedTrack() {
+    trackChoiceTouchedRef.current = true;
     // Edit mode: if the track being removed is the one already saved on the server, remember
     // to detach it on Save (DELETE /events/:id/route). Picking a replacement afterwards clears
     // this again — the replacement's POST is a full replace and needs no separate delete.
@@ -762,6 +782,7 @@ export function EventCreatePage() {
   }
 
   function handleUploadRoute(uploaded: UploadedTrack) {
+    trackChoiceTouchedRef.current = true;
     // A replacement track — the server POST is a full replace, so no separate detach is owed
     // even if this event already had a route.
     setExistingRouteAttached(false);
@@ -777,10 +798,12 @@ export function EventCreatePage() {
     setUploadedRestStops(uploaded.restStops);
     setInvalidRoute(false);
     applyRouteDistanceClimb(uploaded.route);
-    // Uploading (or replacing) a GPX is an explicit action: if the new file carries its own
-    // elevation, take that number even over a value the organizer typed earlier, and clear the
-    // "edited" latch so they can still override it before Save. A file with no elevation data
-    // leaves whatever was there — never wiped, never invented.
+    // Uploading (or replacing) a GPX is an explicit action: the new file's own numbers win
+    // even over values the organizer typed earlier, and the "edited" latches are cleared so
+    // they can still override them before Save. Distance always comes with the file; a file
+    // with no elevation data leaves the climb alone — never wiped, never invented.
+    setDistanceKmInput(String(uploaded.route.distanceKm));
+    setDistanceEdited(false);
     if (uploaded.route.elevationM != null) {
       setClimbMInput(String(uploaded.route.elevationM));
       setClimbEdited(false);

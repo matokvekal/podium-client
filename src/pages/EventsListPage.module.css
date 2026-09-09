@@ -316,8 +316,10 @@
   background: var(--surface-raised);
 }
 
-/* The home stream scrolls with the page — unlike .list below, which is the See-All view's
-   deliberately fixed-height searchable box sized for the old, much shorter card. */
+/* Both My Rides streams scroll with the page. .list used to be a fixed-height (340px) box,
+   sized for the old compact tile: with today's full EventCards that box ended well short of
+   the viewport, leaving the bottom of the screen permanently blank under a list that scrolled
+   inside itself. */
 .homeList {
   display: flex;
   flex-direction: column;
@@ -399,9 +401,9 @@
    EventCard rows (104px card + the .list gap), matching how this looked before more mock
    rides were added. */
 .list {
-  height: 340px;
-  overflow-y: auto;
-  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .list > *,

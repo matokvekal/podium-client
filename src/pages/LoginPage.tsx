@@ -27,6 +27,7 @@ import { renderGoogleButton } from "../auth/google-signin";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { APP_SLOGAN } from "../lib/branding";
 import { config } from "../lib/config";
+import { postLoginDestination } from "../lib/post-login-destination";
 import styles from "./LoginPage.module.css";
 
 type Provider = "GOOGLE" | "SMS" | "EMAIL";
@@ -118,6 +119,10 @@ export function LoginPage() {
   // private-event fallback, and JoinPage's submit guard.
   const from = (location.state as { from?: string } | null)?.from ?? null;
 
+  // …and where signing in actually drops them. Their own account screen is not it — see
+  // lib/post-login-destination.ts.
+  const destination = postLoginDestination(from);
+
   /**
    * Did they arrive with a ride already in mind?
    *
@@ -130,10 +135,10 @@ export function LoginPage() {
    * "/" is deliberately not a destination: it IS the browse screen, so the button would just
    * repeat where they are already going.
    */
-  const arrivedWithDestination = from != null && from !== "/" && from !== "/login";
+  const arrivedWithDestination = destination !== "/";
 
   if (status === "signed-in") {
-    return <Navigate to={from && from !== "/login" ? from : "/"} replace />;
+    return <Navigate to={destination} replace />;
   }
 
   async function requestCode(event: FormEvent) {

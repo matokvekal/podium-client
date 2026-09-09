@@ -177,6 +177,7 @@ import {
   splitDuration,
 } from "../lib/ride-duration";
 import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
+import { useMediaQuery } from "../lib/use-media-query";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
@@ -313,6 +314,15 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
   // SurfaceType and display mappings keep it so existing events still render.
 ];
 
+/**
+ * Below this the horizontal pickers stop fitting: the four Terrain chips need ~270px on one
+ * un-wrapping row, the difficulty bars are 192px of fixed-width bars before their label, and
+ * the two Visibility buttons split what is left in half. On a 320-340px phone all three ran
+ * past the card's right edge. Under this width each becomes a native <select> instead — one
+ * full-width control that cannot overflow, and a thumb-friendly wheel on iOS/Android.
+ */
+const NARROW_PICKER_QUERY = "(max-width: 349px)";
+
 const NEW_TEAM_OPTION = "__new__";
 
 export function EventCreatePage() {
@@ -366,6 +376,9 @@ export function EventCreatePage() {
     (lastDefaults?.teamId && teams[lastDefaults.teamId] ? lastDefaults.teamId : "");
 
   const [name, setName] = useState("");
+  // Terrain / Difficulty / Visibility collapse to dropdowns here — see NARROW_PICKER_QUERY.
+  const narrowPickers = useMediaQuery(NARROW_PICKER_QUERY);
+
   const [activityType, setActivityType] = useState<SurfaceType>(
     lastDefaults?.activityType ?? "mtb",
   );
@@ -1431,20 +1444,35 @@ export function EventCreatePage() {
               <Compass aria-hidden="true" />
               Terrain
             </legend>
-            <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
-              {ACTIVITY_TYPES.map((activity) => (
-                <label key={activity.value} className={styles.chip}>
-                  <input
-                    type="radio"
-                    name="activityType"
-                    className={styles.chipInput}
-                    checked={activityType === activity.value}
-                    onChange={() => setActivityType(activity.value)}
-                  />
-                  {activity.label}
-                </label>
-              ))}
-            </div>
+            {narrowPickers ? (
+              <select
+                className={styles.input}
+                aria-label="Terrain"
+                value={activityType}
+                onChange={(e) => setActivityType(e.target.value as SurfaceType)}
+              >
+                {ACTIVITY_TYPES.map((activity) => (
+                  <option key={activity.value} value={activity.value}>
+                    {activity.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
+                {ACTIVITY_TYPES.map((activity) => (
+                  <label key={activity.value} className={styles.chip}>
+                    <input
+                      type="radio"
+                      name="activityType"
+                      className={styles.chipInput}
+                      checked={activityType === activity.value}
+                      onChange={() => setActivityType(activity.value)}
+                    />
+                    {activity.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </fieldset>
 
           <div className={styles.field} style={{ marginBottom: "var(--space-4)" }}>
@@ -1786,37 +1814,55 @@ export function EventCreatePage() {
                     name written out to the right, large; tapping the already-lit bar again
                     clears back to "not specified," same escape hatch the old dropdown's blank
                     option gave. */}
-                <div className={styles.levelRow}>
-                  <div className={styles.levelBars} role="group" aria-labelledby="levelLabel">
-                    {LEVELS.map((l, i) => (
-                      <button
-                        key={l.value}
-                        type="button"
-                        aria-pressed={level === l.value}
-                        aria-label={l.label}
-                        title={l.label}
-                        className={styles.levelBar}
-                        data-level={l.value}
-                        data-filled={level === l.value}
-                        style={{ height: `${10 + i * 6}px` }}
-                        onClick={() => setLevel(level === l.value ? null : l.value)}
-                      />
+                {narrowPickers ? (
+                  <select
+                    className={styles.input}
+                    aria-labelledby="levelLabel"
+                    value={level ?? ""}
+                    onChange={(e) =>
+                      setLevel(e.target.value === "" ? null : (e.target.value as RiderLevel))
+                    }
+                  >
+                    <option value="">Not specified</option>
+                    {LEVELS.map((l) => (
+                      <option key={l.value} value={l.value}>
+                        {l.label}
+                      </option>
                     ))}
+                  </select>
+                ) : (
+                  <div className={styles.levelRow}>
+                    <div className={styles.levelBars} role="group" aria-labelledby="levelLabel">
+                      {LEVELS.map((l, i) => (
+                        <button
+                          key={l.value}
+                          type="button"
+                          aria-pressed={level === l.value}
+                          aria-label={l.label}
+                          title={l.label}
+                          className={styles.levelBar}
+                          data-level={l.value}
+                          data-filled={level === l.value}
+                          style={{ height: `${10 + i * 6}px` }}
+                          onClick={() => setLevel(level === l.value ? null : l.value)}
+                        />
+                      ))}
+                    </div>
+                    <span className={styles.levelName} data-level={level ?? undefined}>
+                      {level ? (
+                        <>
+                          {(() => {
+                            const LevelIcon = LEVEL_ICON[level];
+                            return <LevelIcon aria-hidden="true" size={16} />;
+                          })()}
+                          {LEVEL_LABEL[level]}
+                        </>
+                      ) : (
+                        "Not specified"
+                      )}
+                    </span>
                   </div>
-                  <span className={styles.levelName} data-level={level ?? undefined}>
-                    {level ? (
-                      <>
-                        {(() => {
-                          const LevelIcon = LEVEL_ICON[level];
-                          return <LevelIcon aria-hidden="true" size={16} />;
-                        })()}
-                        {LEVEL_LABEL[level]}
-                      </>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </span>
-                </div>
+                )}
               </div>
 
               {/* Distance/climb, near the difficulty picker above — auto-filled from whatever
@@ -1824,7 +1870,7 @@ export function EventCreatePage() {
                   any time — a route doesn't always carry real elevation, and this is the
                   fallback for that ("track length + climb shown on cards near difficulty,
                   editable at create if missing," asked for directly). */}
-              <div className={styles.fieldRow}>
+              <div className={styles.metricsRow}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel} htmlFor="distanceKm">
                     <Ruler aria-hidden="true" />
@@ -2002,27 +2048,39 @@ export function EventCreatePage() {
                   <Radio aria-hidden="true" />
                   Visibility
                 </legend>
-                <div className={styles.comms}>
-                  <button
-                    type="button"
-                    className={styles.commsOption}
-                    data-active={visibility === "private"}
-                    onClick={() => setVisibility("private")}
+                {narrowPickers ? (
+                  <select
+                    className={styles.input}
+                    aria-label="Visibility"
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value as "public" | "private")}
                   >
-                    <Lock aria-hidden="true" />
-                    Private
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.commsOption}
-                    data-tone="broadcast"
-                    data-active={visibility === "public"}
-                    onClick={() => setVisibility("public")}
-                  >
-                    <Radio aria-hidden="true" />
-                    Public
-                  </button>
-                </div>
+                    <option value="private">Private</option>
+                    <option value="public">Public</option>
+                  </select>
+                ) : (
+                  <div className={styles.comms}>
+                    <button
+                      type="button"
+                      className={styles.commsOption}
+                      data-active={visibility === "private"}
+                      onClick={() => setVisibility("private")}
+                    >
+                      <Lock aria-hidden="true" />
+                      Private
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.commsOption}
+                      data-tone="broadcast"
+                      data-active={visibility === "public"}
+                      onClick={() => setVisibility("public")}
+                    >
+                      <Radio aria-hidden="true" />
+                      Public
+                    </button>
+                  </div>
+                )}
                 <label className={styles.switchRow}>
                   <input
                     type="checkbox"

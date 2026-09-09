@@ -324,6 +324,23 @@ export function EventsListPage() {
     };
   }, [myRides, q, favoritesOnly, sortBy]);
 
+  // The See-All view is what the chip row's controls glyph opens, so it carries the SAME
+  // bucket chips as the home view and shares their state — tapping "filter" and finding no
+  // filters was the bug. Empty selection means "show everything", exactly as on the home row.
+  const seeAllByBucket = useMemo(() => {
+    const show = (bucket: MyRidesFilter) =>
+      myFilters.length === 0 || myFilters.includes(bucket);
+    const live = show("current") ? filteredMyRidesByBucket.live : [];
+    const upcoming = show("upcoming") ? filteredMyRidesByBucket.upcoming : [];
+    const past = show("past") ? filteredMyRidesByBucket.past : [];
+    return {
+      live,
+      upcoming,
+      past,
+      total: live.length + upcoming.length + past.length,
+    };
+  }, [filteredMyRidesByBucket, myFilters]);
+
   // Find Rides — the public list, identical for everyone, RIDE-type only (see the doc comment
   // above re: no Find Races tab). Fetched once; ALL filtering + sorting is client-side over the
   // events already loaded — see lib/find-rides-filter.ts. No status pills here — "live /
@@ -547,6 +564,19 @@ export function EventsListPage() {
               >
                 ← My Rides
               </button>
+              {/* The back button sits exactly where the "My Rides" heading was, so on a phone
+                  it reads as a title rather than a control — riders opened this view and could
+                  not see how to leave it. An explicit X on the right is the affordance they
+                  look for; both do the same thing. */}
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={() => setShowAll(false)}
+                aria-label="Close search and filters"
+                title="Close"
+              >
+                <X className={styles.iconGlyph} aria-hidden="true" />
+              </button>
             </div>
           ) : (
             <div className="section-header">
@@ -664,16 +694,46 @@ export function EventsListPage() {
                 )}
               </div>
 
-              {filteredMyRidesByBucket.total === 0 ? (
-                <p className={styles.noResults}>No rides match "{search}"</p>
+              <div className={styles.filterChipGroup}>
+                {MY_RIDES_FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    className={styles.filterChip}
+                    data-on={myFilters.includes(f.value)}
+                    aria-pressed={myFilters.includes(f.value)}
+                    onClick={() => toggleMyFilter(f.value)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+                {(myFilters.length > 0 || favoritesOnly || q !== "") && (
+                  <button
+                    type="button"
+                    className={styles.clearFiltersBtn}
+                    onClick={() => {
+                      setMyFilters([]);
+                      setFavoritesOnly(false);
+                      setSearch("");
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {seeAllByBucket.total === 0 ? (
+                <p className={styles.noResults}>
+                  {q ? `No rides match "${search}"` : "No rides match those filters."}
+                </p>
               ) : (
-                <div className={`stack ${styles.list}`}>
-                  {filteredMyRidesByBucket.live.length > 0 && (
+                <div className={styles.list}>
+                  {seeAllByBucket.live.length > 0 && (
                     <>
                       <div className={styles.sectionLabel} data-tone="live">
                         Live now
                       </div>
-                      {filteredMyRidesByBucket.live.map((event) => (
+                      {seeAllByBucket.live.map((event) => (
                         <EventCard
                           key={event.id}
                           event={event}
@@ -683,10 +743,10 @@ export function EventsListPage() {
                       ))}
                     </>
                   )}
-                  {filteredMyRidesByBucket.upcoming.length > 0 && (
+                  {seeAllByBucket.upcoming.length > 0 && (
                     <>
                       <div className={styles.sectionLabel}>Upcoming</div>
-                      {filteredMyRidesByBucket.upcoming.map((event) => (
+                      {seeAllByBucket.upcoming.map((event) => (
                         <EventCard
                           key={event.id}
                           event={event}
@@ -696,10 +756,10 @@ export function EventsListPage() {
                       ))}
                     </>
                   )}
-                  {filteredMyRidesByBucket.past.length > 0 && (
+                  {seeAllByBucket.past.length > 0 && (
                     <>
                       <div className={styles.sectionLabel}>Past</div>
-                      {filteredMyRidesByBucket.past.map((event) => (
+                      {seeAllByBucket.past.map((event) => (
                         <EventCard
                           key={event.id}
                           event={event}
@@ -734,14 +794,15 @@ export function EventsListPage() {
                   ))}
                 </div>
                 {/* The reference puts a controls glyph at the end of the chip row. It opens the
-                    search / sort / favourites toolbar, which already exists as the See-All
-                    view — rather than inventing a second, parallel filter surface. */}
+                    See-All view — search / sort / favourites PLUS these same bucket chips,
+                    which the See-All view shares state with — rather than inventing a second,
+                    parallel filter surface. */}
                 <button
                   type="button"
                   className={styles.filterChipIcon}
                   onClick={() => setShowAll(true)}
-                  aria-label="Search and sort rides"
-                  title="Search and sort"
+                  aria-label="Search, filter and sort rides"
+                  title="Search, filter and sort"
                 >
                   <SlidersHorizontal width={16} height={16} aria-hidden="true" />
                 </button>

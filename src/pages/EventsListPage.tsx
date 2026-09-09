@@ -39,7 +39,9 @@
 import {
   ArrowUpDown,
   Bike,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Compass,
   Heart,
   Plus,
@@ -54,7 +56,13 @@ import { EventCard } from "../app/EventCard";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
-import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import {
+  COUNTRIES,
+  detectDefaultCountryCode,
+  flagEmoji,
+  orderedCountries,
+  searchCountries,
+} from "../lib/countries";
 import {
   activeFilterCount,
   applyFindRidesCriteria,
@@ -350,9 +358,57 @@ export function EventsListPage() {
   // updates. After this runs, the picker is the rider's alone.
   useEffect(() => {
     if (countrySeeded) return;
+    // Wait for auth to settle. `profile` is undefined while status is "loading", so seeding
+    // then would fall back to detectDefaultCountryCode() — the BROWSER LOCALE — and an
+    // Israeli rider on an en-US phone would be seeded to US and shown an empty list with no
+    // clue why. Signed-out is a real answer (no profile is coming), so the guess stands there.
+    if (status === "loading") return;
+    if (status === "signed-in" && !profile) return;
     setFindCountry(defaultCountry);
     setCountrySeeded(true);
-  }, [countrySeeded, defaultCountry]);
+  }, [countrySeeded, defaultCountry, status, profile]);
+
+  // The country picker is its own sheet rather than a <select>. The native popup renders all
+  // twenty countries as an OS list that runs past the bottom of a phone viewport, which put
+  // Sweden — 18th once the rider's own country is pinned first — permanently out of reach.
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
+
+  const countryOptions = useMemo(
+    () => searchCountries(orderedCountries(defaultCountry), countryQuery),
+    [countryQuery, defaultCountry],
+  );
+
+  function countryLabel(code: string | null): string {
+    if (!code) return "All countries";
+    return `${flagEmoji(code)} ${COUNTRIES.find((c) => c.code === code)?.name ?? code}`;
+  }
+
+  function chooseCountry(code: string | null) {
+    setFindCountry(code);
+    setCountryPickerOpen(false);
+    setCountryQuery("");
+  }
+
+  function closeCountryPicker() {
+    setCountryPickerOpen(false);
+    setCountryQuery("");
+  }
+
+  // Escape closes it, matching every other dialog in the app.
+  useEffect(() => {
+    if (!countryPickerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      // The two setters are inlined rather than calling closeCountryPicker: that function is
+      // rebuilt every render, so depending on it would tear down and re-bind this listener on
+      // each one. The setters are stable.
+      if (e.key !== "Escape") return;
+      setCountryPickerOpen(false);
+      setCountryQuery("");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [countryPickerOpen]);
 
   const findCriteria = useMemo(
     () => ({
@@ -947,24 +1003,19 @@ export function EventsListPage() {
             <div className={`stack ${styles.sheetBody}`}>
               <div className={styles.sheetGroup}>
                 <span className={styles.sheetGroupLabel}>Country</span>
-                {/* First, and a select rather than chips: it is the widest cut on the list —
-                    every other filter here narrows within whatever country is chosen — and
-                    twenty countries is far too many to lay out as chips. "All countries" is
-                    the deliberate escape hatch for a rider travelling or planning a trip.
-                    Ordered with the rider's own country first (orderedCountries). */}
-                <select
-                  className={styles.sheetSelect}
-                  value={findCountry ?? ""}
-                  onChange={(e) => setFindCountry(e.target.value || null)}
-                  aria-label="Country"
+                {/* Opens a sheet rather than a native dropdown — see countryPickerOpen. It is
+                    the widest cut on the list (every other filter narrows within the chosen
+                    country) and twenty countries is far too many to lay out as chips. */}
+                <button
+                  type="button"
+                  className={styles.countryTrigger}
+                  onClick={() => setCountryPickerOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={countryPickerOpen}
                 >
-                  <option value="">All countries</option>
-                  {orderedCountries(defaultCountry).map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {flagEmoji(c.code)} {c.name}
-                    </option>
-                  ))}
-                </select>
+                  <span>{countryLabel(findCountry)}</span>
+                  <ChevronDown width={18} height={18} aria-hidden="true" />
+                </button>
               </div>
 
               <div className={styles.sheetGroup}>
@@ -1070,6 +1121,91 @@ export function EventsListPage() {
               ))}
             </div>
           </div>
+
+          {/* Country picker. Its own overlay + sheet above the filter sheet (which stays open
+              underneath, so dismissing this returns the rider exactly where they were).
+              The SHEET is a flex column with a fixed max-height and the LIST is the only
+              scrolling part — that is what guarantees the header and search stay put and the
+              last country is always reachable, which the native <select> could not do. */}
+          {countryPickerOpen && (
+            <>
+              <button
+                type="button"
+                className={styles.pickerOverlay}
+                onClick={closeCountryPicker}
+                aria-label="Close country picker"
+                tabIndex={-1}
+              />
+              <div
+                className={styles.pickerSheet}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Choose a country"
+              >
+                <div className={styles.pickerHeader}>
+                  <h2 className={styles.pickerTitle}>Country</h2>
+                  <button
+                    type="button"
+                    className="button button--quiet"
+                    onClick={closeCountryPicker}
+                    aria-label="Close country picker"
+                  >
+                    <X width={18} height={18} aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className={styles.pickerSearchRow}>
+                  <Search width={16} height={16} aria-hidden="true" />
+                  <input
+                    className={styles.pickerSearch}
+                    type="search"
+                    placeholder="Search countries…"
+                    value={countryQuery}
+                    onChange={(e) => setCountryQuery(e.target.value)}
+                    aria-label="Search countries"
+                  />
+                </div>
+
+                <div className={styles.pickerList}>
+                  {/* Deliberately outside the search filter: "All countries" is an escape
+                      hatch, not a country, and it must stay reachable while typing. */}
+                  <button
+                    type="button"
+                    className={styles.pickerRow}
+                    data-selected={findCountry === null}
+                    onClick={() => chooseCountry(null)}
+                  >
+                    <span className={styles.pickerRowLabel}>All countries</span>
+                    {findCountry === null && <Check width={18} height={18} aria-hidden="true" />}
+                  </button>
+
+                  {countryOptions.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      className={styles.pickerRow}
+                      data-selected={findCountry === c.code}
+                      onClick={() => chooseCountry(c.code)}
+                    >
+                      <span className={styles.pickerRowLabel}>
+                        {flagEmoji(c.code)} {c.name}
+                      </span>
+                      {c.code === defaultCountry && (
+                        <span className={styles.pickerTag}>Your country</span>
+                      )}
+                      {findCountry === c.code && (
+                        <Check width={18} height={18} aria-hidden="true" />
+                      )}
+                    </button>
+                  ))}
+
+                  {countryOptions.length === 0 && (
+                    <p className={styles.pickerEmpty}>No country matches “{countryQuery}”.</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>

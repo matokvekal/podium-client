@@ -90,6 +90,26 @@ export function orderedCountries(firstCode: string): Country[] {
   return [first, ...alphabetical.filter((country) => country.code !== firstCode)];
 }
 
+/**
+ * Narrow a country list by what the rider typed, matching NAME or CODE.
+ *
+ * Both, because a two-letter code is what a rider who knows them will type ("SE") while the
+ * name is what everyone else types ("swe"), and neither alone finds the other. An empty or
+ * whitespace-only query returns the list untouched rather than nothing.
+ *
+ * Lives here rather than inline in the picker so the ordering and the searching that produce
+ * the visible option list are one testable pair — a country the search cannot reach is a
+ * country the rider cannot pick.
+ */
+export function searchCountries(countries: Country[], query: string): Country[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return countries;
+  return countries.filter(
+    (country) =>
+      country.name.toLowerCase().includes(q) || country.code.toLowerCase().includes(q),
+  );
+}
+
 /** "IL" -> "🇮🇱". Regional indicator symbols: each letter maps to U+1F1E6 + (letter - 'A'). */
 export function flagEmoji(countryCode: string): string {
   return [...countryCode.toUpperCase()]

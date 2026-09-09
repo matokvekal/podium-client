@@ -147,7 +147,7 @@ import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
-import { detectDefaultCountryCode } from "../lib/countries";
+import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
 import { effectiveLimits } from "../lib/entitlements";
 import {
   DESCRIPTION_COUNTER_VISIBLE_FROM,
@@ -199,6 +199,10 @@ interface ExistingEvent {
   area?: string | null;
   /** Coarse region key (sql/030-country.sql), or null. Prefills the Area dropdown in edit. */
   region?: string | null;
+  /** The ride's country, ISO 3166-1 alpha-2 (sql/030-country.sql). Prefills the Country
+   *  dropdown in edit — without it an edit would silently re-stamp the ride with the
+   *  organiser's OWN country and quietly move a Swedish ride back to Israel. */
+  country?: string | null;
   description: string | null;
   requiresApproval: boolean;
   showParticipants: boolean;
@@ -435,6 +439,20 @@ export function EventCreatePage() {
   // stops that suggestion overwriting a choice the organiser made.
   const [region, setRegion] = useState<string>("");
   const [regionEdited, setRegionEdited] = useState(false);
+  /**
+   * The country the ride is IN — which is not always the country the organiser lives in.
+   *
+   * Until now this was never asked: create stamped events.country from `profile.country`
+   * silently and edit never sent it at all, so an organiser running a ride abroad had no way
+   * to say so and no way to correct it afterwards. Find Rides filters on this column, so a
+   * wrong stamp is what puts a Swedish ride in front of every Israeli rider.
+   *
+   * Seeded from the organiser's own country — right nearly every time — and overridable.
+   */
+  const [country, setCountry] = useState<string>(detectDefaultCountryCode());
+  // Same "never clobber a value that is already settled" rule as regionEdited/startsAtEdited:
+  // set once the organiser picks a country, or once an edit loads the ride's stored one.
+  const [countrySettled, setCountrySettled] = useState(false);
   const [description, setDescription] = useState("");
   // Create: stays null → the event falls back to the organizer's own profile cover (see
   // app/useOwnerCover.ts). Edit: an event that already has a custom cover keeps it (the effect
@@ -572,6 +590,13 @@ export function EventCreatePage() {
           setRegion(found.region);
           setRegionEdited(true);
         }
+        // The ride's stored country, not the organiser's. An older event (or a server without
+        // sql/030) sends nothing, and the profile seed below stands.
+        if (found.country) setCountry(found.country);
+        // Settled either way: on an edit the organiser's own country must never overwrite what
+        // the ride already says, and for a pre-030 event with no country the safest thing is to
+        // leave the locale guess alone rather than re-stamp it from whoever is editing.
+        setCountrySettled(true);
         setDescription(found.description ?? "");
         setVisibility(found.visibility);
         if (found.startsAt) setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
@@ -724,6 +749,16 @@ export function EventCreatePage() {
   // The organizer's own per-event rider cap — shown next to "Expected riders" so they know the
   // ceiling, but it is never sent to viewers (it is not the "/ N" on the ride page).
   const planMaxParticipants = effectiveLimits(profile).maxParticipantsPerEvent;
+  // The organiser's own country, once the profile resolves — a better default than the browser
+  // locale, which is only a guess about the device. One-shot: a rider who has picked Sweden for
+  // this ride keeps Sweden, and an edit keeps whatever the ride already said.
+  useEffect(() => {
+    if (countrySettled) return;
+    if (!profile?.country) return;
+    setCountry(profile.country);
+    setCountrySettled(true);
+  }, [countrySettled, profile?.country]);
+
   const hasRidesUsage = weekRides != null || profile?.usage != null;
   const ridesLimitReached = !isEditing && hasRidesUsage && ridesUsed >= ridesMax;
   const weeklyLimitMessage = `You've reached your ${ridesMax} rides this week — it frees up 7 days after your earliest one.`;
@@ -736,7 +771,10 @@ export function EventCreatePage() {
     if (!climbEdited) setClimbMInput(route.elevationM != null ? String(route.elevationM) : "");
     // Same rule for the Area dropdown: classify the route's start point into a region and
     // pre-select it, unless the organiser has already chosen one.
-    if (!regionEdited) {
+    // IL_REGIONS and classifyRegion cover Israel only, so this guess is meaningless for a ride
+    // anywhere else — a Swedish route's start point would either match nothing or, worse, land
+    // in a bounding box it has no business in.
+    if (!regionEdited && country === "IL") {
       const start = route.points?.[0];
       const guess = start ? classifyRegion(start[0], start[1]) : null;
       if (guess) setRegion(guess);
@@ -1120,8 +1158,14 @@ export function EventCreatePage() {
             location: location || undefined,
             area: area || undefined,
             // Coarse region key (sql/030-country.sql) — the "Area" dropdown. Sent so an edit
-            // that changes it reaches every viewer and the "Browse tracks" filter.
-            region: region || null,
+            // that changes it reaches every viewer and the "Browse tracks" filter. Forced to
+            // null outside Israel: IL_REGIONS is Israel-only, so a region left over from
+            // before the country was changed would be a key no filter can ever match.
+            region: country === "IL" ? region || null : null,
+            // The ride's country. updateEventSchema has always accepted this and the service
+            // has always written it — the client simply never sent it, which is why a ride
+            // stamped with the wrong country could not be corrected without SQL.
+            country,
             // null, never undefined, when the organizer has emptied the field — see the helper.
             description: descriptionForRequest(description),
             visibility,
@@ -1177,10 +1221,13 @@ export function EventCreatePage() {
           startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
           location: location || undefined,
           area: area || undefined,
-          // The ride's coarse region key + the organiser's country (sql/030-country.sql) —
-          // stamps events.region / events.country, which the "Browse tracks" picker filters on.
-          ...(region ? { region } : {}),
-          country: profile?.country ?? detectDefaultCountryCode(),
+          // The ride's coarse region key + country (sql/030-country.sql) — stamps
+          // events.region / events.country, which BOTH the "Browse tracks" picker and the Find
+          // Rides list filter on. Country now comes from the form's own dropdown rather than
+          // being read off the profile here: a ride abroad is stamped where the ride is, not
+          // where the organiser lives. Region only applies in Israel (IL_REGIONS).
+          ...(country === "IL" && region ? { region } : {}),
+          country,
           // Same shape as the edit request above, so one schema describes both.
           description: descriptionForRequest(description),
           requiresApproval,
@@ -1633,29 +1680,62 @@ export function EventCreatePage() {
               </div>
 
               <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="area">
+                <label className={styles.fieldLabel} htmlFor="country">
                   <MapPin aria-hidden="true" />
-                  Area
+                  Country
                 </label>
                 <select
-                  id="area"
+                  id="country"
                   className={styles.input}
-                  value={region}
+                  value={country}
                   onChange={(e) => {
-                    setRegion(e.target.value);
-                    setRegionEdited(true);
-                    const label = IL_REGIONS.find((r) => r.key === e.target.value)?.he ?? "";
-                    setArea(label);
+                    setCountry(e.target.value);
+                    setCountrySettled(true);
+                    // Israeli regions cannot describe a ride anywhere else — drop the area
+                    // rather than carry a stale key (and its Hebrew label) into another country.
+                    if (e.target.value !== "IL") {
+                      setRegion("");
+                      setArea("");
+                    }
                   }}
                 >
-                  <option value="">Select an area</option>
-                  {IL_REGIONS.map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {r.he}
+                  {orderedCountries(country).map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {flagEmoji(c.code)} {c.name}
                     </option>
                   ))}
                 </select>
+                <p className={styles.hint}>Riders searching this country will find your ride.</p>
               </div>
+
+              {/* Area is Israel-only — src/lib/regions.ts holds Israeli regions and nothing
+                  else — so it is hidden rather than shown empty for a ride abroad. */}
+              {country === "IL" && (
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="area">
+                    <MapPin aria-hidden="true" />
+                    Area
+                  </label>
+                  <select
+                    id="area"
+                    className={styles.input}
+                    value={region}
+                    onChange={(e) => {
+                      setRegion(e.target.value);
+                      setRegionEdited(true);
+                      const label = IL_REGIONS.find((r) => r.key === e.target.value)?.he ?? "";
+                      setArea(label);
+                    }}
+                  >
+                    <option value="">Select an area</option>
+                    {IL_REGIONS.map((r) => (
+                      <option key={r.key} value={r.key}>
+                        {r.he}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className={styles.field}>
                 <label className={styles.fieldLabel} htmlFor="description">

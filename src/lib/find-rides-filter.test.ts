@@ -114,6 +114,37 @@ describe("activeFilterCount", () => {
     expect(activeFilterCount(crit({ when: "upcoming" }))).toBe(0);
     expect(activeFilterCount(crit({ when: "past" }))).toBe(1);
   });
+
+  it("does not badge the rider's own country, but does badge any other choice", () => {
+    // The screen opens on the rider's own country, so it is the landing state and not a filter.
+    expect(activeFilterCount(crit({ country: "IL" }), "IL")).toBe(0);
+    // Another country, and "All countries", are both deliberate changes.
+    expect(activeFilterCount(crit({ country: "SE" }), "IL")).toBe(1);
+    expect(activeFilterCount(crit({ country: null }), "IL")).toBe(1);
+  });
+});
+
+describe("country", () => {
+  const israeli = ride({ name: "Golan Climb", country: "IL" });
+  const swedish = ride({ name: "Malmo Loop", country: "SE" });
+  const unstamped = ride({ name: "Nowhere", country: null });
+
+  it("shows only the chosen country — the bug this filter exists for", () => {
+    const out = applyFindRidesCriteria([israeli, swedish], crit({ country: "IL" }), NOW);
+    expect(out.map((r) => r.name)).toEqual(["Golan Climb"]);
+  });
+
+  it("shows every country when the rider picks All countries", () => {
+    const out = applyFindRidesCriteria([israeli, swedish], crit({ country: null }), NOW);
+    expect(out.map((r) => r.name)).toEqual(["Golan Climb", "Malmo Loop"]);
+  });
+
+  it("hides a ride with no country from a country-scoped list, and shows it under All", () => {
+    // Unreachable in practice — sql/030 backfilled every row and create always stamps one —
+    // but "we do not know where this is" must not read as "it is here".
+    expect(applyFindRidesCriteria([unstamped], crit({ country: "IL" }), NOW)).toHaveLength(0);
+    expect(applyFindRidesCriteria([unstamped], crit({ country: null }), NOW)).toHaveLength(1);
+  });
 });
 
 describe("applyFindRidesCriteria", () => {

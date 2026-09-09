@@ -66,7 +66,7 @@ interface EventsState {
    * Find Rides. `bucket` picks which half of the public list to ask the server for and
    * defaults to "upcoming" — see the doc comment on the implementation.
    */
-  loadOtherRides(bucket?: PublicBucket): Promise<void>;
+  loadOtherRides(bucket?: PublicBucket, country?: string | null): Promise<void>;
   toggleFavoriteRide(id: string): Promise<void>;
   /** Files one authoritative server event — a create response, or the event returned by a
    *  status transition — into My Rides and the IndexedDB cache in one step, so the two never
@@ -120,8 +120,12 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     }
   },
 
-  async loadOtherRides(bucket: PublicBucket = "upcoming") {
+  async loadOtherRides(bucket: PublicBucket = "upcoming", country: string | null = null) {
     const requestId = ++otherRidesRequestId;
+    // Keyed by bucket alone, deliberately — NOT by country. Switching country repaints the
+    // previous country's rows for one frame, and the in-memory country check in
+    // lib/find-rides-filter.ts drops them before they are ever drawn under the new heading.
+    // A per-country cache slot would multiply the stored lists by twenty for that one frame.
     const cacheSlot = BUCKET_CACHE[bucket];
 
     const cached = await getCachedEvents(cacheSlot);
@@ -144,6 +148,11 @@ export const useEventsStore = create<EventsState>((set, get) => ({
         sort: bucket === "finished" ? "latest" : "soonest",
         limit: "100",
       });
+      // Country is filtered SERVER-side (events.country, sql/030 — the $12 clause in
+      // selectPublicEvents), not just in memory. With limit=100 above, an in-memory-only filter
+      // would silently drop every ride past the hundredth before the rider's country was ever
+      // considered. Omitted entirely for "All countries".
+      if (country) params.set("country", country);
       const result = await apiRequest<EventSummary[]>(`/events/public?${params.toString()}`, {
         anonymous: true,
       });

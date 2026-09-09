@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COUNTRIES, detectDefaultCountryCode, deviceLocaleRegion, isKnownCountryCode, orderedCountries, searchCountries } from "./countries";
+import {
+  COUNTRIES,
+  detectDefaultCountryCode,
+  deviceLocaleRegion,
+  deviceTimeZoneRegion,
+  isKnownCountryCode,
+  orderedCountries,
+  searchCountries,
+} from "./countries";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -8,6 +16,30 @@ afterEach(() => {
 function withLanguage(language: unknown) {
   vi.stubGlobal("navigator", { language });
 }
+
+/** The real Intl, captured before any stubbing so the stub below can keep the rest of it. */
+const REAL_INTL = Intl;
+
+/**
+ * Stub the device clock's zone. Every detectDefaultCountryCode test has to set this, because
+ * the time zone now OUTRANKS the locale — left unstubbed these tests would read the zone of
+ * whatever machine happens to run them and pass or fail by geography.
+ *
+ * `Locale` is carried over explicitly: Intl's members are non-enumerable, so a bare spread
+ * produces an object without it, and deviceLocaleRegion's `new Intl.Locale(...)` would then
+ * throw and report "no region" for every locale — quietly turning the fallback tests green
+ * for the wrong reason.
+ */
+function withTimeZone(timeZone: string | undefined) {
+  vi.stubGlobal("Intl", {
+    ...REAL_INTL,
+    Locale: REAL_INTL.Locale,
+    DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone }) }),
+  });
+}
+
+/** A zone deliberately absent from the table, to force the locale fallback path. */
+const UNMAPPED_ZONE = "Antarctica/Troll";
 
 describe("isKnownCountryCode", () => {
   it("accepts codes in the list, rejects everything else", () => {
@@ -50,8 +82,59 @@ describe("deviceLocaleRegion", () => {
   });
 });
 
+describe("deviceTimeZoneRegion", () => {
+  it("maps the zones of countries we support", () => {
+    withTimeZone("Asia/Jerusalem");
+    expect(deviceTimeZoneRegion()).toBe("IL");
+    withTimeZone("Europe/Stockholm");
+    expect(deviceTimeZoneRegion()).toBe("SE");
+    withTimeZone("America/New_York");
+    expect(deviceTimeZoneRegion()).toBe("US");
+    withTimeZone("Europe/London");
+    expect(deviceTimeZoneRegion()).toBe("GB");
+  });
+
+  it("treats every Australian zone as Australia", () => {
+    withTimeZone("Australia/Sydney");
+    expect(deviceTimeZoneRegion()).toBe("AU");
+    withTimeZone("Australia/Perth");
+    expect(deviceTimeZoneRegion()).toBe("AU");
+  });
+
+  it("returns null for a zone we do not map, or no zone at all", () => {
+    withTimeZone(UNMAPPED_ZONE);
+    expect(deviceTimeZoneRegion()).toBeNull();
+    withTimeZone("Asia/Tokyo"); // real place, country not in COUNTRIES
+    expect(deviceTimeZoneRegion()).toBeNull();
+    withTimeZone(undefined);
+    expect(deviceTimeZoneRegion()).toBeNull();
+  });
+});
+
 describe("detectDefaultCountryCode", () => {
-  it("uses the locale region when it is a country we know", () => {
+  // THE bug this ordering exists for. A rider standing in Tel Aviv whose phone menus are in
+  // English reports navigator.language "en-US". Reading that as the United States defaulted
+  // their Find Rides filter to US AND stamped every ride they created as a US ride.
+  it("believes the clock over the menu language for an English phone in Israel", () => {
+    withTimeZone("Asia/Jerusalem");
+    withLanguage("en-US");
+    expect(detectDefaultCountryCode()).toBe("IL");
+  });
+
+  it("still gets a Hebrew phone in Israel right — the two signals agree", () => {
+    withTimeZone("Asia/Jerusalem");
+    withLanguage("he-IL");
+    expect(detectDefaultCountryCode()).toBe("IL");
+  });
+
+  it("does not strand a real traveller: an Israeli phone in Sweden reads Sweden", () => {
+    withTimeZone("Europe/Stockholm");
+    withLanguage("he-IL");
+    expect(detectDefaultCountryCode()).toBe("SE");
+  });
+
+  it("uses the locale region when the zone is one we do not map", () => {
+    withTimeZone(UNMAPPED_ZONE);
     withLanguage("he-IL");
     expect(detectDefaultCountryCode()).toBe("IL");
     withLanguage("en-US");
@@ -60,7 +143,8 @@ describe("detectDefaultCountryCode", () => {
     expect(detectDefaultCountryCode()).toBe("GB");
   });
 
-  it("falls back to Israel for an unknown or missing region", () => {
+  it("falls back to Israel when neither signal gives a country we know", () => {
+    withTimeZone(UNMAPPED_ZONE);
     withLanguage("en-ZZ"); // valid shape, not in our list
     expect(detectDefaultCountryCode()).toBe("IL");
     withLanguage("ja-JP"); // real country, just not in the short list

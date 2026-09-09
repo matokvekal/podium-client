@@ -316,8 +316,10 @@
   background: var(--surface-raised);
 }
 
-/* The home stream scrolls with the page — unlike .list below, which is the See-All view's
-   deliberately fixed-height searchable box sized for the old, much shorter card. */
+/* Both My Rides streams scroll with the page. .list used to be a fixed-height (340px) box,
+   sized for the old compact tile: with today's full EventCards that box ended well short of
+   the viewport, leaving the bottom of the screen permanently blank under a list that scrolled
+   inside itself. */
 .homeList {
   display: flex;
   flex-direction: column;
@@ -399,9 +401,9 @@
    EventCard rows (104px card + the .list gap), matching how this looked before more mock
    rides were added. */
 .list {
-  height: 340px;
-  overflow-y: auto;
-  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .list > *,
@@ -534,22 +536,180 @@
   gap: 8px;
 }
 
-/* The Country picker in the Find Rides filter sheet. Same shape as the Browse-tracks sheet's
-   .panelSelect (app/TrackGallerySheet.module.css) so the two filter surfaces match. */
-.sheetSelect {
+/* The country control in the Find Rides filter sheet. Looks like the Browse-tracks sheet's
+   .panelSelect so the two filter surfaces match, but it is a BUTTON that opens .pickerSheet
+   below — a native <select> renders its twenty options as an OS popup that runs past the
+   bottom of a phone viewport, which made the last countries (Sweden among them) unreachable. */
+.countryTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   width: 100%;
   min-height: var(--tap-target);
   padding: 0 var(--space-3);
   font: inherit;
+  text-align: start;
   color: var(--text);
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  cursor: pointer;
 }
 
-.sheetSelect:focus {
+.countryTrigger:focus-visible {
   border-color: var(--accent);
   outline: none;
+}
+
+/* Above .sheetOverlay (1000) / .sheet (1001): the filter sheet stays open underneath, so
+   dismissing the picker puts the rider back exactly where they were. */
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  padding: 0;
+  border: 0;
+  background: rgb(5 11 22 / 0.55);
+  cursor: default;
+}
+
+/* A flex COLUMN with a bounded height. The sheet itself never scrolls — only .pickerList
+   does — which is what keeps the header and the search box pinned and guarantees the final
+   row can always be scrolled to. 68vh leaves the sheet clearly inside the viewport on a
+   short phone; dvh where supported so an iOS URL bar cannot push the bottom off-screen. */
+.pickerSheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1003;
+  display: flex;
+  flex-direction: column;
+  max-height: 68vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+}
+
+@supports (max-height: 68dvh) {
+  .pickerSheet {
+    max-height: 68dvh;
+  }
+}
+
+/* Desktop: a compact centred panel rather than a full-width bottom sheet, still bounded. */
+@media (min-width: 640px) {
+  .pickerSheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    width: min(420px, calc(100vw - 2 * var(--space-4)));
+    max-height: min(70vh, 560px);
+    transform: translate(-50%, -50%);
+    border-radius: 16px;
+  }
+}
+
+.pickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+/* No font-size: the sibling Filter / Sort sheets in this file use a bare <h2>, and the
+   picker is the same kind of surface. */
+.pickerTitle {
+  margin: 0;
+}
+
+.pickerSearchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.pickerSearch {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-target);
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+/* The only scrolling element. min-height:0 is load-bearing — without it a flex child refuses
+   to shrink below its content and the list grows past the sheet instead of scrolling inside
+   it, which is exactly the bug being fixed. */
+.pickerList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  text-align: start;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.pickerRow:last-child {
+  border-bottom: 0;
+}
+
+.pickerRow[data-selected="true"] {
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  background: var(--surface-sunken);
+}
+
+.pickerRowLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.pickerTag {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.pickerRow[data-selected="true"] .pickerTag {
+  background: var(--surface);
+}
+
+.pickerEmpty {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--text-muted);
 }
 
 .sheetChips .filterChip {

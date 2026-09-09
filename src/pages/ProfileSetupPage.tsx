@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
 import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import { postLoginDestination } from "../lib/post-login-destination";
 import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useCountryStore } from "../store/countryStore";
 import { useUserModeStore } from "../store/userModeStore";
@@ -72,7 +73,7 @@ export function ProfileSetupPage() {
       // countryStore is reconciled from the server response by AuthContext now — nothing to
       // write here.
       setUserMode(organizes ? "organizer" : "rider");
-      navigate(from && from !== "/account/setup" ? from : "/", { replace: true });
+      navigate(postLoginDestination(from), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save. Try again.");
     } finally {

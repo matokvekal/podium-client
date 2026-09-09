@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  COUNTRIES,
-  detectDefaultCountryCode,
-  deviceLocaleRegion,
-  isKnownCountryCode,
-  orderedCountries,
-} from "./countries";
+import { COUNTRIES, detectDefaultCountryCode, deviceLocaleRegion, isKnownCountryCode, orderedCountries, searchCountries } from "./countries";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -102,5 +96,37 @@ describe("orderedCountries", () => {
     expect(list).toHaveLength(COUNTRIES.length);
     const names = list.map((c) => c.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+  });
+});
+
+describe("searchCountries", () => {
+  // The bug this guards: Sweden is 18th of 20 once the rider's own country is pinned first,
+  // and in the old native <select> that put it past the bottom of a phone viewport. The picker
+  // that replaced it is only as good as its search, so the reachability of SE is pinned here.
+  const israeliList = orderedCountries("IL");
+
+  it("returns the whole list for an empty or whitespace query", () => {
+    expect(searchCountries(israeliList, "")).toHaveLength(COUNTRIES.length);
+    expect(searchCountries(israeliList, "   ")).toHaveLength(COUNTRIES.length);
+  });
+
+  it("finds Sweden by name, case-insensitively and part-way through", () => {
+    expect(searchCountries(israeliList, "Sweden").map((c) => c.code)).toEqual(["SE"]);
+    expect(searchCountries(israeliList, "swe").map((c) => c.code)).toEqual(["SE"]);
+    expect(searchCountries(israeliList, "wed").map((c) => c.code)).toEqual(["SE"]);
+  });
+
+  it("finds Sweden by its two-letter code, in either case", () => {
+    expect(searchCountries(israeliList, "SE").map((c) => c.code)).toEqual(["SE"]);
+    expect(searchCountries(israeliList, "se").map((c) => c.code)).toContain("SE");
+  });
+
+  it("keeps Sweden present in the unsearched list — it must be pickable without typing", () => {
+    expect(israeliList.map((c) => c.code)).toContain("SE");
+    expect(israeliList[0]?.code).toBe("IL");
+  });
+
+  it("returns nothing for a query that matches no country", () => {
+    expect(searchCountries(israeliList, "zzzz")).toEqual([]);
   });
 });

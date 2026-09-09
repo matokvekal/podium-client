@@ -232,6 +232,11 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Grid/flex items default to min-width: auto, which is the *input's* min-content width —
+     ~180px for a text box and wider still for a native datetime-local widget. On a 379px
+     phone (Galaxy A41) that pushed the Date/time and Climb fields straight out of the card's
+     right edge. Every field track below is explicitly shrinkable for the same reason. */
+  min-width: 0;
 }
 
 /* Location and start time stay side by side even on narrow phones — asked for directly, no
@@ -241,9 +246,30 @@
    datetime-local widget's hour/minute segment ("cant see the hours"). */
 .fieldRow {
   display: grid;
-  grid-template-columns: 1fr 190px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 190px);
   align-items: start;
   gap: var(--space-3);
+}
+
+/* Distance + Climb. Two number boxes want an even split, not .fieldRow's datetime-shaped
+   190px side column — that handed Climb 190px and squeezed Distance into what was left,
+   which on a narrow phone was the pair that overflowed. */
+.metricsRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* Sub-430px phones (a Galaxy A41 is 379px CSS-wide). The card has ~313px of usable width
+   there, and Date/time needs its full 190px or the native widget clips the hour segment — so
+   the space has to come out of the gaps rather than out of that column. */
+@media (max-width: 429px) {
+  .fieldRow,
+  .metricsRow,
+  .ridePlanRow {
+    gap: var(--space-2);
+  }
 }
 
 /* Ride duration + rest stops. Deliberately NOT .fieldRow: that row's 190px side column is
@@ -252,7 +278,7 @@
    needs 110px, which gives the picker room for both of its wheels. */
 .ridePlanRow {
   display: grid;
-  grid-template-columns: 1fr 110px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 110px);
   align-items: start;
   gap: var(--space-3);
 }
@@ -337,6 +363,11 @@
 .input {
   height: 42px;
   box-sizing: border-box;
+  /* Without these an <input> sizes itself from its own intrinsic width (the `size` attribute,
+     or the native datetime-local widget's fixed internal layout) and simply overflows a track
+     narrower than that. width + min-width make it follow the grid instead. */
+  width: 100%;
+  min-width: 0;
 }
 
 .input::placeholder,
@@ -514,6 +545,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* These panels are <fieldset>s, whose UA default min-inline-size is min-content — it will
+     not shrink below its widest row whatever the container says, so on a 320-340px phone the
+     Terrain row's chips carried the whole panel past the card's right edge. */
+  min-inline-size: 0;
+  min-width: 0;
   padding: var(--space-3);
   background: var(--surface-raised);
   border: 1px solid var(--border);

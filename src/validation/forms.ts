@@ -1,3 +1,5 @@
+import { DESCRIPTION_MAX_CHARS } from "../lib/event-limits";
+
 // Every form rule in the app, in one file.
 //
 // Each function answers one question — "can this form be submitted, and if not, which fields
@@ -53,7 +55,7 @@ export function validateProfileForm(values: ProfileFormValues): ValidationResult
 
 // --- create event --------------------------------------------------------------------------
 
-export type CreateEventField = "name" | "startsAt" | "route";
+export type CreateEventField = "name" | "startsAt" | "route" | "description";
 
 export interface CreateEventFormValues {
   name: string;
@@ -62,6 +64,8 @@ export interface CreateEventFormValues {
   hasRoute: boolean;
   /** Edit mode only ever requires a name — see below. */
   isEditing: boolean;
+  /** Optional everywhere; only ever checked for length. */
+  description: string;
 }
 
 /**
@@ -70,6 +74,9 @@ export interface CreateEventFormValues {
  * Editing requires only a name, on purpose: a route is never prefilled back into the edit
  * form (there is no server field to read it from), so demanding one there would trap every
  * edit behind re-picking a track the event already has.
+ *
+ * The description length rule applies to BOTH modes — the server enforces it on create and
+ * update alike, so the form must not let an edit through that a create would refuse.
  */
 export function validateCreateEventForm(
   values: CreateEventFormValues,
@@ -79,6 +86,12 @@ export function validateCreateEventForm(
   if (!values.isEditing) {
     if (!values.startsAt.trim()) errors.startsAt = "Start date and time are required.";
     if (!values.hasRoute) errors.route = "Pick a track for this ride.";
+  }
+  // The textarea's maxLength already stops typing at the cap; this catches the ways round it
+  // (paste on some browsers, autofill, a value restored from a draft) so the organizer is told
+  // here instead of by a 400. Trimmed because the server trims before it measures.
+  if (values.description.trim().length > DESCRIPTION_MAX_CHARS) {
+    errors.description = `Description must be ${DESCRIPTION_MAX_CHARS} characters or fewer.`;
   }
   return result(errors);
 }

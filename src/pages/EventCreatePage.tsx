@@ -149,6 +149,12 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { detectDefaultCountryCode } from "../lib/countries";
 import { effectiveLimits } from "../lib/entitlements";
+import {
+  DESCRIPTION_COUNTER_VISIBLE_FROM,
+  DESCRIPTION_COUNTER_WARN_FROM,
+  DESCRIPTION_MAX_CHARS,
+  descriptionForRequest,
+} from "../lib/event-limits";
 import type { EventRoute } from "../lib/event-route";
 import {
   type EventDetail,
@@ -474,6 +480,7 @@ export function EventCreatePage() {
   const [invalidName, setInvalidName] = useState(false);
   const [invalidStartsAt, setInvalidStartsAt] = useState(false);
   const [invalidRoute, setInvalidRoute] = useState(false);
+  const [invalidDescription, setInvalidDescription] = useState(false);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [copiedFrom, setCopiedFrom] = useState<EventSummary | null>(null);
@@ -1064,12 +1071,17 @@ export function EventCreatePage() {
       startsAt,
       hasRoute: copiedRoute != null,
       isEditing,
+      description,
     });
     setInvalidName(errors.name != null);
     setInvalidStartsAt(errors.startsAt != null);
     setInvalidRoute(errors.route != null);
+    setInvalidDescription(errors.description != null);
     if (!ok) {
-      setError("Fill in the highlighted fields before saving.");
+      // A too-long description is the one failure here the generic sentence cannot explain —
+      // the field is filled in, it is filled in too far, and the counter is the only other
+      // clue. Say the actual rule instead.
+      setError(errors.description ?? "Fill in the highlighted fields before saving.");
       return;
     }
 
@@ -1110,7 +1122,8 @@ export function EventCreatePage() {
             // Coarse region key (sql/030-country.sql) — the "Area" dropdown. Sent so an edit
             // that changes it reaches every viewer and the "Browse tracks" filter.
             region: region || null,
-            description: description || undefined,
+            // null, never undefined, when the organizer has emptied the field — see the helper.
+            description: descriptionForRequest(description),
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
             requiresApproval,
@@ -1168,7 +1181,8 @@ export function EventCreatePage() {
           // stamps events.region / events.country, which the "Browse tracks" picker filters on.
           ...(region ? { region } : {}),
           country: profile?.country ?? detectDefaultCountryCode(),
-          description: description || undefined,
+          // Same shape as the edit request above, so one schema describes both.
+          description: descriptionForRequest(description),
           requiresApproval,
           showParticipants: ridersListVisible,
           // Difficulty + activity type are REAL event columns (sql/010-event-profile.sql) and
@@ -1651,11 +1665,28 @@ export function EventCreatePage() {
                 <textarea
                   id="description"
                   rows={3}
-                  className={styles.textarea}
+                  className={`${styles.textarea} ${invalidDescription ? styles.inputInvalid : ""}`}
                   placeholder={'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'}
                   value={description}
+                  maxLength={DESCRIPTION_MAX_CHARS}
+                  /* Not the dominant-script detection the event page uses: this text is being
+                     typed. Re-deciding the whole field's direction on a keystroke moves the
+                     caret under the organizer's hands, so the browser's own per-paragraph
+                     "auto" — which settles on the first strong character and then stays put —
+                     is the right behaviour in an input. */
+                  dir="auto"
                   onChange={(e) => handleDescriptionChange(e.target.value)}
                 />
+                {description.length >= DESCRIPTION_COUNTER_VISIBLE_FROM && (
+                  <p
+                    className={`${styles.counter} ${
+                      description.length >= DESCRIPTION_COUNTER_WARN_FROM ? styles.counterWarn : ""
+                    }`}
+                    aria-live="polite"
+                  >
+                    {description.length} / {DESCRIPTION_MAX_CHARS}
+                  </p>
+                )}
                 {dateHint && (
                   <p className={`${styles.hint} ${styles["hint--active"]}`}>{dateHint}</p>
                 )}

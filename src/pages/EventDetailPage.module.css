@@ -1088,39 +1088,6 @@
 
 /* --- description ------------------------------------------------------------------------- */
 
-.description {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.descriptionText {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--text);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  /* Always a short preview on the page — the full text lives in the sheet behind "Read more". */
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.descriptionToggle {
-  align-self: flex-start;
-  margin-top: 2px;
-  padding: 4px 0;
-  font-size: 0.85rem;
-  font-weight: var(--weight-medium);
-  color: var(--accent-strong);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
 /* --- route preview header ----------------------------------------------------------------- */
 
 .routeHeader {

@@ -1,0 +1,78 @@
+/* Card chrome copied from EventDetailPage's .organizerCard, the section directly above this one
+   on the page, so the two read as the same kind of thing. Tokens only — no literals — so this
+   shrinks with the rest of the page under the compact display mode (tokens.css). */
+.card {
+  display: flex;
+  flex-direction: column;
+  /* Flex items default to min-width: auto ("never shrink below my content"), which lets one
+     long unbroken word push the card past the viewport instead of wrapping. Same fix, and the
+     same reason, as .stack in global.css. */
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+  /* The section label is chrome, not content: it stays in the app's own reading direction even
+     when the description below it is Hebrew. */
+  text-align: start;
+}
+
+.text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  /* The organizer's own line breaks are the structure of a ride plan ("06:00 meet / 06:30 roll
+     out") — preserved, never collapsed. */
+  white-space: pre-wrap;
+  /* A pasted Strava URL is one unbreakable token; without this it sets the card's width and the
+     page scrolls sideways on a phone. */
+  overflow-wrap: anywhere;
+  /* Follows the dir attribute set from the text itself, so Hebrew lands right and English left
+     without a second source of truth in CSS. */
+  text-align: start;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Expanded is the ABSENCE of the clamp, not a bigger one: the card grows to whatever the text
+   needs, which is what keeps it off a fixed height. */
+.text[data-expanded="true"] {
+  display: block;
+  overflow: visible;
+}
+
+.toggle {
+  align-self: flex-start;
+  /* Full tap target height without stealing vertical space from the card: the button is
+     min-height 44px but its text sits flush left with no horizontal padding. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  margin-top: calc(var(--space-2) * -1);
+  margin-bottom: calc(var(--space-2) * -1);
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}

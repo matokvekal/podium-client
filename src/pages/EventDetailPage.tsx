@@ -66,10 +66,10 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
-import { DescriptionSheet } from "../app/DescriptionSheet";
 import { ElevationProfile } from "../app/ElevationProfile";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
+import { RideDescription } from "../app/RideDescription";
 import { SafetySheet } from "../app/SafetySheet";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
@@ -107,9 +107,6 @@ import styles from "./EventDetailPage.module.css";
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
 // string) — kept as two formatters, not one, so there's no risk of the field-order bug
 // formatLocalDateTime hit (lib/time.ts's own doc comment).
-/** Longer than this and the description collapses behind a "… more" toggle, as in the mock. */
-const DESCRIPTION_CLAMP_CHARS = 140;
-
 const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
@@ -375,7 +372,6 @@ export function EventDetailPage() {
   // for "leave", the rider's own sticky bottom bar) swaps to a small message + Cancel/Confirm
   // pair for that one action.
   const [confirming, setConfirming] = useState<"live" | "finish" | "leave" | null>(null);
-  const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   // The invitation this rider arrived on, if they got here from a link or a QR — recorded by
   // JoinPage when the code resolved (store/invitedEventsStore.ts). Persisted rather than passed
@@ -1506,21 +1502,10 @@ export function EventDetailPage() {
         )}
 
         {/* --- description ------------------------------------------------------------------
-            A few clamped lines inline; when the text is longer, "Read more" opens the full
-            description in a scrollable sheet rather than pushing the rest of the page down. */}
+            Clamped to a few lines and expanded in place. Whether "Read more" is drawn at all is
+            measured from the rendered text, not guessed from its length — see RideDescription. */}
         {event.description && (
-          <div className={styles.description}>
-            <p className={styles.descriptionText}>{event.description}</p>
-            {event.description.length > DESCRIPTION_CLAMP_CHARS && (
-              <button
-                type="button"
-                className={styles.descriptionToggle}
-                onClick={() => setDescriptionSheetOpen(true)}
-              >
-                Read more
-              </button>
-            )}
-          </div>
+          <RideDescription key={event.description} text={event.description} />
         )}
 
         {resultsLoading && !results && (
@@ -2031,13 +2016,6 @@ export function EventDetailPage() {
       )}
 
       {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
-
-      {descriptionSheetOpen && event.description && (
-        <DescriptionSheet
-          text={event.description}
-          onClose={() => setDescriptionSheetOpen(false)}
-        />
-      )}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

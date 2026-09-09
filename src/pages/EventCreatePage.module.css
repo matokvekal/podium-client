@@ -112,8 +112,7 @@
   padding: var(--space-3) var(--space-4);
   color: var(--status-live-strong);
   background: color-mix(in srgb, var(--status-live) 20%, transparent);
-  border: 1px solid
-    color-mix(in srgb, var(--status-live-strong) 56%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-live-strong) 56%, transparent);
   border-radius: var(--radius-sm);
   animation: success-banner-in 180ms ease-out;
 }
@@ -302,6 +301,22 @@
 }
 
 .input,
+/* Character counter under the description. Deliberately silent until the organizer is near the
+   cap — a running count on an empty field reads as a demand for length, which is the opposite of
+   what this form wants. Limit itself is in lib/event-limits.ts, mirroring the server. */
+.counter {
+  margin: 0;
+  align-self: flex-end;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.counterWarn {
+  color: var(--status-pending);
+  font-weight: var(--weight-medium);
+}
+
 .textarea {
   width: 100%;
   padding: 10px 12px;

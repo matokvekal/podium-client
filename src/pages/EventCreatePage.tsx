@@ -891,6 +891,9 @@ export function EventCreatePage() {
     // alone, so a failed preview fetch costs a thumbnail, not the route.
     void apiRequest<{
       trackPoints?: [number, number][];
+      /** Parallel to trackPoints, absent when the stored route carried no elevation. Kept so a
+       *  track picked here draws the same profile under the map as an uploaded one. */
+      elevations?: (number | null)[] | null;
       distanceKm: number | null;
       elevationM: number | null;
     }>(`/routes/${picked.fromRouteId}`)
@@ -900,6 +903,7 @@ export function EventCreatePage() {
             points: route.trackPoints,
             distanceKm: route.distanceKm,
             elevationM: route.elevationM,
+            elevations: route.elevations ?? null,
           });
         }
       })

@@ -153,6 +153,7 @@ import {
   DESCRIPTION_COUNTER_VISIBLE_FROM,
   DESCRIPTION_COUNTER_WARN_FROM,
   DESCRIPTION_MAX_CHARS,
+  descriptionForRequest,
 } from "../lib/event-limits";
 import type { EventRoute } from "../lib/event-route";
 import {
@@ -1121,7 +1122,8 @@ export function EventCreatePage() {
             // Coarse region key (sql/030-country.sql) — the "Area" dropdown. Sent so an edit
             // that changes it reaches every viewer and the "Browse tracks" filter.
             region: region || null,
-            description: description || undefined,
+            // null, never undefined, when the organizer has emptied the field — see the helper.
+            description: descriptionForRequest(description),
             visibility,
             startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
             requiresApproval,
@@ -1179,7 +1181,8 @@ export function EventCreatePage() {
           // stamps events.region / events.country, which the "Browse tracks" picker filters on.
           ...(region ? { region } : {}),
           country: profile?.country ?? detectDefaultCountryCode(),
-          description: description || undefined,
+          // Same shape as the edit request above, so one schema describes both.
+          description: descriptionForRequest(description),
           requiresApproval,
           showParticipants: ridersListVisible,
           // Difficulty + activity type are REAL event columns (sql/010-event-profile.sql) and

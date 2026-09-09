@@ -17,7 +17,7 @@
  * blinking so i can get in fast").
  */
 
-import { CalendarDays, Heart, Mountain, Pencil, Ruler } from "lucide-react";
+import { CalendarDays, Heart, Mountain, Pencil } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -26,6 +26,7 @@ import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
+import { distanceIconFor } from "./ActivityIcons";
 import { Avatar } from "./Avatar";
 import styles from "./EventTile.module.css";
 import {
@@ -69,6 +70,8 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   const activityType = extras.activityType ?? "road";
   const TypeIcon = SURFACE_TYPE_ICON[activityType];
+  // Distance is labelled with this ride's own bike, same as EventCard/EventDetailPage.
+  const DistanceIcon = distanceIconFor(activityType);
   // No fallback, same rule as the difficulty above: with no club name set on this device and
   // no owner name from the server, the "Organized by" caption is simply not shown. It used to
   // say "Independent ride", which states something about the ride instead of admitting the
@@ -195,7 +198,7 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
         <div className={styles.metaRow}>
           {distanceKm != null && (
             <span className={styles.metaItem}>
-              <Ruler className={styles.metaIcon} aria-hidden="true" />
+              <DistanceIcon className={styles.metaIcon} aria-hidden="true" />
               {distanceKm} km
             </span>
           )}

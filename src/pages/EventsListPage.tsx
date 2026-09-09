@@ -54,6 +54,7 @@ import { EventCard } from "../app/EventCard";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
+import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
 import {
   activeFilterCount,
   applyFindRidesCriteria,
@@ -331,17 +332,40 @@ export function EventsListPage() {
   const [findWhen, setFindWhen] = useState<WhenFilter>(DEFAULT_FIND_RIDES_CRITERIA.when);
   const [findSort, setFindSort] = useState<FindRidesSort>(DEFAULT_FIND_RIDES_CRITERIA.sort);
 
+  /**
+   * The rider's own country — the state Find Rides opens in, and what "Clear" returns to.
+   *
+   * `profile.country` once signed in (users.country, sql/030), otherwise the browser locale.
+   * The fallback is not a nicety: this tab is the landing screen for anyone who followed an
+   * invitation link, and it fetches anonymously — a logged-out visitor in Sweden must still
+   * land on Swedish rides. Same seed the Browse-tracks sheet uses (app/TrackGallerySheet.tsx).
+   */
+  const defaultCountry = profile?.country ?? detectDefaultCountryCode();
+  const [findCountry, setFindCountry] = useState<string | null>(null);
+  const [countrySeeded, setCountrySeeded] = useState(false);
+
+  // Seed ONCE. The profile arrives after the first paint, so the initial state above cannot be
+  // the real default — but re-seeding on every profile change would yank a rider who has
+  // deliberately switched to Sweden back to Israel the moment anything else on the profile
+  // updates. After this runs, the picker is the rider's alone.
+  useEffect(() => {
+    if (countrySeeded) return;
+    setFindCountry(defaultCountry);
+    setCountrySeeded(true);
+  }, [countrySeeded, defaultCountry]);
+
   const findCriteria = useMemo(
     () => ({
       search: findSearch,
+      country: findCountry,
       difficulty: findDifficulty,
       surface: findSurface,
       when: findWhen,
       sort: findSort,
     }),
-    [findSearch, findDifficulty, findSurface, findWhen, findSort],
+    [findSearch, findCountry, findDifficulty, findSurface, findWhen, findSort],
   );
-  const findActiveFilters = activeFilterCount(findCriteria);
+  const findActiveFilters = activeFilterCount(findCriteria, defaultCountry);
 
   function toggleFindDifficulty(bucket: DifficultyBucket) {
     setFindDifficulty((current) =>
@@ -357,6 +381,9 @@ export function EventsListPage() {
     setFindDifficulty([]);
     setFindSurface([]);
     setFindWhen(DEFAULT_FIND_RIDES_CRITERIA.when);
+    // Back to the rider's own country — the landing state — not to "All countries". Clearing
+    // filters should return the screen to how it opened, and worldwide is not how it opened.
+    setFindCountry(defaultCountry);
   }
 
   // Which half of the public list the server is asked for. Only "Past" leaves the upcoming
@@ -367,8 +394,13 @@ export function EventsListPage() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectNonce is a deliberate re-run trigger, not a value this effect reads — it changes only when the server goes from unreachable to reachable, which is exactly when this should refetch.
   useEffect(() => {
-    loadOtherRides(findBucket);
-  }, [loadOtherRides, findBucket, reconnectNonce]);
+    // Country goes to the SERVER (see store/eventsStore.ts) — the response is capped at 100
+    // rides, so narrowing it here rather than only in memory is what makes the hundredth-ride
+    // case correct. Not fetched until the seed effect above has run, or the first request would
+    // ask for every country and be replaced a frame later.
+    if (!countrySeeded) return;
+    loadOtherRides(findBucket, findCountry);
+  }, [loadOtherRides, findBucket, findCountry, countrySeeded, reconnectNonce]);
 
   // Full set (incl. created events) — so Find Rides never lists something already on this
   // rider's plate, even one they own but aren't in Rider-mode "My Rides".
@@ -808,6 +840,24 @@ export function EventsListPage() {
                   <X width={12} height={12} aria-hidden="true" />
                 </button>
               )}
+              {/* Shown only when the rider is NOT looking at their own country — otherwise
+                  every rider would carry a permanent chip they never set. Dismissing it goes
+                  back to their own country, the same place Clear goes. */}
+              {findCountry !== defaultCountry && (
+                <button
+                  type="button"
+                  className={styles.activeFilterChip}
+                  onClick={() => setFindCountry(defaultCountry)}
+                >
+                  {findCountry
+                    ? `${flagEmoji(findCountry)} ${
+                        orderedCountries(defaultCountry).find((c) => c.code === findCountry)
+                          ?.name ?? findCountry
+                      }`
+                    : "All countries"}
+                  <X width={12} height={12} aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 className={styles.clearFiltersBtn}
@@ -895,6 +945,28 @@ export function EventsListPage() {
               </div>
             </div>
             <div className={`stack ${styles.sheetBody}`}>
+              <div className={styles.sheetGroup}>
+                <span className={styles.sheetGroupLabel}>Country</span>
+                {/* First, and a select rather than chips: it is the widest cut on the list —
+                    every other filter here narrows within whatever country is chosen — and
+                    twenty countries is far too many to lay out as chips. "All countries" is
+                    the deliberate escape hatch for a rider travelling or planning a trip.
+                    Ordered with the rider's own country first (orderedCountries). */}
+                <select
+                  className={styles.sheetSelect}
+                  value={findCountry ?? ""}
+                  onChange={(e) => setFindCountry(e.target.value || null)}
+                  aria-label="Country"
+                >
+                  <option value="">All countries</option>
+                  {orderedCountries(defaultCountry).map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {flagEmoji(c.code)} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className={styles.sheetGroup}>
                 <span className={styles.sheetGroupLabel}>Difficulty</span>
                 <div className={styles.sheetChips}>

@@ -534,6 +534,24 @@
   gap: 8px;
 }
 
+/* The Country picker in the Find Rides filter sheet. Same shape as the Browse-tracks sheet's
+   .panelSelect (app/TrackGallerySheet.module.css) so the two filter surfaces match. */
+.sheetSelect {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.sheetSelect:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .sheetChips .filterChip {
   display: inline-flex;
   align-items: center;

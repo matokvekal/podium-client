@@ -1,16 +1,19 @@
-// Client-side filtering + sorting for the "Find Rides" tab. Works ENTIRELY on the events the
-// existing GET /events/public response already returns (see server toEventSummary): a summary
-// carries id/name/status/type/startsAt/endsAt/location/activityType/level — and nothing else.
+// Filtering + sorting for the "Find Rides" tab. Everything here except `country` runs purely
+// client-side over the events GET /events/public already returned (see server toEventSummary):
+// a summary carries id/name/status/type/startsAt/endsAt/location/activityType/level plus
+// country/region (sql/030-country.sql).
 //
-// So only these filters/sorts are possible today; the rest of the product wishlist
-// (distance-from-me, ride distance, elevation gain, duration) needs fields the list API does
-// not send, and is deliberately left out rather than faked:
+// `country` is the one filter that is ALSO applied server-side — store/eventsStore.ts puts it on
+// the query string. That is not belt-and-braces: the fetch asks for limit=100, so filtering only
+// in memory would quietly lose every ride past the hundredth. The in-memory check below still
+// runs, because a cached list painted before the network answers carries whatever country was
+// last fetched. Same split as the "Browse tracks" picker — see lib/track-gallery-filter.ts.
+//
+// Still not possible today; these need fields the list API does not send, and are left out
+// rather than faked:
 //   - distance from me  → no event coordinates on the summary (location is free text)
 //   - ride distance     → no distanceKm on a real event (route data isn't in the list)
 //   - elevation gain    → no climbM on a real event
-//   - duration          → no duration field anywhere, client or server
-//
-// No new API, no server change.
 
 // figmaStatus lives in app/ rather than lib/, but it is pure (no React, no CSS) and it is THE
 // definition of live/upcoming/finished in this app — the card tags, the My Rides chips and this
@@ -33,6 +36,16 @@ export type FindRidesSort = "soonest" | "latest" | "name" | "easiest" | "hardest
 export interface FindRidesCriteria {
   /** Matched against name + location, case-insensitive. */
   search: string;
+  /**
+   * ISO 3166-1 alpha-2, uppercase — an exact match against `events.country`. `null` is
+   * "All countries" and applies no filter at all.
+   *
+   * The DEFAULT is not in DEFAULT_FIND_RIDES_CRITERIA: it is the rider's own country, which
+   * this module cannot know. EventsListPage seeds it from `profile.country`, falling back to
+   * the browser locale for a logged-out visitor — the same seed the Browse-tracks sheet does
+   * (app/TrackGallerySheet.tsx).
+   */
+  country: string | null;
   difficulty: DifficultyBucket[];
   surface: SurfaceType[];
   when: WhenFilter;
@@ -54,6 +67,9 @@ export interface FindRidesCriteria {
  */
 export const DEFAULT_FIND_RIDES_CRITERIA: FindRidesCriteria = {
   search: "",
+  // Null, not "IL": the landing state is the RIDER's country and only the page knows it. Seeding
+  // a country here would hard-code Israel for a Swedish rider on the very first paint.
+  country: null,
   difficulty: [],
   surface: [],
   when: "upcoming",
@@ -156,10 +172,20 @@ export function matchesWhen(
  *  Measured against the DEFAULTS, not against "no filter at all": Upcoming is the state the
  *  screen opens in, so badging it as an active filter would show every rider a permanent "1"
  *  they never set and cannot clear. Choosing anything else — Past, All rides, a date window —
- *  is a real narrowing and does count. */
-export function activeFilterCount(c: FindRidesCriteria): number {
+ *  is a real narrowing and does count.
+ *
+ *  Country follows the same rule, which is why `defaultCountry` has to be passed in: the rider's
+ *  own country is the state the screen opens in and is not a filter, while switching to another
+ *  country — or to "All countries", a deliberate widening — is. Identical to
+ *  trackGalleryActiveFilterCount. Defaults to null so a caller that has not resolved the rider's
+ *  country yet simply sees the pre-seed state as unfiltered. */
+export function activeFilterCount(
+  c: FindRidesCriteria,
+  defaultCountry: string | null = null,
+): number {
   const whenChanged = c.when !== DEFAULT_FIND_RIDES_CRITERIA.when ? 1 : 0;
-  return c.difficulty.length + c.surface.length + whenChanged;
+  const countryChanged = c.country !== defaultCountry ? 1 : 0;
+  return c.difficulty.length + c.surface.length + whenChanged + countryChanged;
 }
 
 /** Comparator that sorts by `key` in the given direction, but always sinks rows whose key is
@@ -202,6 +228,12 @@ export function applyFindRidesCriteria(
     if (c.surface.length > 0) {
       if (ride.activityType == null || !c.surface.includes(ride.activityType)) return false;
     }
+    // Exact match, no normalizing: both sides are already uppercase alpha-2 — the server
+    // upper-cases on the way in (schemas/event.schemas.ts countryCode) and the picker only ever
+    // offers codes from lib/countries.ts. A ride with a NULL country matches no country at all,
+    // which is the honest reading of "we do not know where this is"; it is unreachable in
+    // practice since sql/030 backfilled every row and create always stamps one.
+    if (c.country && ride.country !== c.country) return false;
     if (!matchesWhen(ride, c.when, now)) return false;
     return true;
   });

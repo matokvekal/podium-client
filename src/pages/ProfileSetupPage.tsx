@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
 import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useCountryStore } from "../store/countryStore";
 import { useUserModeStore } from "../store/userModeStore";
 
@@ -46,8 +47,12 @@ export function ProfileSetupPage() {
   );
   const [country, setCountry] = useState(defaultCountry);
   // Client-only UI preference (store/userModeStore.ts) — NOT part of the profile sent to the
-  // server. Unchecked by default: a new user is a rider unless they say otherwise.
-  const [organizes, setOrganizes] = useState(false);
+  // server. Pre-checked when the server has enabled this account for ride creation, so it
+  // agrees with the first-run default the menu switch now gets (lib/user-mode.ts
+  // `shouldDefaultToOrganizer`); untouched-means-null so a profile that arrives after the
+  // first render still moves the box, while a deliberate uncheck sticks.
+  const [organizesChoice, setOrganizesChoice] = useState<boolean | null>(null);
+  const organizes = organizesChoice ?? organizerSwitchEnabled(profile?.canOrganize);
   const setUserMode = useUserModeStore((state) => state.setMode);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -147,7 +152,7 @@ export function ProfileSetupPage() {
           <input
             type="checkbox"
             checked={organizes}
-            onChange={(event) => setOrganizes(event.target.checked)}
+            onChange={(event) => setOrganizesChoice(event.target.checked)}
           />
           <span>
             I also organize events

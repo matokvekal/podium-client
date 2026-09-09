@@ -2,10 +2,11 @@
 // permission. The server's authorization is unchanged: an "organizer" here is just someone
 // who wants the full create/manage UI, and a "rider" wants the simplified one.
 //
-// "rider" is the default and the safe fallback: an existing install with no saved mode, or a
-// stored value this build doesn't recognise, resolves to "rider" (see normalizeUserMode and
-// store/userModeStore.ts). Nothing organizer-only is ever shown unless the user explicitly
-// asked for it.
+// "rider" is the safe fallback: a stored value this build doesn't recognise resolves to
+// "rider" (see normalizeUserMode and store/userModeStore.ts), and nothing organizer-only is
+// shown on an account the server has not enabled. The one exception is a genuine first run
+// on an enabled account, which starts in "organizer" and saves that — see
+// shouldDefaultToOrganizer below.
 
 export type UserMode = "rider" | "organizer";
 
@@ -38,4 +39,25 @@ export function shouldForceRiderMode(canOrganize: boolean | undefined): boolean 
  */
 export function organizerSwitchEnabled(canOrganize: boolean | undefined): boolean {
   return canOrganize === true;
+}
+
+/**
+ * Should a first-run account be dropped into Organizer mode without being asked?
+ *
+ * Yes, but only for someone who has never expressed a preference (`hasChosen: false` — no
+ * stored mode at all) AND whose account the server has affirmatively enabled. Someone the
+ * server enabled deliberately is an organizer; making them hunt for the switch before they
+ * can create their first ride is the wrong first run. Everyone else keeps "rider": an
+ * unknown (`undefined`) eligibility is not a yes, and a stored preference — including an
+ * explicit "rider" — always wins over this default, so we never re-flip a returning user
+ * who switched it off.
+ *
+ * The caller persists the result (store/userModeStore.ts `adoptOrganizerDefault`), so this
+ * only ever decides a first run: from then on it is a stored choice like any other.
+ */
+export function shouldDefaultToOrganizer(
+  canOrganize: boolean | undefined,
+  hasChosen: boolean,
+): boolean {
+  return !hasChosen && organizerSwitchEnabled(canOrganize);
 }

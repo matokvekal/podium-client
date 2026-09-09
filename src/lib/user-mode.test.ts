@@ -3,6 +3,7 @@ import {
   DEFAULT_USER_MODE,
   normalizeUserMode,
   organizerSwitchEnabled,
+  shouldDefaultToOrganizer,
   shouldForceRiderMode,
 } from "./user-mode";
 
@@ -47,5 +48,20 @@ describe("organizerSwitchEnabled", () => {
     expect(organizerSwitchEnabled(true)).toBe(true);
     expect(organizerSwitchEnabled(false)).toBe(false);
     expect(organizerSwitchEnabled(undefined)).toBe(false);
+  });
+});
+
+describe("shouldDefaultToOrganizer", () => {
+  it("starts a first run on an enabled account in organizer mode", () => {
+    expect(shouldDefaultToOrganizer(true, false)).toBe(true);
+  });
+
+  it("leaves a stored preference alone, including an explicit rider", () => {
+    expect(shouldDefaultToOrganizer(true, true)).toBe(false);
+  });
+
+  it("does not default an account the server has not enabled, or not answered for", () => {
+    expect(shouldDefaultToOrganizer(false, false)).toBe(false);
+    expect(shouldDefaultToOrganizer(undefined, false)).toBe(false);
   });
 });

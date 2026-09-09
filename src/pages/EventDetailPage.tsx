@@ -53,7 +53,6 @@ import {
   Mountain,
   Navigation,
   Pencil,
-  Ruler,
   Settings,
   Share2,
   Ticket,
@@ -64,7 +63,9 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
+import { CalorieEstimator } from "../app/CalorieEstimator";
 import { DescriptionSheet } from "../app/DescriptionSheet";
 import { ElevationProfile } from "../app/ElevationProfile";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
@@ -1041,6 +1042,9 @@ export function EventDetailPage() {
   // rather than being labelled Road because that happened to be first in the list.
   const activityType = event.activityType ?? extras.activityType ?? null;
   const ActivityIcon = activityType ? SURFACE_TYPE_ICON[activityType] : null;
+  // Distance stat icon: the bike this ride is ridden on (app/ActivityIcons.tsx), matching
+  // the list card. Falls back to a ruler for run/hike and for an unset activity type.
+  const DistanceIcon = distanceIconFor(activityType);
   // Same fallback chain EventCard.tsx/EventTile.tsx use on the list cards — a team or manual
   // club name the organizer explicitly picked on EventCreatePage.tsx (extras.organizerGroup)
   // wins; failing that, the real signed-in owner's name (event.ownerName — nickname, else
@@ -1249,7 +1253,7 @@ export function EventDetailPage() {
             -------------------------------------------------------------------------------- */}
         <div className={styles.statStrip}>
           <div className={styles.statTile}>
-            <Ruler className={styles.statTileIcon} aria-hidden="true" />
+            <DistanceIcon className={styles.statTileIcon} aria-hidden="true" />
             <span className={styles.statTileValue}>
               {distanceKm != null ? `${distanceKm} km` : "—"}
             </span>
@@ -1583,7 +1587,7 @@ export function EventDetailPage() {
                   <span className={styles.routeMeta}>
                     {results.route.distanceKm != null && (
                       <span className={styles.routeMetaItem}>
-                        <Ruler width={13} height={13} aria-hidden="true" />
+                        <DistanceIcon width={13} height={13} aria-hidden="true" />
                         {results.route.distanceKm} km
                       </span>
                     )}
@@ -1607,6 +1611,26 @@ export function EventDetailPage() {
                 )}
               </div>
             )}
+
+            {/* --- calories -------------------------------------------------------------
+                A small utility bar under the map, asked for directly (Images/calories.png):
+                the ride's own distance and climb, plus the only two things it cannot know —
+                the rider's weight and the speed they expect to hold — turned into a burn.
+
+                It sits AFTER the route card rather than inside it, so it does not split the
+                map from its elevation profile, and so a ride that has a distance but no
+                uploaded route still gets the row. Distance and climb are not repeated inside
+                it; they are already in the stat strip at the top of this page.
+
+                The number is an estimate off a MET curve and is labelled as one. The component
+                renders nothing without a usable distance, and nothing on a running/hiking ride
+                — see app/CalorieEstimator.tsx. --------------------------------------------- */}
+            <CalorieEstimator
+              distanceKm={distanceKm}
+              climbM={climbM}
+              level={level}
+              activityType={activityType}
+            />
 
             {/* --- info strip -------------------------------------------------------------
                 The mock's four-cell strip: Start · Meeting Point · Finish · Participants.

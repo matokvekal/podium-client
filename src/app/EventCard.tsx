@@ -37,7 +37,6 @@ import {
   MapPin,
   MapPinned,
   Mountain,
-  Ruler,
   Timer,
   Truck,
   UsersRound,
@@ -53,6 +52,7 @@ import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
+import { distanceIconFor } from "./ActivityIcons";
 import styles from "./EventCard.module.css";
 import {
   eventCoverBackground,
@@ -109,6 +109,10 @@ export function EventCard({
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   const activityType = event.activityType ?? extras.activityType ?? null;
   const TypeIcon = activityType ? SURFACE_TYPE_ICON[activityType] : null;
+  // The distance stat is labelled with the BIKE this ride is ridden on — a road bike for a
+  // road ride, an MTB for an MTB ride (app/ActivityIcons.tsx). A ruler again only when the
+  // organizer set no activity type, or the distance is run/walked rather than ridden.
+  const DistanceIcon = distanceIconFor(activityType);
 
   // Server list value is the source of truth now — GET /events sends distanceKm / elevationGain
   // (server's toEventSummary), so a fresh login shows these immediately with no Event Detail
@@ -244,7 +248,7 @@ export function EventCard({
 
       <div className={styles.stats}>
         <div className={styles.stat}>
-          <Ruler className={styles.statIcon} aria-hidden="true" />
+          <DistanceIcon className={styles.statIcon} aria-hidden="true" />
           <span className={styles.statValue}>{distanceKm != null ? `${distanceKm} km` : "—"}</span>
           <span className={styles.statLabel}>Distance</span>
         </div>

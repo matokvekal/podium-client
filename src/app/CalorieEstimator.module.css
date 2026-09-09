@@ -1,0 +1,286 @@
+/* One low utility bar, deliberately lighter than a `.card`: it sits directly under the route
+   card and must read as a tool attached to the ride, not as another section of it.
+
+   Colour comes only from tokens.css, so light and dark both fall out of the palette already
+   defined there — nothing in here is theme-specific. */
+
+/* The effort ramp: the higher the speed, the hotter the row runs. --energy drives the track
+   fill, the thumb and the flame together, so the whole control heats up as one thing; --glow is
+   the halo that grows behind the thumb at the top of the range. Asked for directly — pushing
+   the slider up should feel like asking more of yourself, not just like a bigger number.
+
+   Text is deliberately NOT tinted: an amber or magenta figure on white fails contrast, and the
+   numbers are the part that has to stay readable. */
+.row {
+  --energy: var(--energy-1);
+  --glow: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.row[data-energy="2"] {
+  --energy: var(--energy-2);
+}
+
+.row[data-energy="3"] {
+  --energy: var(--energy-3);
+  --glow: 2px;
+}
+
+.row[data-energy="4"] {
+  --energy: var(--energy-4);
+  --glow: 3px;
+}
+
+.row[data-energy="5"] {
+  --energy: var(--energy-5);
+  --glow: 5px;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+/* The speed group is the only elastic one — it eats whatever width the row has left. */
+.group[data-grow="true"] {
+  flex: 1 1 200px;
+}
+
+.groupIcon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+/* --- weight ---------------------------------------------------------------------------- */
+
+.step {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.step:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--border-strong);
+}
+
+.step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.weight {
+  min-width: 52px;
+  text-align: center;
+  font-size: var(--fs-base);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.unit {
+  margin-left: 3px;
+  font-size: var(--fs-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+/* --- speed ----------------------------------------------------------------------------- */
+
+.bound {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.track {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 60px;
+  height: 26px;
+}
+
+.trackBg,
+.trackFill {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.trackBg {
+  left: 0;
+  right: 0;
+  background: var(--border);
+}
+
+/* --fill is set inline from the current speed. */
+.trackFill {
+  left: 0;
+  width: var(--fill, 0%);
+  background: var(--energy);
+  transition: background-color 160ms ease;
+}
+
+/* The native input carries the interaction and the thumb; the two bars above are the visible
+   track. Everything the global `input` rule (styles/global.css) applies to a text field —
+   border, background, 44px min-height, padding — is undone here. */
+.range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 26px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.range:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 26px;
+  background: none;
+}
+
+.range::-moz-range-track {
+  height: 26px;
+  background: none;
+}
+
+/* Same thumb as app/RangeSlider.tsx's filter slider, so the two sliders in the app look like
+   one control. That component is two-handle and could not be reused as a whole. */
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--energy);
+  border: 2px solid var(--surface);
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 0.3),
+    0 0 0 var(--glow) color-mix(in srgb, var(--energy) 28%, transparent);
+  cursor: pointer;
+  /* Centres the 22px thumb (18px + 2px border a side) in the 26px track. */
+  margin-top: 2px;
+}
+
+.range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--energy);
+  border: 2px solid var(--surface);
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 0.3),
+    0 0 0 var(--glow) color-mix(in srgb, var(--energy) 28%, transparent);
+  cursor: pointer;
+}
+
+.speed {
+  flex: none;
+  min-width: 66px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* --- the result ------------------------------------------------------------------------ */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.kcalRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.flame {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--energy);
+  transition: color 160ms ease;
+}
+
+/* The loudest thing in the row — it is what the row is for. */
+.kcal {
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.estimated {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* On a phone the slider gets its own line, with weight and the burn sharing the first — the
+   bar stays two short rows rather than four cramped columns. */
+@media (max-width: 520px) {
+  .row {
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .group[data-grow="true"] {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

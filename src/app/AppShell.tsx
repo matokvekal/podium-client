@@ -14,10 +14,11 @@
 
 import { ArrowLeft, Menu, User } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiRequest } from "../lib/api-client";
+import { appTagline } from "../lib/app-tagline";
 import {
   applyColorTheme,
   type ColorTheme,
@@ -26,6 +27,7 @@ import {
 } from "../lib/color-theme";
 import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
+import { useCountryStore } from "../store/countryStore";
 import { AppDrawer } from "./AppDrawer";
 import { Avatar } from "./Avatar";
 import { useEnforceOrganizerEligibility } from "./useEnforceOrganizerEligibility";
@@ -73,6 +75,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => getInitialColorTheme());
 
+  // Header subtitle, in the rider's language — see lib/app-tagline.ts for how it is chosen.
+  // Memoised on the country alone: the device locale cannot change without a reload, so the
+  // only input that moves is the picked country.
+  const country = useCountryStore((s) => s.code);
+  const tagline = useMemo(() => appTagline(country), [country]);
+
   const showBackArrow =
     (EVENT_DETAIL_PATH.test(location.pathname) && location.pathname !== "/events/new") ||
     TEAMS_PATH.test(location.pathname);
@@ -115,6 +123,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         )}
 
+        {/* The logo sits beside the two text lines rather than above them, so the subtitle
+            centres under "El Niño Ride" itself and not under the icon+name block — asked for
+            directly. The subtitle is small on purpose: the header's height is set by the 44px
+            icon buttons either side, and both lines together stay under that, so adding it
+            does not push the header down. */}
         <NavLink to="/" className="app-header__brand">
           <img
             className="app-header__logo"
@@ -124,7 +137,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             width={22}
             height={22}
           />
-          El Niño Ride
+          <span className="app-header__brand-text">
+            <span className="app-header__brand-name">El Niño Ride</span>
+            <span className="app-header__tagline" lang={tagline.language} dir={tagline.dir}>
+              {tagline.text}
+            </span>
+          </span>
         </NavLink>
 
         <button

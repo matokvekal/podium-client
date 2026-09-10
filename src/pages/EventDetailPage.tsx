@@ -96,7 +96,7 @@ import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { formatDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
-import { formatLocalDateTime } from "../lib/time";
+import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -1031,6 +1031,10 @@ export function EventDetailPage() {
   // the create form, so every event that exists already has them.
   const next = NEXT_STATUS[displayStatus];
   const wazeHref = wazeUrl(event.location, routePoint);
+  // The meeting TIME, for the hero badge that already carries the date — "so no questions near
+  // the date". Split from its AM/PM so the digits can sit at the day number's size (see
+  // lib/time.ts). Same device-local conversion every other time on this page uses.
+  const heroClock = formatLocalClockParts(event.startsAt);
   const googleMapsHref = googleMapsUrl(event.location, routePoint);
   const extras = getEventExtras(extrasByEvent, event.id);
   // Server value first — activityType is a real field on the event now (see EventSummary).
@@ -1166,13 +1170,23 @@ export function EventDetailPage() {
 
         <div className={styles.heroTop}>
           {event.startsAt ? (
-            <span className={styles.dateBadge}>
+            <span className={styles.dateBadge} title={formatLocalDateTime(event.startsAt)}>
               <span className={styles.dateBadgeMonth}>
                 {heroMonthFormat.format(new Date(event.startsAt))}
               </span>
               <span className={styles.dateBadgeDay}>
                 {heroDayFormat.format(new Date(event.startsAt))}
               </span>
+              {/* The meeting time, read off the badge at a glance like a clock face rather
+                  than hunted for in the info strip further down the page. */}
+              {heroClock && (
+                <span className={styles.dateBadgeTime}>
+                  {heroClock.time}
+                  {heroClock.suffix && (
+                    <span className={styles.dateBadgeMeridiem}>{heroClock.suffix}</span>
+                  )}
+                </span>
+              )}
             </span>
           ) : (
             <span />
@@ -1185,6 +1199,23 @@ export function EventDetailPage() {
             >
               {displayStatus === "cancelled" ? "Cancelled" : FIGMA_TAG_LABEL[bucket]}
             </span>
+            {/* Drive there. The meeting point is a car journey for most riders — bikes go on
+                the rack — and the Waze link for it was buried in the info strip halfway down
+                the page. This is the same wazeHref, kept there too for anyone reading the
+                meeting point itself. Rendered only when there is somewhere to navigate TO
+                (nav-links.ts returns null with neither coordinates nor a location string). */}
+            {wazeHref && (
+              <a
+                href={wazeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${styles.heroIconBtn} ${styles.heroWazeBtn}`}
+                aria-label="Navigate to the meeting point with Waze"
+                title="Drive to the meeting point — Waze"
+              >
+                <Navigation aria-hidden="true" />
+              </a>
+            )}
             {/* Share is gone once the ride is over. A share link exists to get someone TO a
                 ride — it opens the join flow behind a code that the server stops resolving the
                 moment the event finishes (selectActiveEventByCode filters on is_active, which

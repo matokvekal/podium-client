@@ -41,6 +41,26 @@ export function formatLocalTime(utcIso: string | Date | null | undefined): strin
   return date ? timeFormat.format(date) : "—";
 }
 
+/** { time: "08:30", suffix: "AM" | null } — one clock reading split from its day period, for
+ *  UI that wants the digits big and the AM/PM small: the ride page's hero date badge shows the
+ *  meeting time at the same size as the day number, and a full "08:30 AM" at that size would
+ *  not fit the badge. A 24-hour locale returns suffix: null and the caller renders nothing
+ *  extra. Built off the same timeFormat as formatLocalTime, so the two never disagree. */
+export function formatLocalClockParts(
+  utcIso: string | Date | null | undefined,
+): { time: string; suffix: string | null } | null {
+  const date = toDate(utcIso);
+  if (!date) return null;
+  const parts = timeFormat.formatToParts(date);
+  const suffix = parts.find((part) => part.type === "dayPeriod")?.value ?? null;
+  const time = parts
+    .filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal")
+    .map((part) => part.value)
+    .join("")
+    .trim();
+  return { time, suffix };
+}
+
 /** 13 Aug, 14:32 — for event lists and history. Built from two separate formatters and
  * concatenated in a fixed order rather than one Intl.DateTimeFormat with all four fields —
  * asked for directly after a locale/engine rendered day-time-month instead of day-month-time

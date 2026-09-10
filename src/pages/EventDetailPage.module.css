@@ -60,12 +60,15 @@
   padding: var(--space-3);
 }
 
+/* Month over day over TIME. The width is a minimum rather than a fixed 46px now: the clock
+   line is the widest thing in the badge, and a locale that renders "08:30 AM" needs more room
+   than one that renders "08:30". */
 .dateBadge {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 46px;
-  padding: 5px 0;
+  min-width: 46px;
+  padding: 5px 7px 6px;
   background: rgba(15, 20, 30, 0.65);
   backdrop-filter: blur(3px);
   border-radius: var(--radius-sm);
@@ -85,9 +88,44 @@
   font-weight: var(--weight-bold);
 }
 
+/* The meeting time, at the day number's size so neither reads as the footnote of the other,
+   and in tabular mono digits so it scans like a clock — "16:41" always occupies the same
+   width, and the colon sits where the eye expects it. The hairline separates the calendar
+   half of the badge from the clock half without spending a whole row on a divider. */
+.dateBadgeTime {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  align-self: stretch;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 16px;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+/* AM/PM only exists in 12-hour locales, and it is a qualifier, not a digit — small and quiet
+   so it never competes with the numbers it hangs off. */
+.dateBadgeMeridiem {
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+/* Wraps because this row can carry a status pill plus up to three icon buttons next to a
+   badge that is now wider — on the narrowest phones that is more than one line's worth. */
 .heroTopRight {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -119,6 +157,7 @@
 
 .heroIconBtn {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 32px;
@@ -128,6 +167,7 @@
   backdrop-filter: blur(3px);
   border: none;
   border-radius: 999px;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -138,6 +178,23 @@
 
 .heroIconBtn:hover {
   background: rgba(15, 20, 30, 0.7);
+}
+
+/* Waze is the one button here that is not an app action but a hand-off to another app, so it
+   wears that app's colour instead of the hero's smoked glass — Waze cyan, with the navigation
+   arrow filled solid so it reads as a mark at 16px rather than as a thin outline. */
+.heroWazeBtn {
+  color: #04222c;
+  background: #33ccff;
+  backdrop-filter: none;
+}
+
+.heroWazeBtn svg {
+  fill: currentColor;
+}
+
+.heroWazeBtn:hover {
+  background: #05c8f7;
 }
 
 .heroBottom {

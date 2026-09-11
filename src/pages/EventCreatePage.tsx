@@ -129,6 +129,7 @@ import {
   Truck,
   Upload,
   Users,
+  X,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -164,7 +165,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import {
-  nextUpcomingSaturdayStart,
+  nextWeekdayStart,
   parseQuickAdd,
   toDatetimeLocalValue,
 } from "../lib/quick-add-parser";
@@ -325,6 +326,16 @@ const NARROW_PICKER_QUERY = "(max-width: 349px)";
 
 const NEW_TEAM_OPTION = "__new__";
 
+// The three days group rides most often go out on. JS's own Date#getDay() numbering
+// (0=Sunday..6=Saturday), which is what nextWeekdayStart expects.
+const STARTS_AT_DAY_CHIPS: { label: string; day: number }[] = [
+  { label: "Fri", day: 5 },
+  { label: "Sat", day: 6 },
+  { label: "Sun", day: 0 },
+];
+
+const STARTS_AT_TIME_CHIPS = [6, 7, 8];
+
 export function EventCreatePage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -440,9 +451,13 @@ export function EventCreatePage() {
   const [visibility, setVisibility] = useState<"public" | "private">(
     lastDefaults?.visibility ?? "private",
   );
-  const [startsAt, setStartsAt] = useState(() =>
-    isEditing ? "" : toDatetimeLocalValue(nextUpcomingSaturdayStart()),
-  );
+  // Deliberately blank on create, never a silent default: a pre-filled "next Saturday" looked
+  // like a real, chosen value, so an organizer who forgot to touch it shipped a ride on the
+  // wrong day with no error at any point (reported directly). The day/time quick-pick chips
+  // below give the one-tap speed a default bought, without a value existing before anyone
+  // asked for one — so the "start date/time are required" check above actually has something
+  // to catch.
+  const [startsAt, setStartsAt] = useState("");
   const [startsAtEdited, setStartsAtEdited] = useState(false);
   const [dateHint, setDateHint] = useState<string | null>(null);
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
@@ -902,6 +917,28 @@ export function EventCreatePage() {
       setClimbMInput(String(uploaded.route.elevationM));
       setClimbEdited(false);
     }
+  }
+
+  // Day/time quick-pick chips — the one-tap replacement for the old silent "next Saturday"
+  // default (see the startsAt state's own comment). A day chip keeps whatever hour is already
+  // set (defaulting to 07:00 when nothing is); a time chip keeps whatever day is already set
+  // (defaulting to the next Saturday when nothing is) — so either order of tapping lands on a
+  // sensible combined value in exactly two taps.
+  function pickStartsAtDay(day: number) {
+    const hour = startsAt ? Number(startsAt.slice(11, 13)) : 7;
+    setStartsAt(toDatetimeLocalValue(nextWeekdayStart(day, hour)));
+    setStartsAtEdited(true);
+    setDateHint(null);
+    setInvalidStartsAt(false);
+  }
+
+  function pickStartsAtTime(hour: number) {
+    const base = startsAt ? new Date(startsAt) : nextWeekdayStart(6, hour);
+    base.setHours(hour, 0, 0, 0);
+    setStartsAt(toDatetimeLocalValue(base));
+    setStartsAtEdited(true);
+    setDateHint(null);
+    setInvalidStartsAt(false);
   }
 
   function handleDescriptionChange(value: string) {
@@ -1384,6 +1421,15 @@ export function EventCreatePage() {
                 : "Set the ride plan — riders join with your code."}
             </p>
           </div>
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={() => navigate(-1)}
+            aria-label="Cancel"
+            title="Cancel"
+          >
+            <X aria-hidden="true" />
+          </button>
         </header>
 
         {!isEditing && hasRidesUsage && (
@@ -1572,7 +1618,7 @@ export function EventCreatePage() {
                     <circle className={styles.trackBrowsePreviewStart} cx="8" cy="42" r="4" />
                     <circle className={styles.trackBrowsePreviewEnd} cx="112" cy="34" r="4" />
                   </svg>
-                  <span className={styles.trackBrowseLabel}>Browse tracks</span>
+                  <span className={styles.trackBrowseLabel}>See other rides</span>
                   <span className={styles.trackBrowseHint}>From rides people have ridden</span>
                 </button>
               </div>
@@ -1704,6 +1750,37 @@ export function EventCreatePage() {
                       if (e.target.value) setInvalidStartsAt(false);
                     }}
                   />
+                  {!isEditing && (
+                    <div className={styles.quickPickRow}>
+                      {STARTS_AT_DAY_CHIPS.map(({ label, day }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          className={styles.quickPickBtn}
+                          data-active={
+                            (startsAt !== "" && new Date(startsAt).getDay() === day) || undefined
+                          }
+                          onClick={() => pickStartsAtDay(day)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      {STARTS_AT_TIME_CHIPS.map((hour) => (
+                        <button
+                          key={hour}
+                          type="button"
+                          className={styles.quickPickBtn}
+                          data-active={
+                            (startsAt !== "" && Number(startsAt.slice(11, 13)) === hour) ||
+                            undefined
+                          }
+                          onClick={() => pickStartsAtTime(hour)}
+                        >
+                          {String(hour).padStart(2, "0")}:00
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

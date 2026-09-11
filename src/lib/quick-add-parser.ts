@@ -36,6 +36,14 @@ function nextWeekday(from: Date, targetDay: number, includeToday: boolean): Date
 }
 
 /**
+ * The next upcoming Friday/Saturday/Sunday (never today) at the given hour — feeds the
+ * create-form's day quick-pick chips. `targetDay` is JS's own 0=Sunday..6=Saturday.
+ */
+export function nextWeekdayStart(targetDay: number, hour: number, now: Date = new Date()): Date {
+  return atHour(nextWeekday(now, targetDay, false), hour, 0);
+}
+
+/**
  * The next upcoming Saturday at the app's default ride start time (06:00 local).
  * If today is Saturday before 06:00, returns today at 06:00; otherwise returns next Saturday.
  */

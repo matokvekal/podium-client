@@ -599,7 +599,7 @@ export function EventsListPage() {
                 {isOrganizer && (
                   <Link className={styles.addBtn} to="/events/new">
                     <Plus width={15} height={15} aria-hidden="true" />
-                    Add
+                    New Ride
                   </Link>
                 )}
               </div>
@@ -689,7 +689,7 @@ export function EventsListPage() {
                 {isOrganizer && (
                   <Link className={styles.addBtn} to="/events/new">
                     <Plus width={15} height={15} aria-hidden="true" />
-                    Add
+                    New Ride
                   </Link>
                 )}
               </div>
@@ -848,7 +848,7 @@ export function EventsListPage() {
             </div>
             <Link className={styles.addBtn} to="/events/new">
               <Plus width={15} height={15} aria-hidden="true" />
-              Add
+              New Ride
             </Link>
           </div>
           {createdRides.length === 0 ? (

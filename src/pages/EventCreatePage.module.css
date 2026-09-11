@@ -44,6 +44,31 @@
   height: 22px;
 }
 
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.closeBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.closeBtn:active {
+  transform: translateY(1px);
+}
+
 .title {
   margin: 0 0 2px;
   font-size: 1.3rem;
@@ -604,6 +629,33 @@
 .chip:has(.chipInput:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* --- date/time quick-pick chips -------------------------------------------------- */
+
+.quickPickRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.quickPickBtn {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quickPickBtn[data-active] {
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 /* --- route / track picker -------------------------------------------------- */

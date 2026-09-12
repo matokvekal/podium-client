@@ -224,17 +224,10 @@
   border-top-width: 3px;
 }
 
-@keyframes cardSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.cardSlide {
-  animation: cardSlideIn 180ms ease-out;
+/* Highlights the card matching whichever pin was tapped on the map above the list. */
+.cardSelected {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-md);
+  transition: outline-color 180ms ease-out;
 }

@@ -19,6 +19,8 @@ import { JoinPage } from "./pages/JoinPage";
 import { LiveEventPage } from "./pages/LiveEventPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
+import { StatisticsAchievementsPage } from "./pages/StatisticsAchievementsPage";
+import { StatisticsLeaderboardPage } from "./pages/StatisticsLeaderboardPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
@@ -213,6 +215,22 @@ export function App() {
         element={
           <RequireAuth>
             <StatisticsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/stats/achievements"
+        element={
+          <RequireAuth>
+            <StatisticsAchievementsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/stats/leaderboard"
+        element={
+          <RequireAuth>
+            <StatisticsLeaderboardPage />
           </RequireAuth>
         }
       />

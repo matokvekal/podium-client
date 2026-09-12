@@ -1,80 +1,23 @@
-/* Rider Statistics — gamified, not a BI dashboard. Mobile-first: everything below is designed
-   at ~380-420px first, then simply has room to breathe on anything wider (no separate desktop
-   layout is asked for). */
+/* Page-specific rules for StatisticsPage.tsx — shared gem/tab/progress/hero rules live in
+   StatisticsShared.module.css. */
 
-.page {
-  padding-bottom: var(--space-6);
-}
-
-.hero {
+.profileRow {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-3);
 }
 
-.eyebrow {
-  margin: 0;
-  font-size: var(--text-xs);
+.profileAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+}
+
+.profileName {
+  font-size: var(--fs-md);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-.sectionEyebrow {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-.trophyIcon {
-  width: 14px;
-  height: 14px;
-  color: #d99206;
-}
-
-/* --- lifetime/year + leaderboard category tabs: same segmented-control shape, reused --- */
-
-.scopeTabs,
-.categoryTabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--surface-sunken);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-}
-
-.scopeTab,
-.categoryTab,
-.scopeTabActive,
-.categoryTabActive {
-  flex: 1;
-  white-space: nowrap;
-  padding: 8px 12px;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.scopeTabActive,
-.categoryTabActive {
-  background: var(--surface);
   color: var(--text);
-  font-weight: var(--weight-bold);
-  box-shadow: var(--shadow-sm);
 }
-
-/* --- the 4 stat tiles --- */
 
 .tileGrid {
   display: grid;
@@ -95,6 +38,7 @@
 }
 
 .tileIcon {
+  display: flex;
   width: 20px;
   height: 20px;
   color: var(--accent-strong);
@@ -114,182 +58,70 @@
   font-weight: var(--weight-medium);
 }
 
-/* --- achievements: one hero card + compact rows for the rest --- */
-
-.achievementHero {
+.milestoneCard,
+.goalsCard {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  background: linear-gradient(160deg, var(--accent-soft), var(--surface));
-  border: 1px solid var(--border-strong);
+  text-decoration: none;
+  color: inherit;
 }
 
-.heroGemRow {
+.milestoneLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.viewAll {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+}
+
+.milestoneBody {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.heroGem {
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
-}
-
-.heroGemName {
-  font-size: var(--fs-md);
+.milestoneGemName {
   font-weight: var(--weight-bold);
   color: var(--text);
 }
 
-.progressTrack {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  overflow: hidden;
+.leaderboardLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--text);
+  font-weight: var(--weight-medium);
 }
 
-.progressFill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--energy-2), var(--energy-3));
-  transition: width var(--beat-3) ease;
+.goalRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.progressCaption {
-  margin: 0;
+.goalLabel {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--text-muted);
-}
-
-.achievementRows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.achievementRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-}
-
-.rowGem {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-}
-
-.achievementRowBody {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.rowLabel {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
   color: var(--text);
 }
 
-.progressTrackSmall {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-
-.progressFillSmall {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--accent-strong);
-  transition: width var(--beat-3) ease;
-}
-
-/* --- leaderboard --- */
-
-.leaderboard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.leaderboardList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.leaderboardRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 10px 4px;
-  border-bottom: 1px solid var(--border);
-}
-
-.leaderboardRow:last-child {
-  border-bottom: none;
-}
-
-.leaderboardRowMe {
-  background: var(--accent-soft);
-  border-radius: var(--radius-md);
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
-  font-weight: var(--weight-bold);
-}
-
-.rank {
-  width: 24px;
-  flex-shrink: 0;
-  text-align: center;
-  font-size: var(--text-sm);
+.goalPercent {
+  font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
+  width: 32px;
+  text-align: right;
 }
 
-.leaderboardName {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-sm);
-  color: var(--text);
-}
-
-.leaderboardValue {
-  font-size: var(--text-sm);
+.goalDone {
+  color: #10b981;
   font-weight: var(--weight-bold);
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-.leaderboardEllipsis {
-  display: flex;
-  justify-content: center;
-  padding: 2px 0;
-  color: var(--text-muted);
-}
-
-.ellipsisIcon {
-  width: 16px;
-  height: 16px;
-  transform: rotate(90deg);
-}
-
-.quote {
-  text-align: center;
-  font-size: var(--text-sm);
-  font-style: italic;
-  color: var(--text-muted);
-  margin: var(--space-3) var(--space-4) 0;
+  width: 32px;
+  text-align: right;
 }

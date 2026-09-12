@@ -1,0 +1,212 @@
+/* Shared across StatisticsPage / StatisticsAchievementsPage / StatisticsLeaderboardPage —
+   the gem/progress/tab/hero vocabulary the reference designs (images/statisics/*.JPG) repeat
+   on every screen. Mobile-first throughout, same as every other page in this app. */
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-height: 160px;
+  padding: var(--space-4);
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  color: #fff;
+  /* Stand-in for the reference's mountain/dusk photography — a real photo asset can replace
+     this background without touching any layout below it. */
+  background: linear-gradient(160deg, #0f2545 0%, #1c3a63 45%, #3f5a7d 75%, #b8895a 100%);
+  overflow: hidden;
+}
+
+.heroTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heroBackBtn,
+.heroIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  opacity: 0.85;
+}
+
+/* --- segmented pill tabs (category tabs, Me/Year, Lifetime/Year) --- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.tab,
+.tabActive {
+  flex: 1;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tabActive {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Reference uses a light "active" pill on a dark tab strip for category tabs specifically
+   (achivment.JPG / board.JPG) — same shape, different resting colour. */
+.darkTabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.darkTab,
+.darkTabActive {
+  flex: 1;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.darkTabActive {
+  background: #fff;
+  color: #14243c;
+  font-weight: var(--weight-bold);
+}
+
+/* --- gems --- */
+
+.gem {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.gemLg {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+}
+
+.gemLocked {
+  opacity: 0.35;
+}
+
+/* --- progress bars --- */
+
+.progressTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--energy-2), var(--energy-3));
+  transition: width var(--beat-3) ease;
+}
+
+.progressTrackSmall {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.progressFillSmall {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  transition: width var(--beat-3) ease;
+}
+
+/* --- compact header for sub-pages (Achievements, Leaderboard) — no photo, just back + title,
+   matching those two references' flatter app-bar (only the main Statistics/Year screens use
+   the full photo .hero above). --- */
+
+.plainHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.plainHeaderBack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.plainHeaderTitle {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.quote {
+  text-align: center;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-muted);
+  margin: var(--space-3) var(--space-4) 0;
+}

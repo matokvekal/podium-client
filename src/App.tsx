@@ -19,6 +19,7 @@ import { JoinPage } from "./pages/JoinPage";
 import { LiveEventPage } from "./pages/LiveEventPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
+import { StatisticsPage } from "./pages/StatisticsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -201,6 +202,17 @@ export function App() {
         element={
           <RequireAuth>
             <EventGroupsPage />
+          </RequireAuth>
+        }
+      />
+      {/* Rider Statistics — lifetime/yearly totals, achievements, leaderboard. Signed-in riders
+          only (like Teams): this is the rider's own participation history, not a browse
+          surface. See pages/StatisticsPage.tsx's own header for its current mock-data status. */}
+      <Route
+        path="/stats"
+        element={
+          <RequireAuth>
+            <StatisticsPage />
           </RequireAuth>
         }
       />

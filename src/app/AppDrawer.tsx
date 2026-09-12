@@ -20,6 +20,7 @@ import {
   Moon,
   QrCode,
   Sun,
+  TrendingUp,
   User,
   Users,
   X,
@@ -113,6 +114,12 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             <Bike aria-hidden="true" />
             My Rides
           </NavLink>
+          {status === "signed-in" && (
+            <NavLink to="/stats" className="drawer__nav-item" onClick={onClose}>
+              <TrendingUp aria-hidden="true" />
+              Statistics
+            </NavLink>
+          )}
           {isOrganizer && (
             <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
               <MapIcon aria-hidden="true" />

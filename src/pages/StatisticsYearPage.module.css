@@ -7,8 +7,23 @@
  * CSS almost verbatim.
  */
 
-* {
+/* BUG FIX: this was a bare `* { box-sizing: border-box; }` copied verbatim from the source
+   component's embedded <style> tag. CSS Modules only scope CLASS/ID selectors — a bare universal
+   selector is NOT scoped and leaks out to the entire application, overriding box-sizing on every
+   element on every page. Scoped to this component's own subtree instead. */
+.yni-phone,
+.yni-phone * {
   box-sizing: border-box;
+}
+
+/* ONE explicit centering parent for the whole page, rather than relying on the card's own
+   margin: auto alone — a real flex row that centers its single child, so there is exactly one
+   place responsible for horizontal centering and nothing upstream (the app shell, .app-main)
+   needs to be trusted to get it right on its own. */
+.yni-stats-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .yni-phone {
@@ -63,11 +78,14 @@
 }
 
 .yni-hero {
-  min-height: 242px;
+  min-height: 200px;
   padding: 11px 14px 0;
   color: white;
-  background-position: 15% 40%;
-  background-size: cover;
+  /* Zoomed and pushed hard toward the left edge — the image carries its own baked-in "Keep
+     riding" text and EL NIÑO logo on its right ~40%, which would double up with the real HTML
+     text below. This crop keeps only the cyclist/mountain scenery on the left in frame. */
+  background-position: 0% 35%;
+  background-size: 230% auto;
   background-repeat: no-repeat;
   background-color: #173b57;
   position: relative;
@@ -139,32 +157,39 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  background: rgba(29, 47, 61, 0.94);
+  /* Light/frosted, not the heavy near-black bar this was before — asked for directly: a
+     premium, translucent control that separates from the photo without going dark. */
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 14px;
-  box-shadow: 0 5px 18px rgba(7, 29, 46, 0.24);
+  box-shadow: 0 6px 20px rgba(7, 29, 46, 0.18);
 }
 
 .yni-tab {
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.92);
   border-radius: 10px;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .yni-tab-active {
   background: white;
   color: var(--navy);
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.1);
+  text-shadow: none;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.12);
 }
 
 .yni-content {
-  padding: 8px 6px 16px;
+  padding: 8px 6px 10px;
 }
 
 .yni-season-card {
   background: white;
   border-radius: 12px;
-  padding: 18px 16px 22px;
+  padding: 14px 16px 16px;
   box-shadow: 0 3px 12px rgba(31, 51, 68, 0.11);
 }
 
@@ -172,7 +197,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .yni-season-title {
@@ -242,6 +267,17 @@
   stroke-width: 1.85;
 }
 
+/* The provided bike/calorie icon PNGs are opaque (no alpha channel, solid white square
+   background) — multiply blends white into whatever's behind it (the stat card's own
+   near-white #f7f8fa) so the icon reads as if it were transparent, without needing a
+   re-exported asset. */
+.yni-icon-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
 .yni-green {
   color: #22c665;
 }
@@ -276,8 +312,8 @@
 }
 
 .yni-goals-title-row {
-  margin-top: 24px;
-  margin-bottom: 14px;
+  margin-top: 18px;
+  margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -298,7 +334,7 @@
 .yni-goals {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 13px;
 }
 
 .yni-goal-row {
@@ -306,7 +342,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 9px;
+  margin-bottom: 6px;
 }
 
 .yni-goal-label {
@@ -367,11 +403,13 @@
   font-weight: 800;
 }
 
+/* Decorative only, not primary content (Hero/Tabs/Season/Stats/Goals are) — kept short on
+   purpose so it never forces a scroll just to see it. */
 .yni-quote-card {
   margin-top: 8px;
-  height: 170px;
+  height: 96px;
   border-radius: 14px;
-  background-position: 30% 30%;
+  background-position: 35% 30%;
   background-size: cover;
   background-repeat: no-repeat;
   background-color: #274b66;
@@ -382,17 +420,17 @@
 
 .yni-quote {
   position: absolute;
-  right: 18px;
-  bottom: 34px;
+  right: 16px;
+  top: 12px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 24px;
-  line-height: 1.02;
+  font-size: 16px;
+  line-height: 1.05;
   font-style: italic;
   font-weight: 700;
-  transform: rotate(-7deg);
+  transform: rotate(-4deg);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
 }
 

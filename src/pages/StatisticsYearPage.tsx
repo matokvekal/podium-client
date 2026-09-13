@@ -1,42 +1,51 @@
 /**
  * Rider Statistics — Year View. Route: /stats/year.
  *
- * This is a literal reproduction of images/statisics/year view.JPG — that file is the UI
- * specification, not inspiration. Match layout/cards/hierarchy/spacing/tabs/progress exactly;
- * do not redesign. Built as its own isolated route so it can be reviewed on its own before the
- * other Statistics pages (menu entry, My Statistics, Achievements, Leaderboard) are touched.
+ * Integrates the React reference component the user provided directly
+ * (statisics/year/YearStatisticsMock.tsx) — that component is now the source of truth for this
+ * page's UI, not the earlier JPG reference. Markup, class names (kept as literal "yni-*"
+ * strings, just moved into a CSS module) and the custom inline SVG icons are carried over as
+ * closely as possible; only two things were adapted, both necessary to fit the existing app
+ * rather than a redesign:
  *
- * ONE DELIBERATE DEVIATION, not an oversight — flagged for review: the reference shows a
- * persistent bottom tab bar (Home/Rides/Statistics/Tracks/More) on every screen. The real El
- * Niño app has no bottom tab bar anywhere — it navigates via AppDrawer's slide-out drawer only.
- * Adding one here alone (and not on any other page) would look broken, and adding one app-wide
- * is a much bigger change than "rebuild this page." Everything ABOVE the bottom nav is
- * reproduced as closely as possible; back navigation instead goes to /stats.
+ *   1. The source component wrapped itself in its own fake "phone frame" (.yni-page/.yni-phone,
+ *      a floating rounded rectangle on a grey canvas) plus a fake status bar (9:41/signal/wifi/
+ *      battery) — that was the mockup tool's presentation chrome, not app UI. Dropped; the real
+ *      app already provides the real screen. The `.yni-phone` rule's CSS variables and base
+ *      text colour are kept on a plain wrapper so the rest of the (otherwise unmodified) CSS
+ *      still resolves the same colours.
+ *   2. The source component's bottom nav (Home/Rides/Statistics/Tracks/Groups) was decorative
+ *      only in the source too (the buttons have no onClick) — the real app navigates via
+ *      AppDrawer's slide-out drawer and has no bottom tab bar anywhere. Dropped for the same
+ *      reason as the phone frame: adding one to a single page would look broken, and adding one
+ *      app-wide is a far bigger change than "integrate this page." Back navigation instead uses
+ *      the real router (Link to="/stats").
  *
- * UI-REVIEW PASS: reads MOCK_RIDER_STATS (lib/rider-stats-mock.ts) — see its header. "Overview"
- * is the only tab with real content; "Achievements"/"Activity" are present (matching the
- * reference) but placeholders, since those are their own pages built in a later step.
+ * The two provided photos (statisics/year/upper.png, bottom.png) are copied into
+ * public/statistics-year-header.png / -footer.png. Both source images carry their OWN baked-in
+ * text/logo (visible if you open them directly) which the component's separate HTML text
+ * layer would otherwise duplicate — background-position/size below is tuned to keep the
+ * cyclist/mountain/road scenery in frame and crop the baked text out, matched by eye against
+ * full_page_example.JPG. This is the one thing most likely to need a live tweak once you can
+ * see it rendered — flag any crop adjustment needed and it's a one-line CSS change.
+ *
+ * UI-REVIEW PASS: still reads MOCK_RIDER_STATS (lib/rider-stats-mock.ts) — no store, no network
+ * call. "Achievements"/"Activity" tabs are present (matching the source component) but
+ * placeholder, since those are separate pages built in a later step.
  *
  * Route:   /stats/year
- * Loads:   lib/rider-stats-mock.ts (temporary)
+ * Loads:   lib/rider-stats-mock.ts (temporary), public/statistics-year-{header,footer}.png
  * Actions: Overview/Achievements/Activity tab switch (Overview only has content); year prev/next
  */
 
-import {
-  Bike,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Flame,
-  MapPin,
-  Mountain,
-  Settings,
-} from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { MOCK_RIDER_STATS } from "../lib/rider-stats-mock";
-import shared from "./StatisticsShared.module.css";
 import styles from "./StatisticsYearPage.module.css";
+
+const HERO_IMAGE = "/statistics-year-header.png";
+const FOOTER_IMAGE = "/statistics-year-footer.png";
 
 type YearTab = "overview" | "achievements" | "activity";
 
@@ -44,35 +53,53 @@ export function StatisticsYearPage() {
   const data = MOCK_RIDER_STATS;
   const [tab, setTab] = useState<YearTab>("overview");
   const [yearIndex, setYearIndex] = useState(0);
-
   const year = data.perYear[yearIndex];
 
+  const stats: { label: string; value: string; tone: "green" | "blue" | "lime" | "orange"; icon: ReactNode }[] = [
+    { label: "Rides", value: year.totals.ridesCount.toLocaleString("en-US"), tone: "green", icon: <BikeIcon /> },
+    { label: "Kilometers", value: year.totals.totalKm.toLocaleString("en-US"), tone: "blue", icon: <PinIcon /> },
+    { label: "Climb (m)", value: year.totals.totalClimbM.toLocaleString("en-US"), tone: "lime", icon: <MountainIcon /> },
+    {
+      label: "Calories",
+      value: (year.totals.totalCalories ?? 0).toLocaleString("en-US"),
+      tone: "orange",
+      icon: <FlameIcon />,
+    },
+  ];
+
   return (
-    <div>
-      <div className={`${shared.hero} ${styles.hero}`}>
-        <div className={shared.heroTopRow}>
-          <Link to="/stats" className={shared.heroBackBtn} aria-label="Back to Statistics">
-            <ChevronLeft width={18} height={18} aria-hidden="true" />
+    <div className={styles["yni-phone"]}>
+      {/* HERO */}
+      <section
+        className={styles["yni-hero"]}
+        style={{
+          backgroundImage: `linear-gradient(180deg, rgba(9,34,56,.10) 0%, rgba(9,34,56,.18) 48%, rgba(9,34,56,.82) 100%), url("${HERO_IMAGE}")`,
+        }}
+      >
+        <div className={styles["yni-topbar"]}>
+          <Link to="/stats" className={styles["yni-icon-btn"]} aria-label="Back to Statistics">
+            <ChevronLeftIcon />
           </Link>
-          <span className={styles.heroName}>Alex Rider</span>
-          <button type="button" className={shared.heroIconBtn} aria-label="Settings">
-            <Settings width={17} height={17} aria-hidden="true" />
+          <div className={styles["yni-name"]}>Alex Rider</div>
+          <button type="button" className={styles["yni-icon-btn"]} aria-label="Settings">
+            <SettingsIcon />
           </button>
         </div>
-        <p className={styles.heroTagline}>
-          Keep riding.
-          <br />
-          Good things ahead.
-        </p>
-      </div>
 
-      <div className={styles.sheet}>
-        <div className={shared.tabs} role="tablist" aria-label="Year view section">
+        <div className={styles["yni-hero-copy"]}>
+          <div>Keep riding.</div>
+          <div>Good things ahead.</div>
+        </div>
+      </section>
+
+      {/* SEGMENTED TABS */}
+      <div className={styles["yni-tabs-shell"]}>
+        <div className={styles["yni-tabs"]} role="tablist" aria-label="Year view section">
           <button
             type="button"
             role="tab"
             aria-selected={tab === "overview"}
-            className={tab === "overview" ? shared.tabActive : shared.tab}
+            className={tab === "overview" ? `${styles["yni-tab"]} ${styles["yni-tab-active"]}` : styles["yni-tab"]}
             onClick={() => setTab("overview")}
           >
             Overview
@@ -81,7 +108,9 @@ export function StatisticsYearPage() {
             type="button"
             role="tab"
             aria-selected={tab === "achievements"}
-            className={tab === "achievements" ? shared.tabActive : shared.tab}
+            className={
+              tab === "achievements" ? `${styles["yni-tab"]} ${styles["yni-tab-active"]}` : styles["yni-tab"]
+            }
             onClick={() => setTab("achievements")}
           >
             Achievements
@@ -90,128 +119,201 @@ export function StatisticsYearPage() {
             type="button"
             role="tab"
             aria-selected={tab === "activity"}
-            className={tab === "activity" ? shared.tabActive : shared.tab}
+            className={tab === "activity" ? `${styles["yni-tab"]} ${styles["yni-tab-active"]}` : styles["yni-tab"]}
             onClick={() => setTab("activity")}
           >
             Activity
           </button>
         </div>
+      </div>
 
+      {/* CONTENT */}
+      <main className={styles["yni-content"]}>
         {tab !== "overview" ? (
-          <p className="muted" style={{ textAlign: "center", padding: "var(--space-5) 0" }}>
+          <p className="muted" style={{ textAlign: "center", padding: "24px 0" }}>
             {tab === "achievements" ? "Achievements" : "Activity"} — built in a later step.
           </p>
         ) : (
-          <>
-            <div className={styles.seasonRow}>
-              <Calendar width={16} height={16} aria-hidden="true" className={styles.seasonIcon} />
-              <span className={styles.seasonTitle}>{year.year} Season</span>
-              <button
-                type="button"
-                className={styles.seasonArrow}
-                disabled={yearIndex === data.perYear.length - 1}
-                onClick={() => setYearIndex((i) => Math.min(data.perYear.length - 1, i + 1))}
-                aria-label="Previous season"
-              >
-                <ChevronLeft width={15} height={15} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={styles.seasonArrow}
-                disabled={yearIndex === 0}
-                onClick={() => setYearIndex((i) => Math.max(0, i - 1))}
-                aria-label="Next season"
-              >
-                <ChevronRight width={15} height={15} aria-hidden="true" />
-              </button>
-            </div>
+          <section className={styles["yni-season-card"]}>
+            <div className={styles["yni-season-header"]}>
+              <div className={styles["yni-season-title"]}>
+                <CalendarIcon />
+                <span>{year.year} Season</span>
+              </div>
 
-            <div className={styles.tileGrid}>
-              <div className={styles.tile}>
-                <Bike width={22} height={22} aria-hidden="true" className={styles.tileIconBike} />
-                <div>
-                  <div className={styles.tileValue}>{year.totals.ridesCount.toLocaleString("en-US")}</div>
-                  <div className={styles.tileLabel}>Rides</div>
-                </div>
-              </div>
-              <div className={styles.tile}>
-                <MapPin width={22} height={22} aria-hidden="true" className={styles.tileIconKm} />
-                <div>
-                  <div className={styles.tileValue}>{year.totals.totalKm.toLocaleString("en-US")}</div>
-                  <div className={styles.tileLabel}>Kilometers</div>
-                </div>
-              </div>
-              <div className={styles.tile}>
-                <Mountain width={22} height={22} aria-hidden="true" className={styles.tileIconClimb} />
-                <div>
-                  <div className={styles.tileValue}>
-                    {year.totals.totalClimbM.toLocaleString("en-US")}
-                  </div>
-                  <div className={styles.tileLabel}>Climb (m)</div>
-                </div>
-              </div>
-              <div className={styles.tile}>
-                <Flame width={22} height={22} aria-hidden="true" className={styles.tileIconCal} />
-                <div>
-                  <div className={styles.tileValue}>
-                    {(year.totals.totalCalories ?? 0).toLocaleString("en-US")}
-                  </div>
-                  <div className={styles.tileLabel}>Calories</div>
-                </div>
+              <div className={styles["yni-season-actions"]}>
+                <button
+                  type="button"
+                  className={styles["yni-mini-btn"]}
+                  aria-label="Previous season"
+                  disabled={yearIndex === data.perYear.length - 1}
+                  onClick={() => setYearIndex((i) => Math.min(data.perYear.length - 1, i + 1))}
+                >
+                  <ChevronLeftIcon />
+                </button>
+                <button
+                  type="button"
+                  className={styles["yni-mini-btn"]}
+                  aria-label="Next season"
+                  disabled={yearIndex === 0}
+                  onClick={() => setYearIndex((i) => Math.max(0, i - 1))}
+                >
+                  <ChevronRightIcon />
+                </button>
               </div>
             </div>
 
-            <div className={styles.goalsHeader}>
-              <span className={styles.goalsTitle}>Season Goals</span>
-              <button type="button" className={styles.editGoals}>
+            {/* STATS */}
+            <div className={styles["yni-stats-grid"]}>
+              {stats.map((stat) => (
+                <div className={styles["yni-stat-card"]} key={stat.label}>
+                  <div className={`${styles["yni-stat-icon"]} ${styles[`yni-${stat.tone}`]}`}>{stat.icon}</div>
+                  <div className={styles["yni-stat-copy"]}>
+                    <div className={styles["yni-stat-value"]}>{stat.value}</div>
+                    <div className={styles["yni-stat-label"]}>{stat.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* GOALS */}
+            <div className={styles["yni-goals-title-row"]}>
+              <h3>Season Goals</h3>
+              <button type="button" className={styles["yni-edit-btn"]}>
                 Edit Goals
               </button>
             </div>
 
-            <div className={styles.goalsList}>
+            <div className={styles["yni-goals"]}>
               {year.goals.map((goal) => {
-                const percent = Math.min(100, Math.round((goal.current / goal.target) * 100));
-                const met = goal.current >= goal.target;
+                const pct = Math.min(100, Math.round((goal.current / goal.target) * 100));
+                const done = goal.current >= goal.target;
+
                 return (
-                  <div key={goal.label} className={styles.goalRow}>
-                    <div className={styles.goalTopRow}>
-                      <span className={styles.goalLabel}>{goal.label}</span>
-                      <span className={styles.goalFraction}>
+                  <div className={styles["yni-goal"]} key={goal.label}>
+                    <div className={styles["yni-goal-row"]}>
+                      <span className={styles["yni-goal-label"]}>{goal.label}</span>
+                      <span className={styles["yni-goal-value"]}>
                         {goal.current.toLocaleString("en-US")} / {goal.target.toLocaleString("en-US")}
                       </span>
                     </div>
-                    <div className={styles.goalBarRow}>
-                      <div className={styles.goalTrack} aria-hidden="true">
-                        <div
-                          className={styles.goalFill}
-                          style={{ width: `${percent}%` }}
-                          data-met={met || undefined}
-                        />
+
+                    <div className={styles["yni-goal-progress-row"]}>
+                      <div className={styles["yni-progress-track"]}>
+                        <div className={styles["yni-progress-fill"]} style={{ width: `${pct}%` }} />
                       </div>
-                      {met ? (
-                        <span className={styles.goalCheck} aria-label="Goal complete">
-                          ✓
-                        </span>
+
+                      {done ? (
+                        <div className={styles["yni-done"]}>
+                          <CheckIcon />
+                        </div>
                       ) : (
-                        <span className={styles.goalPercent}>{percent}%</span>
+                        <div className={styles["yni-percent"]}>{pct}%</div>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </>
+          </section>
         )}
 
-        <div className={styles.footerPhoto}>
-          <p className={styles.footerQuote}>
-            Same Roads
-            <br />
-            Stronger You
-          </p>
-          <p className={styles.footerBrand}>EL NIÑO</p>
-        </div>
-      </div>
+        {/* FOOTER VISUAL */}
+        <section
+          className={styles["yni-quote-card"]}
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(3,29,49,.10), rgba(3,29,49,.48)), url("${FOOTER_IMAGE}")`,
+          }}
+        >
+          <div className={styles["yni-quote"]}>
+            <span>Same Roads</span>
+            <span>Stronger You</span>
+          </div>
+          <div className={styles["yni-brand"]}>EL NIÑO</div>
+        </section>
+      </main>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------
+ * Inline SVG icons, carried over verbatim from the provided component — no icon package
+ * substitution, so shapes stay pixel-identical to the reference.
+ * ------------------------------------------------------------ */
+
+function BikeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="5.5" cy="17.5" r="3.2" />
+      <circle cx="18.5" cy="17.5" r="3.2" />
+      <path d="M8.3 17.5 11 11h3l4.5 6.5M11 11 8.5 7.5h3.3M10.9 11l-5.4 6.5M13.6 7.5h3" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s6-6.2 6-12A6 6 0 0 0 6 9c0 5.8 6 12 6 12Z" />
+      <circle cx="12" cy="9" r="2" />
+    </svg>
+  );
+}
+
+function MountainIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m3 19 6.2-11 3.1 5 2.2-3.3L21 19H3Z" />
+    </svg>
+  );
+}
+
+function FlameIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13 2s.8 4.2-2.4 7.3C7.3 12.4 8 16 10 17.5c-4.5-1.2-6.4-6.2-3.4-10.3C8.3 5 9.5 4 9.5 4s.7 2.2.1 4.1C13.1 6.6 13 2 13 2Zm1.7 8.1c3 2 4.3 4.3 3.6 6.8-.6 2.3-2.7 4.1-5.3 4.1-2.3 0-4.3-1.4-5.1-3.3 2.2 1.4 5.1.8 6.2-1.3 1.1-2 .6-4.5.6-6.3Z" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M7 3v4M17 3v4M3 10h18M8 14h2M12 14h2M16 14h1M8 17h2M12 17h2" />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m15 5-7 7 7 7" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.8-2L17 6l-2.1-2.1-1.8.8a7 7 0 0 0-2-.8L10.5 2h-3l-.7 1.9a7 7 0 0 0-2 .8L3 3.9.9 6l.8 1.8a7 7 0 0 0-.8 2L-1 10.5v3l1.9.7a7 7 0 0 0 .8 2L.9 18 3 20.1l1.8-.8a7 7 0 0 0 2 .8l.7 1.9h3l.7-1.9a7 7 0 0 0 2-.8l1.8.8 2.1-2.1-.8-1.8a7 7 0 0 0 .8-2l1.9-.7Z" transform="translate(3)" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m6 12 4 4 8-9" />
+    </svg>
   );
 }

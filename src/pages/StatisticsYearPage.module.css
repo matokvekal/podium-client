@@ -19,14 +19,37 @@
   --orange: #ff6c36;
   --muted: #6e7c8e;
 
-  /* Cancels .app-main's own padding (tokens.css --space-4) so the hero/footer below can bleed
-     edge to edge, the same way every other full-bleed header in this app does it. Not in the
-     source component, which had no host page to sit inside. */
-  margin: calc(var(--space-4) * -1);
+  /* Restored from the source component's own width/shape constraints — these are what make
+     the stat cards square-ish and the hero read at the right proportion; they are NOT part of
+     the fake phone-frame chrome that was correctly dropped (the status bar, the bottom nav). A
+     wide desktop viewport gets a centered ~420px card (matching the reference's own look on a
+     screen wider than a phone); at real mobile widths it goes edge-to-edge, per the source's
+     own `@media (max-width: 430px)` rule below. */
+  width: min(420px, 100%);
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 70px rgba(25, 48, 68, 0.2),
+    0 3px 10px rgba(25, 48, 68, 0.08);
 
   color: var(--navy);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   position: relative;
+}
+
+/* Edge-to-edge on a real phone — cancels .app-main's own padding (tokens.css --space-4) so the
+   hero/footer can bleed to the true screen edge, the same way every other full-bleed header in
+   this app does it, and drops the floating-card shape that only makes sense with room around
+   it. Threshold matches the source component's own breakpoint. */
+@media (max-width: 430px) {
+  .yni-phone {
+    width: 100%;
+    margin: calc(var(--space-4) * -1);
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 .yni-phone svg {
@@ -43,8 +66,8 @@
   min-height: 242px;
   padding: 11px 14px 0;
   color: white;
-  background-position: 30% 35%;
-  background-size: 160% auto;
+  background-position: 15% 40%;
+  background-size: cover;
   background-repeat: no-repeat;
   background-color: #173b57;
   position: relative;
@@ -141,7 +164,7 @@
 .yni-season-card {
   background: white;
   border-radius: 12px;
-  padding: 14px 14px 16px;
+  padding: 18px 16px 22px;
   box-shadow: 0 3px 12px rgba(31, 51, 68, 0.11);
 }
 
@@ -149,20 +172,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 13px;
+  margin-bottom: 16px;
 }
 
 .yni-season-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 17px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 850;
 }
 
 .yni-season-title svg {
-  width: 19px;
-  height: 19px;
+  width: 22px;
+  height: 22px;
 }
 
 .yni-season-actions {
@@ -173,8 +196,8 @@
 
 .yni-mini-btn {
   color: var(--navy);
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
 }
@@ -185,37 +208,37 @@
 }
 
 .yni-mini-btn svg {
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
 }
 
 .yni-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.yni-stat-card {
-  min-height: 79px;
-  border-radius: 13px;
-  background: #f7f8fa;
-  padding: 10px 10px;
-  display: flex;
-  align-items: center;
   gap: 10px;
 }
 
+.yni-stat-card {
+  min-height: 100px;
+  border-radius: 14px;
+  background: #f7f8fa;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .yni-stat-icon {
-  width: 37px;
-  height: 37px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
 }
 
 .yni-stat-icon svg {
-  width: 31px;
-  height: 31px;
+  width: 40px;
+  height: 40px;
   stroke-width: 1.85;
 }
 
@@ -237,23 +260,24 @@
 }
 
 .yni-stat-value {
-  font-size: 21px;
+  font-size: 27px;
   line-height: 1;
-  font-weight: 850;
+  font-weight: 900;
   letter-spacing: -0.45px;
+  color: var(--navy);
 }
 
 .yni-stat-label {
-  margin-top: 5px;
-  color: #5c697b;
-  font-size: 11px;
+  margin-top: 6px;
+  color: #45536b;
+  font-size: 13px;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .yni-goals-title-row {
-  margin-top: 19px;
-  margin-bottom: 12px;
+  margin-top: 24px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -261,20 +285,20 @@
 
 .yni-goals-title-row h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 850;
 }
 
 .yni-edit-btn {
   color: #397deb;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .yni-goals {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
 }
 
 .yni-goal-row {
@@ -282,28 +306,29 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 7px;
+  margin-bottom: 9px;
 }
 
 .yni-goal-label {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
+  color: var(--navy);
 }
 
 .yni-goal-value {
-  color: #617084;
-  font-size: 11px;
-  font-weight: 650;
+  color: #4b5b73;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .yni-goal-progress-row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
 }
 
 .yni-progress-track {
-  height: 8px;
+  height: 11px;
   background: #dce3e8;
   border-radius: 999px;
   overflow: hidden;
@@ -318,8 +343,8 @@
 }
 
 .yni-done {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #28c96a;
   color: white;
@@ -329,25 +354,25 @@
 }
 
 .yni-done svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   stroke-width: 3;
 }
 
 .yni-percent {
-  width: 30px;
+  width: 36px;
   text-align: right;
-  font-size: 11px;
-  color: #46566a;
-  font-weight: 750;
+  font-size: 13px;
+  color: #3d4c62;
+  font-weight: 800;
 }
 
 .yni-quote-card {
   margin-top: 8px;
   height: 170px;
   border-radius: 14px;
-  background-position: 25% center;
-  background-size: 180% auto;
+  background-position: 30% 30%;
+  background-size: cover;
   background-repeat: no-repeat;
   background-color: #274b66;
   color: white;

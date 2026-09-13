@@ -22,6 +22,7 @@ import { ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { StatisticsAchievementsPage } from "./pages/StatisticsAchievementsPage";
 import { StatisticsLeaderboardPage } from "./pages/StatisticsLeaderboardPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
+import { StatisticsYearPage } from "./pages/StatisticsYearPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -231,6 +232,14 @@ export function App() {
         element={
           <RequireAuth>
             <StatisticsLeaderboardPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/stats/year"
+        element={
+          <RequireAuth>
+            <StatisticsYearPage />
           </RequireAuth>
         }
       />

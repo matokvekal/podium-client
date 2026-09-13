@@ -5,9 +5,10 @@
  * near-literal port of it into this app's lib/ layer so StatisticsLeaderboardPage.tsx can
  * import it the same way every other page imports its own mock.
  *
- * Exactly four ranking dimensions — Rides, Climb, Distance, Hours. No Calories: this screen is
- * rider-vs-rider (a national championship), not the personal me-vs-myself history the rest of
- * Statistics covers, and calories were deliberately left off the source-of-truth spec.
+ * Exactly four ranking dimensions, in this order — Rides, Distance, Climb, Hours. No Calories:
+ * this screen is rider-vs-rider (a national championship), not the personal me-vs-myself
+ * history the rest of Statistics covers, and calories stay on that personal screen only. Hours
+ * is accumulated riding/activity duration, not elapsed calendar time.
  *
  * UI-only. Swapping this for a real GET /leaderboard is a separate pass — see
  * StatisticsLeaderboardPage.tsx's own header.
@@ -64,7 +65,9 @@ function valueFor(metric: LeaderboardMetric, rank: number): number {
   if (metric === "rides") return Math.max(4, Math.round(150 - rank * 0.42));
   if (metric === "climb") return Math.max(800, Math.round(92000 - rank * 255));
   if (metric === "distance") return Math.max(450, Math.round(8700 - rank * 22.7));
-  return Math.max(12, Math.round(510 - rank * 1.45));
+  // Accumulated riding time, one decimal place (e.g. "82.5 h") — matches how a real duration
+  // total would actually read, not a whole-number placeholder.
+  return Math.max(12, Math.round((510 - rank * 1.45) * 10) / 10);
 }
 
 /** Rank of the mocked "current rider" — kept away from the podium on purpose (the whole point

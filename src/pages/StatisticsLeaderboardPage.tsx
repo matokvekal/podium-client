@@ -12,8 +12,9 @@
  * not the network. No API contract exists for this yet; wiring it to a real
  * GET /leaderboard is a separate pass once this UI is approved.
  *
- * Exactly four categories, in this fixed order: Rides, Climb, Distance, Hours. No Calories —
- * asked for directly.
+ * Exactly four categories, in this fixed order: Rides, Distance, Climb, Hours. No Calories —
+ * asked for directly (calories stay on the rider's personal Statistics screen, not here). Hours
+ * is accumulated riding/activity duration, not elapsed calendar time.
  *
  * Route:   /stats/leaderboard
  * Loads:   lib/national-leaderboard-mock.ts (mock, 300 rows per category)
@@ -37,7 +38,7 @@ import {
 import styles from "./StatisticsLeaderboardPage.module.css";
 import shared from "./StatisticsShared.module.css";
 
-const METRICS: LeaderboardMetric[] = ["rides", "climb", "distance", "hours"];
+const METRICS: LeaderboardMetric[] = ["rides", "distance", "climb", "hours"];
 const YEARS = [2026, 2025, 2024];
 // Silver / gold / bronze left-to-right, gold centred and tallest — same order the reference
 // podium uses.

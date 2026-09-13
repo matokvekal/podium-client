@@ -21,7 +21,20 @@
  * Actions: Month/Year switch (resets the timeline); infinite scroll loads older periods
  */
 
-import { Bike, ChevronLeft, Clock, Flame, Info, Mountain, Ruler, Trophy, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bike,
+  ChevronLeft,
+  ChevronUp,
+  Clock,
+  Flame,
+  Info,
+  Mountain,
+  Ruler,
+  Trophy,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -48,14 +61,35 @@ const STAT_ICON: Record<StatKey, ReactNode> = {
 
 const PAGE_SIZE = 6;
 
+/** Signed whole-percent change vs the prior period. `null` when the prior period had no
+ *  baseline to compare against (0), so a rider's very first ride ever doesn't read as "+∞%". */
+function percentChange(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
 export function StatisticsAchievementsPage() {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [count, setCount] = useState(PAGE_SIZE);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const periods: PeriodStats[] =
-    periodType === "month" ? getMonthlyPeriods(count) : getYearlyPeriods(count);
+  // The timeline can scroll for a while (infinite scroll, by design) — a jump-to-top button
+  // appears once the rider has actually scrolled away from the header/period toggle.
+  useEffect(() => {
+    function onScroll() {
+      setShowBackToTop(window.scrollY > 400);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // +1 so the OLDEST visible period can still show a trend against the one just before it —
+  // that extra period is fetched but never rendered.
+  const periodsWithLookback: PeriodStats[] =
+    periodType === "month" ? getMonthlyPeriods(count + 1) : getYearlyPeriods(count + 1);
+  const periods = periodsWithLookback.slice(0, count);
 
   function switchPeriodType(next: PeriodType) {
     setPeriodType(next);
@@ -124,43 +158,75 @@ export function StatisticsAchievementsPage() {
       <p className={styles.sectionEyebrow}>MY RESULTS</p>
 
       <div className={styles.timeline}>
-        {periods.map((period, i) => (
-          <section className={styles.periodBlock} key={period.period}>
-            <div className={styles.periodHeaderRow}>
-              <h2 className={styles.periodLabel}>{period.label}</h2>
-              {i === 0 && <span className={styles.currentBadge}>Current</span>}
-            </div>
+        {periods.map((period, i) => {
+          // The period right before this one, chronologically — one older, i.e. the NEXT entry
+          // in this newest-first list. Always present: periodsWithLookback fetched one extra.
+          const previousPeriod = periodsWithLookback[i + 1];
+          return (
+            <section className={styles.periodBlock} key={period.period}>
+              <div className={styles.periodHeaderRow}>
+                <h2 className={styles.periodLabel}>{period.label}</h2>
+                {i === 0 && <span className={styles.currentBadge}>Current</span>}
+              </div>
 
-            <div className={styles.statList}>
-              {STAT_ORDER.map((key) => {
-                const stat = period.stats[key];
-                return (
-                  <div className={styles.statRow} key={key}>
-                    <span className={styles.statIcon}>{STAT_ICON[key]}</span>
-                    <span className={styles.statLabel}>{STAT_LABEL[key]}</span>
-                    <span className={styles.statValue}>{formatStatValue(stat)}</span>
-                    <img
-                      src={GEM_ASSET(stat.gem)}
-                      alt={stat.gem}
-                      className={styles.statGem}
-                      title={stat.gem}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+              <div className={styles.statList}>
+                {STAT_ORDER.map((key) => {
+                  const stat = period.stats[key];
+                  const trend = percentChange(stat.value, previousPeriod.stats[key].value);
+                  return (
+                    <div className={styles.statRow} key={key}>
+                      <span className={styles.statIcon}>{STAT_ICON[key]}</span>
+                      <span className={styles.statLabel}>{STAT_LABEL[key]}</span>
+                      <span className={styles.statValue}>{formatStatValue(stat)}</span>
+                      {trend != null && (
+                        <span
+                          className={trend >= 0 ? styles.trendUp : styles.trendDown}
+                          title={`${trend >= 0 ? "Up" : "Down"} ${Math.abs(trend)}% vs ${
+                            periodType === "month" ? "last month" : "last year"
+                          }`}
+                        >
+                          {trend >= 0 ? (
+                            <ArrowUp aria-hidden="true" />
+                          ) : (
+                            <ArrowDown aria-hidden="true" />
+                          )}
+                          {Math.abs(trend)}%
+                        </span>
+                      )}
+                      <img
+                        src={GEM_ASSET(stat.gem)}
+                        alt={stat.gem}
+                        className={styles.statGem}
+                        title={stat.gem}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Reserved for the "ME vs OTHER RIDERS" phase — top 3 + my rank per category, for
-                this same period. Not built yet; this affordance just holds its place in the
-                layout, per instruction to design for it now and build it later. */}
-            <button type="button" className={styles.rankingsButton} disabled title="Coming soon">
-              <Trophy aria-hidden="true" />
-              Rankings for {period.label}
-            </button>
-          </section>
-        ))}
+              {/* Reserved for the "ME vs OTHER RIDERS" phase — top 3 + my rank per category, for
+                  this same period. Not built yet; this affordance just holds its place in the
+                  layout, per instruction to design for it now and build it later. */}
+              <button type="button" className={styles.rankingsButton} disabled title="Coming soon">
+                <Trophy aria-hidden="true" />
+                Rankings for {period.label}
+              </button>
+            </section>
+          );
+        })}
         <div ref={sentinelRef} aria-hidden="true" />
       </div>
+
+      {showBackToTop && (
+        <button
+          type="button"
+          className={styles.backToTop}
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="Back to top"
+        >
+          <ChevronUp aria-hidden="true" />
+        </button>
+      )}
 
       {legendOpen && (
         <div

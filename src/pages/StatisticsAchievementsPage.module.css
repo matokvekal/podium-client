@@ -1,116 +1,392 @@
-.roadmap {
-  position: relative;
+/*
+ * Carried over from the provided reference package (statisics/achivment/AchievementMock.css)
+ * as closely as possible. Two adjustments only, both explained in
+ * StatisticsAchievementsPage.tsx's header:
+ *   1. `* { box-sizing: border-box; }` was a bare universal selector — CSS Modules only scope
+ *      class/id selectors, so copied verbatim this would leak globally to the whole app (the
+ *      exact bug found and fixed on the Year View page). Scoped to .achPage's own subtree here
+ *      from the start.
+ *   2. `.achPage`'s `min-height: 100dvh` assumed it was the only thing on the screen; dropped so
+ *      it doesn't add a second full viewport height on top of this app's own header/footer.
+ */
+
+.achPage,
+.achPage * {
+  box-sizing: border-box;
+}
+
+.achPage {
+  /* Scoped here rather than :root — a bare :root selector is, like the universal selector
+     above, NOT scoped by CSS Modules and would leak these names onto the real <html> element. */
+  --ach-bg: #edf2f4;
+  --ach-card: #ffffff;
+  --ach-navy: #13243b;
+  --ach-muted: #738095;
+  --ach-green: #38d676;
+  --ach-dark-tab: #28445a;
+
+  width: 100%;
   display: flex;
-  justify-content: space-between;
-  padding: var(--space-4) var(--space-2) 0;
+  justify-content: center;
+  background: var(--ach-bg);
+  color: var(--ach-navy);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Cancels .app-main's own padding (tokens.css --space-4) so the header bar below can bleed to
+     the true screen edge on mobile, the same way every other full-bleed header in this app does
+     it — the source component had no host page to sit inside, so it never needed this. */
+  margin: calc(var(--space-4) * -1);
+  padding: var(--space-4);
 }
 
-.roadmapLine {
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  top: 25px;
-  height: 2px;
-  background: repeating-linear-gradient(
-    to right,
-    var(--border-strong) 0,
-    var(--border-strong) 4px,
-    transparent 4px,
-    transparent 8px
-  );
-  z-index: 0;
+.achShell {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0 8px 18px;
 }
 
-.roadmapStop {
-  position: relative;
-  z-index: 1;
+.achShell svg {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.achHeader {
+  height: 58px;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  color: white;
+  background: linear-gradient(180deg, #245a7c, #2c688b);
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.achHeader h1 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.iconButton {
+  border: 0;
+  background: transparent;
+  color: white;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.iconButton svg {
+  width: 24px;
+  height: 24px;
+}
+
+.categoryTabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 7px 0;
+}
+
+.categoryTab {
+  min-height: 64px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: var(--ach-dark-tab);
   display: flex;
   flex-direction: column;
+  gap: 4px;
   align-items: center;
-  gap: 2px;
-  background: var(--surface);
-  padding: 0 2px;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
-.roadmapName {
-  font-size: 10px;
-  font-weight: var(--weight-bold);
-  color: var(--text);
+.categoryTab.active {
+  color: #1f5034;
+  background: linear-gradient(180deg, #affc9e, #7ee889);
+  box-shadow: 0 4px 10px rgba(58, 194, 103, 0.18);
 }
 
-.roadmapThreshold {
-  font-size: 9px;
-  color: var(--text-muted);
+.categoryIcon {
+  font-size: 24px;
+  display: grid;
+  place-items: center;
+}
+.categoryIcon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.progressCard,
+.allCard {
+  background: var(--ach-card);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(25, 44, 58, 0.1);
 }
 
 .progressCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  padding: 12px 12px 14px;
 }
 
-.percentBadge {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-  padding: 2px 8px;
+.progressCard h2,
+.allCard h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.progressHero {
+  display: grid;
+  grid-template-columns: 105px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 4px 10px;
+}
+
+/* JPG renders have their own soft glow baked into a white background (no alpha channel) — no
+   CSS drop-shadow layered on top (that would shadow the image's rectangle, not the gem), and no
+   blend-mode needed since .progressCard/.allCard are already pure white. */
+.heroGem {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+}
+
+.progressCopy {
+  min-width: 0;
+}
+
+.achievementName {
+  font-size: 20px;
+  font-weight: 850;
+  margin-bottom: 6px;
+}
+
+.achievementValue {
+  font-size: 16px;
+  color: #42556c;
+  font-weight: 700;
+}
+
+.achievementValue strong {
+  color: var(--ach-navy);
+  font-weight: 900;
+}
+
+.progressLine {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.progressTrack {
+  height: 10px;
   border-radius: 999px;
+  overflow: hidden;
+  background: #dfe5ea;
 }
 
-.progressCardBody {
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #2fd26e, #68e792);
+  border-radius: inherit;
+}
+
+.progressPercent {
+  font-size: 13px;
+  font-weight: 850;
+  min-width: 34px;
+  text-align: right;
+}
+
+.remainingText {
+  margin-top: 5px;
+  color: #68768a;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.gemRail {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.gemLevel {
+  text-align: center;
+  min-width: 0;
+}
+
+.gemWrap {
+  width: 51px;
+  height: 58px;
+  margin: 0 auto 3px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.gemWrap img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.gemWrap.current {
+  border-radius: 13px;
+  background: rgba(239, 35, 60, 0.07);
+}
+
+.checkBadge {
+  position: absolute;
+  right: -1px;
+  bottom: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #26cb68;
+  color: white;
+  display: grid;
+  place-items: center;
+  border: 2px solid white;
+}
+.checkBadge svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+
+.gemName {
+  font-size: 10px;
+  font-weight: 800;
+}
+.gemThreshold {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #657286;
+  font-weight: 700;
+}
+
+.allCard {
+  margin-top: 8px;
+  padding: 12px;
+}
+
+.achievementList {
+  margin-top: 8px;
+}
+
+.achievementRow {
+  min-height: 55px;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.achievementRow:last-child {
+  border-bottom: 0;
+}
+.achievementRow.locked {
+  opacity: 0.42;
+}
+
+.rowAssetWrap {
+  width: 42px;
+  display: grid;
+  place-items: center;
+}
+.rowGem {
+  width: 35px;
+  height: 35px;
+  object-fit: contain;
+}
+
+.lockedCircle {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: #919ba6;
+  color: white;
+  display: grid;
+  place-items: center;
+}
+.lockedCircle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rowMain {
+  min-width: 0;
+}
+.rowTitle {
+  font-size: 13px;
+  font-weight: 850;
+}
+.rowValue {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #627085;
+  font-weight: 650;
+}
+.rowDate {
+  color: #8995a4;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.motivationBox {
+  min-height: 64px;
+  margin-top: 10px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #f8fafb, #f2f5f6);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  gap: 13px;
+  color: #536274;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 650;
 }
 
-.progressTierName {
-  font-size: var(--fs-md);
-  font-weight: var(--weight-bold);
-  color: var(--text);
+.mountainMark {
+  width: 54px !important;
+  height: 32px !important;
+  color: #264b6a;
 }
 
-.listCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.listTitle {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--text);
-}
-
-.tierRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tierRow:last-child {
-  border-bottom: none;
-}
-
-.tierRowName {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--text);
-}
-
-.earnedDate {
-  font-size: var(--text-xs);
-  color: #10b981;
-  font-weight: var(--weight-medium);
-  flex-shrink: 0;
-}
-
-.inProgress {
-  font-size: var(--text-xs);
-  color: var(--accent-strong);
-  font-weight: var(--weight-bold);
-  flex-shrink: 0;
+@media (max-width: 430px) {
+  .achPage {
+    padding: 0;
+  }
+  .achShell {
+    max-width: none;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .achHeader {
+    margin-left: -6px;
+    margin-right: -6px;
+    padding-left: 6px;
+    padding-right: 6px;
+    border-radius: 0;
+  }
 }

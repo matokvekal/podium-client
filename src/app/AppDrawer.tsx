@@ -12,6 +12,7 @@
  */
 
 import {
+  BarChart3,
   Bike,
   LogOut,
   Map as MapIcon,
@@ -20,7 +21,6 @@ import {
   Moon,
   QrCode,
   Sun,
-  TrendingUp,
   User,
   Users,
   X,
@@ -114,11 +114,38 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             <Bike aria-hidden="true" />
             My Rides
           </NavLink>
+          {/* Statistics is a group, not a single link — "My Statistics" (the existing
+              me-vs-myself history) and "Leaderboard" (the national me-vs-everyone-else
+              championship, StatisticsLeaderboardPage.tsx) are different screens, asked for
+              directly as a nested pair under one "Statistics" heading rather than two
+              unrelated-looking top-level items. */}
           {status === "signed-in" && (
-            <NavLink to="/stats" className="drawer__nav-item" onClick={onClose}>
-              <TrendingUp aria-hidden="true" />
-              Statistics
-            </NavLink>
+            <div className="drawer__nav-group">
+              <div className="drawer__nav-heading">
+                <BarChart3 aria-hidden="true" />
+                Statistics
+              </div>
+              <NavLink to="/stats" end className="drawer__nav-subaction" onClick={onClose}>
+                My Statistics
+              </NavLink>
+              <NavLink to="/stats/year" className="drawer__nav-subaction" onClick={onClose}>
+                Year View
+              </NavLink>
+              <NavLink
+                to="/stats/achievements"
+                className="drawer__nav-subaction"
+                onClick={onClose}
+              >
+                Achievements
+              </NavLink>
+              <NavLink
+                to="/stats/leaderboard"
+                className="drawer__nav-subaction"
+                onClick={onClose}
+              >
+                Leaderboard
+              </NavLink>
+            </div>
           )}
           {isOrganizer && (
             <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>

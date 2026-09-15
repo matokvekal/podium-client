@@ -104,7 +104,7 @@ describe("deviceTimeZoneRegion", () => {
   it("returns null for a zone we do not map, or no zone at all", () => {
     withTimeZone(UNMAPPED_ZONE);
     expect(deviceTimeZoneRegion()).toBeNull();
-    withTimeZone("Asia/Tokyo"); // real place, country not in COUNTRIES
+    withTimeZone("Asia/Shanghai"); // real place, country not in COUNTRIES
     expect(deviceTimeZoneRegion()).toBeNull();
     withTimeZone(undefined);
     expect(deviceTimeZoneRegion()).toBeNull();
@@ -147,7 +147,7 @@ describe("detectDefaultCountryCode", () => {
     withTimeZone(UNMAPPED_ZONE);
     withLanguage("en-ZZ"); // valid shape, not in our list
     expect(detectDefaultCountryCode()).toBe("IL");
-    withLanguage("ja-JP"); // real country, just not in the short list
+    withLanguage("zh-CN"); // real country, just not in the short list
     expect(detectDefaultCountryCode()).toBe("IL");
     withLanguage("en");
     expect(detectDefaultCountryCode()).toBe("IL");
@@ -165,13 +165,13 @@ describe("orderedCountries", () => {
 
     const rest = list.slice(1).map((c) => c.name);
     expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
-    expect(rest[0]).toBe("Australia");
+    expect(rest[0]).toBe("Argentina");
   });
 
   it("works for a US device", () => {
     const list = orderedCountries("US");
     expect(list[0]?.name).toBe("United States");
-    expect(list.slice(1)[0]?.name).toBe("Australia");
+    expect(list.slice(1)[0]?.name).toBe("Argentina");
     expect(list.filter((c) => c.code === "US")).toHaveLength(1);
   });
 
@@ -184,9 +184,10 @@ describe("orderedCountries", () => {
 });
 
 describe("searchCountries", () => {
-  // The bug this guards: Sweden is 18th of 20 once the rider's own country is pinned first,
-  // and in the old native <select> that put it past the bottom of a phone viewport. The picker
-  // that replaced it is only as good as its search, so the reachability of SE is pinned here.
+  // The bug this guards: further down the alphabet once the rider's own country is pinned
+  // first, Sweden fell past the bottom of a phone viewport in the old native <select>. The
+  // picker that replaced it is only as good as its search, so the reachability of SE is pinned
+  // here regardless of how long the list grows.
   const israeliList = orderedCountries("IL");
 
   it("returns the whole list for an empty or whitespace query", () => {

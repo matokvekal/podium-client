@@ -47,6 +47,7 @@ import {
   CheckCircle2,
   Circle,
   Coffee,
+  Download,
   LifeBuoy,
   MapPin,
   MapPinned,
@@ -97,6 +98,7 @@ import { formatDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
+import { buildGpxFile, downloadGpxFile, gpxFilenameFor } from "../lib/track-gpx";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -1614,6 +1616,24 @@ export function EventDetailPage() {
                       </span>
                     )}
                   </span>
+                  {/* Download the route as a GPX so a rider can load it onto a bike computer
+                      or nav app, not just look at the in-app map — asked for directly
+                      ("download button so they can download the gpx file to phone"). Client-
+                      side only: the points/elevations are already on screen in the map above. */}
+                  <button
+                    type="button"
+                    className={styles.routeDownloadBtn}
+                    onClick={() => {
+                      if (!results.route) return;
+                      downloadGpxFile(
+                        gpxFilenameFor(event.name),
+                        buildGpxFile(results.route, event.name),
+                      );
+                    }}
+                  >
+                    <Download width={14} height={14} aria-hidden="true" />
+                    GPX
+                  </button>
                 </div>
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={results.route.points} />

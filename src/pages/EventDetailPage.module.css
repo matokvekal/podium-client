@@ -1169,6 +1169,25 @@
   gap: 5px;
 }
 
+.routeDownloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.routeDownloadBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
 /* "Track copied from <ride>" — a credit under the map, deliberately quiet: it names whose work
    this ride is built on without competing with the route itself. Sits at the same muted weight
    as .routeMeta above. The link half is absent when the source ride is gone, so this styles the

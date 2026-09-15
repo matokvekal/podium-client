@@ -1,58 +1,80 @@
 /**
  * National Leaderboard. Route: /stats/leaderboard.
  *
- * UI-REVIEW PASS, replacing the earlier Top-10 mock (images/statisics/board.JPG) with the
- * approved "National Champions" reference supplied directly
- * (statisics/board/elnino-national-leaderboard-mock.zip — NationalLeaderboardMock.tsx/.css,
- * mockLeaderboard.ts, assets/). This is a rider-vs-EVERYONE-ELSE screen (a country
- * championship), distinct from the me-vs-myself history the rest of Statistics covers — see
- * README.md in that package.
- *
- * Reads lib/national-leaderboard-mock.ts (a near-literal port of the supplied mock data) —
- * not the network. No API contract exists for this yet; wiring it to a real
- * GET /leaderboard is a separate pass once this UI is approved.
+ * REAL DATA: reads useStatisticsStore (GET /api/v1/statistics/leaderboard), cache-first via
+ * local-db.ts. Visual structure reproduces the approved "National Champions" reference
+ * (statisics/board/ — NationalLeaderboardMock.tsx/.css, mockLeaderboard.ts, assets/); see that
+ * package's README.md.
  *
  * Exactly four categories, in this fixed order: Rides, Distance, Climb, Hours. No Calories —
  * asked for directly (calories stay on the rider's personal Statistics screen, not here). Hours
  * is accumulated riding/activity duration, not elapsed calendar time.
  *
+ * COUNTRY, NOT STATE: the scope select's "State / Region" option is left in but does not change
+ * the query — there is no per-state subdivision data anywhere in the schema yet (see the
+ * architecture note in statistics.service.ts). The country scope is always the SIGNED-IN
+ * RIDER'S OWN users.country — a national leaderboard is about a rider's own country's
+ * community, not where any one ride physically happened.
+ *
+ * A rider who has not set a country yet, or who has never opened Statistics, sees an honest
+ * empty/not-ranked state rather than a guessed number — see the empty-state renders below.
+ *
  * Route:   /stats/leaderboard
- * Loads:   lib/national-leaderboard-mock.ts (mock, 300 rows per category)
- * Actions: category tabs; country/state scope select (state has no real subdivision data yet,
- *          so it only relabels the scope — see the select's own comment); year select (cosmetic,
- *          every year reads the same mock rows); "Where am I?" scrolls the ranked list to the
- *          mocked current rider's row, which is also highlighted green wherever it appears
- *          (podium or list).
+ * Loads:   store/statisticsStore.ts -> GET /api/v1/statistics/leaderboard
+ * Actions: category tabs; year select; "Where am I?" scrolls to my row when it is in the
+ *          rendered list, or just re-confirms my rank (already shown on the button) when I am
+ *          ranked outside it — the server sends only the top 50 plus my own row, not everyone.
  */
 
 import { ChevronLeft, LocateFixed } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
+import { useMyIdentity } from "../app/useMyIdentity";
 import {
-  CURRENT_RIDER_ID,
-  type LeaderboardMetric,
-  makeNationalLeaderboard,
-  metricMeta,
-} from "../lib/national-leaderboard-mock";
+  type LeaderboardCategory,
+  leaderboardScopeKey,
+  leaderboardSlot,
+  useStatisticsStore,
+} from "../store/statisticsStore";
 import styles from "./StatisticsLeaderboardPage.module.css";
 import shared from "./StatisticsShared.module.css";
 
-const METRICS: LeaderboardMetric[] = ["rides", "distance", "climb", "hours"];
-const YEARS = [2026, 2025, 2024];
+const ICON_BASE = "/images/statistics/leaderboard";
+
+const CATEGORY_META: Record<LeaderboardCategory, { label: string; unit: string; icon: string }> = {
+  rides: { label: "Rides", unit: "rides", icon: `${ICON_BASE}/rides.svg` },
+  distanceKm: { label: "Distance", unit: "km", icon: `${ICON_BASE}/distance.svg` },
+  climbM: { label: "Climb", unit: "m", icon: `${ICON_BASE}/climb.svg` },
+  hours: { label: "Hours", unit: "h", icon: `${ICON_BASE}/hours.svg` },
+};
+
+const CATEGORIES: LeaderboardCategory[] = ["rides", "distanceKm", "climbM", "hours"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
 // Silver / gold / bronze left-to-right, gold centred and tallest — same order the reference
 // podium uses.
 const PODIUM_ORDER = [1, 0, 2];
 
 export function StatisticsLeaderboardPage() {
-  const [metric, setMetric] = useState<LeaderboardMetric>("rides");
+  const me = useMyIdentity();
+  const [category, setCategory] = useState<LeaderboardCategory>("rides");
   const [scope, setScope] = useState<"country" | "state">("country");
   const [year, setYear] = useState(YEARS[0]);
 
-  const rows = useMemo(() => makeNationalLeaderboard(metric), [metric]);
+  const loadLeaderboard = useStatisticsStore((s) => s.loadLeaderboard);
+  const scopeKey = leaderboardScopeKey(category, "year", year, undefined);
+  const { data, loading } = useStatisticsStore(leaderboardSlot(scopeKey));
+
+  useEffect(() => {
+    if (me.userId != null) void loadLeaderboard(me.userId, category, "year", year, undefined);
+  }, [me.userId, category, year, loadLeaderboard]);
+
+  const unit = CATEGORY_META[category].unit;
+  const rows = data?.top ?? [];
   const podium = [rows[0], rows[1], rows[2]];
   const rest = rows.slice(3);
-  const currentRider = rows.find((r) => r.id === CURRENT_RIDER_ID) ?? null;
+  const currentRider = data?.me ?? null;
   const currentRowRef = useRef<HTMLDivElement | null>(null);
 
   function scrollToMe() {
@@ -79,8 +101,8 @@ export function StatisticsLeaderboardPage() {
         </div>
 
         <div className={styles.filters}>
-          {/* State/region has no real subdivision data yet (no per-country region list wired
-              to this mock) — the select only relabels the scope for now; see the file header. */}
+          {/* State/region has no real subdivision data yet — the select only relabels the
+              scope for now; see the file header. */}
           <select
             className={styles.filterSelect}
             value={scope}
@@ -105,87 +127,99 @@ export function StatisticsLeaderboardPage() {
         </div>
 
         <div className={styles.tabs} role="tablist" aria-label="Leaderboard category">
-          {METRICS.map((key) => (
+          {CATEGORIES.map((key) => (
             <button
               key={key}
               type="button"
               role="tab"
-              aria-selected={metric === key}
-              className={metric === key ? styles.tabActive : styles.tab}
-              onClick={() => setMetric(key)}
+              aria-selected={category === key}
+              className={category === key ? styles.tabActive : styles.tab}
+              onClick={() => setCategory(key)}
             >
-              <img src={metricMeta[key].icon} alt="" aria-hidden="true" />
-              <span>{metricMeta[key].label}</span>
+              <img src={CATEGORY_META[key].icon} alt="" aria-hidden="true" />
+              <span>{CATEGORY_META[key].label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className={styles.podium}>
-        {PODIUM_ORDER.map((rowIndex, position) => {
-          const row = podium[rowIndex];
-          if (!row) return <div key={rowIndex} />;
-          const place = position === 0 ? 2 : position === 1 ? 1 : 3;
-          return (
-            <article
-              key={row.id}
-              className={styles.podiumSpot}
-              data-place={place}
-              data-me={row.id === CURRENT_RIDER_ID || undefined}
-            >
-              <div className={styles.podiumRing}>
-                <Avatar
-                  name={row.name}
-                  avatarUrl={row.avatar}
-                  seed={row.id}
-                  className={styles.podiumAvatar}
-                />
-              </div>
-              <strong className={styles.podiumPlace}>{place}</strong>
-              <h3 className={styles.podiumName}>{row.name}</h3>
-              <b className={styles.podiumValue}>
-                {row.value.toLocaleString()} {row.unit}
-              </b>
-              <small aria-hidden="true">🇮🇱</small>
-            </article>
-          );
-        })}
-      </div>
+      {data && data.country === "" ? (
+        <p className="muted">
+          Set your country on the account screen to see your national leaderboard.
+        </p>
+      ) : loading && rows.length === 0 ? (
+        <p className="muted">Loading the leaderboard…</p>
+      ) : rows.length === 0 ? (
+        <p className="muted">No riders ranked here yet — be the first to finish a ride.</p>
+      ) : (
+        <>
+          <div className={styles.podium}>
+            {PODIUM_ORDER.map((rowIndex, position) => {
+              const row = podium[rowIndex];
+              if (!row) return <div key={rowIndex} />;
+              const place = position === 0 ? 2 : position === 1 ? 1 : 3;
+              return (
+                <article
+                  key={row.userId}
+                  className={styles.podiumSpot}
+                  data-place={place}
+                  data-me={row.userId === currentRider?.userId || undefined}
+                >
+                  <div className={styles.podiumRing}>
+                    <Avatar
+                      name={row.displayName}
+                      avatarUrl={row.avatarUrl}
+                      seed={String(row.userId)}
+                      className={styles.podiumAvatar}
+                    />
+                  </div>
+                  <strong className={styles.podiumPlace}>{place}</strong>
+                  <h3 className={styles.podiumName}>{row.displayName}</h3>
+                  <b className={styles.podiumValue}>
+                    {row.value.toLocaleString()} {unit}
+                  </b>
+                  <small aria-hidden="true">🇮🇱</small>
+                </article>
+              );
+            })}
+          </div>
 
-      <section className={`card ${styles.listCard}`}>
-        <div className={styles.listHeader}>
-          <span>#</span>
-          <span style={{ flex: 1 }}>Rider</span>
-          <span>{metricMeta[metric].label}</span>
-        </div>
+          <section className={`card ${styles.listCard}`}>
+            <div className={styles.listHeader}>
+              <span>#</span>
+              <span style={{ flex: 1 }}>Rider</span>
+              <span>{CATEGORY_META[category].label}</span>
+            </div>
 
-        <div className={styles.listScroll}>
-          {rest.map((row) => {
-            const isMe = row.id === CURRENT_RIDER_ID;
-            return (
-              <div
-                key={row.id}
-                ref={isMe ? currentRowRef : undefined}
-                className={isMe ? styles.listRowMe : styles.listRow}
-              >
-                <span className={styles.listRank}>{row.rank}</span>
-                <Avatar
-                  name={row.name}
-                  avatarUrl={row.avatar}
-                  seed={row.id}
-                  className={styles.listAvatar}
-                />
-                <span className={styles.listName}>
-                  {row.name} <span aria-hidden="true">🇮🇱</span>
-                </span>
-                <span className={styles.listValue}>
-                  {row.value.toLocaleString()} {row.unit}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+            <div className={styles.listScroll}>
+              {rest.map((row) => {
+                const isMe = row.userId === currentRider?.userId;
+                return (
+                  <div
+                    key={row.userId}
+                    ref={isMe ? currentRowRef : undefined}
+                    className={isMe ? styles.listRowMe : styles.listRow}
+                  >
+                    <span className={styles.listRank}>{row.rank}</span>
+                    <Avatar
+                      name={row.displayName}
+                      avatarUrl={row.avatarUrl}
+                      seed={String(row.userId)}
+                      className={styles.listAvatar}
+                    />
+                    <span className={styles.listName}>
+                      {row.displayName} <span aria-hidden="true">🇮🇱</span>
+                    </span>
+                    <span className={styles.listValue}>
+                      {row.value.toLocaleString()} {unit}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
 
       {currentRider && (
         <button type="button" className={styles.findMe} onClick={scrollToMe}>

@@ -302,14 +302,24 @@ interface PodiumDB extends DBSchema {
     value: UserScopedRow & { riders: LiveRider[]; paused: boolean };
     indexes: { userId: number };
   };
+  // v3: Rider Statistics. `statistics` holds exactly one row per viewer ("me") plus one row
+  // per leaderboard scope they have opened ("leaderboard:{category}:{period}:{year}:{country}")
+  // — private data (a rider's own totals, and their own rank) so it is user-scoped exactly like
+  // the v2 stores, never a shared/global cache.
+  statistics: {
+    key: string;
+    value: UserScopedRow & { payload: unknown };
+    indexes: { userId: number };
+  };
 }
 
-/** The v2 stores — every one user-scoped, so sign-out clears exactly these. */
+/** The v2+v3 stores — every one user-scoped, so sign-out clears exactly these. */
 const USER_SCOPED_STORES = [
   "eventDetails",
   "eventRoutes",
   "eventParticipants",
   "eventLive",
+  "statistics",
 ] as const;
 
 type UserScopedStore = (typeof USER_SCOPED_STORES)[number];
@@ -317,19 +327,28 @@ type UserScopedStore = (typeof USER_SCOPED_STORES)[number];
 let dbPromise: Promise<IDBPDatabase<PodiumDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<PodiumDB>> {
-  dbPromise ??= openDB<PodiumDB>("podium-db", 2, {
-    // Additive only: v1's `events` store and its rows survive the upgrade untouched, so an
-    // existing install keeps its list cache and just gains the four new stores.
+  dbPromise ??= openDB<PodiumDB>("podium-db", 3, {
+    // Additive only: every earlier store and its rows survive the upgrade untouched, so an
+    // existing install keeps its list cache and just gains the new stores.
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         const store = db.createObjectStore("events", { keyPath: "id" });
         store.createIndex("source", "source");
       }
       if (oldVersion < 2) {
-        for (const name of USER_SCOPED_STORES) {
+        for (const name of [
+          "eventDetails",
+          "eventRoutes",
+          "eventParticipants",
+          "eventLive",
+        ] as const) {
           const store = db.createObjectStore(name, { keyPath: "id" });
           store.createIndex("userId", "userId");
         }
+      }
+      if (oldVersion < 3) {
+        const store = db.createObjectStore("statistics", { keyPath: "id" });
+        store.createIndex("userId", "userId");
       }
     },
   });
@@ -569,6 +588,30 @@ export async function putCachedLiveRiders(
     riders,
     paused,
   });
+}
+
+/**
+ * Rider Statistics cache. `scope` is `"me"` for the personal payload, or
+ * `"leaderboard:{category}:{period}:{year}:{country}"` for one leaderboard view — every scope
+ * a viewer opens gets its own row, so switching category/period/year/country never shows a
+ * flash of the wrong data while the network catches up. `payload` is stored opaque (whatever
+ * shape statisticsStore.ts last received) rather than typed here, the same way `eventLive`
+ * above stores its riders array without local-db.ts knowing what a rider looks like.
+ */
+export async function getCachedStatistics<T>(
+  scope: string,
+  userId: number,
+): Promise<CacheHit<T> | null> {
+  const row = await readScoped("statistics", scope, userId);
+  return row ? { value: row.payload as T, lastSyncedAt: row.lastSyncedAt } : null;
+}
+
+export async function putCachedStatistics<T>(
+  scope: string,
+  userId: number,
+  payload: T,
+): Promise<void> {
+  await writeScoped("statistics", { id: scope, userId, lastSyncedAt: Date.now(), payload });
 }
 
 /**

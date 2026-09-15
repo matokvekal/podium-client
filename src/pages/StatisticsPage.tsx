@@ -26,8 +26,10 @@ import {
   Flame,
   Gem,
   Mountain,
+  RefreshCw,
   Ruler,
   Settings,
+  Sparkles,
   Trophy,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -68,9 +70,32 @@ export function StatisticsPage() {
           </div>
           <p className={shared.heroSubtitle}>Ride. Explore. Progress.</p>
         </div>
-        <p className="muted">
-          {loading ? "Loading your statistics…" : "Statistics are unavailable right now."}
-        </p>
+        {loading ? (
+          <div className={shared.emptyState}>
+            <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
+              <RefreshCw aria-hidden="true" />
+            </span>
+            <p className={shared.emptyTitle}>Loading your statistics…</p>
+          </div>
+        ) : (
+          <div className={`card ${shared.emptyState}`}>
+            <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
+              <RefreshCw aria-hidden="true" />
+            </span>
+            <p className={shared.emptyTitle}>Statistics are unavailable right now</p>
+            <p className={shared.emptyBody}>
+              We couldn't reach the server. Your numbers are safe — check your connection and try
+              again.
+            </p>
+            <button
+              type="button"
+              className="button"
+              onClick={() => me.userId != null && void loadMyStatistics(me.userId)}
+            >
+              Try again
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -126,6 +151,22 @@ export function StatisticsPage() {
               </div>
             </div>
           </div>
+
+          {data.lifetime.rides === 0 && (
+            <div className={`card ${shared.emptyState}`}>
+              <span className={shared.emptyIcon}>
+                <Sparkles aria-hidden="true" />
+              </span>
+              <p className={shared.emptyTitle}>Your cycling story starts here</p>
+              <p className={shared.emptyBody}>
+                Finish your first ride and every number below fills in — rides, kilometers, climb,
+                calories, and your first milestone.
+              </p>
+              <Link to="/" className="button">
+                Find a ride
+              </Link>
+            </div>
+          )}
 
           <div className={styles.tileGrid}>
             <StatTile
@@ -197,9 +238,19 @@ export function StatisticsPage() {
           <p className={shared.quote}>"A little further each ride leads to big places."</p>
         </>
       ) : data.byYear.length === 0 ? (
-        <p className="muted">
-          No finished rides yet — your yearly breakdown appears here once you have.
-        </p>
+        <div className={`card ${shared.emptyState}`}>
+          <span className={shared.emptyIcon}>
+            <Sparkles aria-hidden="true" />
+          </span>
+          <p className={shared.emptyTitle}>No season yet</p>
+          <p className={shared.emptyBody}>
+            Your yearly breakdown — rides, kilometers, climb — appears here the moment you finish
+            your first ride of the year.
+          </p>
+          <Link to="/" className="button">
+            Find a ride
+          </Link>
+        </div>
       ) : (
         year && (
           <>

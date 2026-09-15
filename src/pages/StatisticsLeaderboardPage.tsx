@@ -26,7 +26,7 @@
  *          ranked outside it — the server sends only the top 50 plus my own row, not everyone.
  */
 
-import { ChevronLeft, LocateFixed } from "lucide-react";
+import { ChevronLeft, Flag, LocateFixed, RefreshCw, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
@@ -144,13 +144,39 @@ export function StatisticsLeaderboardPage() {
       </div>
 
       {data && data.country === "" ? (
-        <p className="muted">
-          Set your country on the account screen to see your national leaderboard.
-        </p>
+        <div className={`card ${shared.emptyState}`}>
+          <span className={shared.emptyIcon}>
+            <Flag aria-hidden="true" />
+          </span>
+          <p className={shared.emptyTitle}>Set your country to see your leaderboard</p>
+          <p className={shared.emptyBody}>
+            The National Leaderboard ranks riders by country. Add yours on the account screen to
+            join it.
+          </p>
+          <Link to="/account" className="button">
+            Set my country
+          </Link>
+        </div>
       ) : loading && rows.length === 0 ? (
-        <p className="muted">Loading the leaderboard…</p>
+        <div className={shared.emptyState}>
+          <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
+            <RefreshCw aria-hidden="true" />
+          </span>
+          <p className={shared.emptyTitle}>Loading the leaderboard…</p>
+        </div>
       ) : rows.length === 0 ? (
-        <p className="muted">No riders ranked here yet — be the first to finish a ride.</p>
+        <div className={`card ${shared.emptyState}`}>
+          <span className={shared.emptyIcon}>
+            <Trophy aria-hidden="true" />
+          </span>
+          <p className={shared.emptyTitle}>No champions yet</p>
+          <p className={shared.emptyBody}>
+            Nobody in your country has finished a ride yet — be the first name on this board.
+          </p>
+          <Link to="/" className="button">
+            Find a ride
+          </Link>
+        </div>
       ) : (
         <>
           <div className={styles.podium}>

@@ -210,3 +210,54 @@
   color: var(--text-muted);
   margin: var(--space-3) var(--space-4) 0;
 }
+
+/* --- empty / unavailable states, shared by every Statistics screen --- */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+}
+
+.emptyIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--energy-2), var(--energy-3));
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.emptyIcon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.emptyBody {
+  margin: 0;
+  max-width: 320px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Same shape, a quieter/neutral icon tone — the fetch itself failed (server unreachable,
+   500, offline), not "you have no rides yet". Kept visually distinct so a rider never reads
+   "we couldn't reach the server" as "you haven't ridden" (that would be quietly wrong). */
+.emptyIconMuted {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}

@@ -1719,69 +1719,54 @@ export function EventCreatePage() {
                 </div>
               )}
 
-              <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="location">
-                    <MapPin aria-hidden="true" />
-                    Meeting At
-                  </label>
-                  <input
-                    id="location"
-                    className={styles.input}
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                  />
-                </div>
-
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="startsAt">
-                    <Clock aria-hidden="true" />
-                    Date/time
-                  </label>
-                  <input
-                    id="startsAt"
-                    type="datetime-local"
-                    className={`${styles.input} ${invalidStartsAt ? styles.inputInvalid : ""}`}
-                    value={startsAt}
-                    onChange={(e) => {
-                      setStartsAt(e.target.value);
-                      setStartsAtEdited(true);
-                      setDateHint(null);
-                      if (e.target.value) setInvalidStartsAt(false);
-                    }}
-                  />
-                  {!isEditing && (
-                    <div className={styles.quickPickRow}>
-                      {STARTS_AT_DAY_CHIPS.map(({ label, day }) => (
-                        <button
-                          key={label}
-                          type="button"
-                          className={styles.quickPickBtn}
-                          data-active={
-                            (startsAt !== "" && new Date(startsAt).getDay() === day) || undefined
-                          }
-                          onClick={() => pickStartsAtDay(day)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                      {STARTS_AT_TIME_CHIPS.map((hour) => (
-                        <button
-                          key={hour}
-                          type="button"
-                          className={styles.quickPickBtn}
-                          data-active={
-                            (startsAt !== "" && Number(startsAt.slice(11, 13)) === hour) ||
-                            undefined
-                          }
-                          onClick={() => pickStartsAtTime(hour)}
-                        >
-                          {String(hour).padStart(2, "0")}:00
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="startsAt">
+                  <Clock aria-hidden="true" />
+                  Date/time
+                </label>
+                <input
+                  id="startsAt"
+                  type="datetime-local"
+                  className={`${styles.input} ${invalidStartsAt ? styles.inputInvalid : ""}`}
+                  value={startsAt}
+                  onChange={(e) => {
+                    setStartsAt(e.target.value);
+                    setStartsAtEdited(true);
+                    setDateHint(null);
+                    if (e.target.value) setInvalidStartsAt(false);
+                  }}
+                />
+                {!isEditing && (
+                  <div className={styles.quickPickRow}>
+                    {STARTS_AT_DAY_CHIPS.map(({ label, day }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className={styles.quickPickBtn}
+                        data-active={
+                          (startsAt !== "" && new Date(startsAt).getDay() === day) || undefined
+                        }
+                        onClick={() => pickStartsAtDay(day)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    {STARTS_AT_TIME_CHIPS.map((hour) => (
+                      <button
+                        key={hour}
+                        type="button"
+                        className={styles.quickPickBtn}
+                        data-active={
+                          (startsAt !== "" && Number(startsAt.slice(11, 13)) === hour) ||
+                          undefined
+                        }
+                        onClick={() => pickStartsAtTime(hour)}
+                      >
+                        {String(hour).padStart(2, "0")}:00
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className={styles.field}>

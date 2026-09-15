@@ -47,6 +47,7 @@ import {
   resolveUserCover,
   serverSupportsCountry,
   serverSupportsVisualIdentity,
+  serverSupportsWeight,
 } from "../lib/user-identity";
 import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useUserIdentityStore } from "../store/userIdentityStore";
@@ -124,6 +125,8 @@ export function AccountPage() {
       </div>
 
       {serverSupportsCountry(profile) && <CountryCard />}
+
+      {serverSupportsWeight(profile) && <WeightCard />}
 
       <div className={`card ${styles.identityCard}`}>
         <div
@@ -229,6 +232,74 @@ function CountryCard() {
           </option>
         ))}
       </select>
+      {error && (
+        <p className="banner banner--error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const WEIGHT_MIN_KG = 40;
+const WEIGHT_MAX_KG = 120;
+
+/**
+ * The rider's body weight — the one personal input Rider Statistics' calorie estimate needs.
+ * Rendered only when the server carries the field (serverSupportsWeight). Unlike country this
+ * MAY be cleared: an empty field saves `null`, not left alone, so a mis-typed value can be
+ * removed rather than stuck.
+ */
+function WeightCard() {
+  const { profile, updateProfile } = useAuth();
+  const [value, setValue] = useState(profile?.weightKg != null ? String(profile.weightKg) : "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function save() {
+    setError(null);
+    if (value.trim() === "") {
+      if (profile?.weightKg == null) return;
+      setBusy(true);
+      void updateProfile({ weightKg: null })
+        .catch(() => setError("Could not save. Try again."))
+        .finally(() => setBusy(false));
+      return;
+    }
+    const next = Number(value);
+    if (!Number.isFinite(next) || next < WEIGHT_MIN_KG || next > WEIGHT_MAX_KG) {
+      setError(`Enter a weight between ${WEIGHT_MIN_KG} and ${WEIGHT_MAX_KG} kg.`);
+      return;
+    }
+    if (next === profile?.weightKg) return;
+    setBusy(true);
+    void updateProfile({ weightKg: next })
+      .catch(() => setError("Could not save. Try again."))
+      .finally(() => setBusy(false));
+  }
+
+  return (
+    <div className="card stack">
+      <p className="muted" style={{ margin: 0, fontWeight: "var(--weight-medium)" }}>
+        Weight
+      </p>
+      <p className="muted" style={{ margin: 0 }}>
+        Used only for your personal calorie estimate on Statistics. Leave blank to hide it there.
+      </p>
+      <input
+        type="number"
+        inputMode="decimal"
+        min={WEIGHT_MIN_KG}
+        max={WEIGHT_MAX_KG}
+        step="0.5"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        disabled={busy}
+        placeholder="kg"
+        aria-label="Weight in kilograms"
+        style={{ minHeight: "var(--tap-target)" }}
+      />
       {error && (
         <p className="banner banner--error" role="alert">
           {error}

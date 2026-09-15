@@ -47,6 +47,13 @@ export interface Profile {
    */
   country?: string | null;
   /**
+   * The rider's body weight in kg (40-120) — or null when never set. Presence of the key is
+   * how the app detects the server supports it at all (see serverSupportsWeight), same pattern
+   * as country. Drives Rider Statistics' personal calorie estimate only; a rider with no weight
+   * set sees `calories: null` there rather than an invented number. Changeable on AccountPage.
+   */
+  weightKg?: number | null;
+  /**
    * The Google profile photo, straight from the sign-in token — the same flat field every
    * event/participant endpoint already sends for OTHER people (see EventOwner.avatarUrl in
    * lib/local-db.ts). Optional because the server does not populate `users.avatar_url` on the

@@ -193,12 +193,14 @@ export function StatisticsAchievementsPage() {
                           {Math.abs(trend)}%
                         </span>
                       )}
-                      <img
-                        src={GEM_ASSET(stat.gem)}
-                        alt={stat.gem}
-                        className={styles.statGem}
-                        title={stat.gem}
-                      />
+                      <span className={styles.statGemFrame}>
+                        <img
+                          src={GEM_ASSET(stat.gem)}
+                          alt={stat.gem}
+                          className={styles.statGem}
+                          title={stat.gem}
+                        />
+                      </span>
                     </div>
                   );
                 })}
@@ -255,7 +257,9 @@ export function StatisticsAchievementsPage() {
           <div className={styles.legendGrid}>
             {(["stone", "onyx", "emerald", "ruby", "diamond"] as const).map((gem) => (
               <div className={styles.legendItem} key={gem}>
-                <img src={GEM_ASSET(gem)} alt={gem} className={styles.legendGem} />
+                <span className={styles.legendGemFrame}>
+                  <img src={GEM_ASSET(gem)} alt={gem} className={styles.legendGem} />
+                </span>
                 <span className={styles.legendName}>
                   {gem.charAt(0).toUpperCase() + gem.slice(1)}
                 </span>

@@ -185,9 +185,15 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   },
 }));
 
+// A stable reference for "nothing loaded for this scope yet" — returning a fresh object
+// literal here on every call (the obvious way to write this) breaks useSyncExternalStore's
+// referential-equality check and React logs "The result of getSnapshot should be cached to
+// avoid an infinite loop" (real risk in concurrent/strict mode, not just a warning).
+const EMPTY_LEADERBOARD_SLOT: LeaderboardSlot = { data: null, loading: true, stale: false };
+
 export function leaderboardSlot(scope: string) {
   return (state: StatisticsState): LeaderboardSlot =>
-    state.leaderboards[scope] ?? { data: null, loading: true, stale: false };
+    state.leaderboards[scope] ?? EMPTY_LEADERBOARD_SLOT;
 }
 
 export { leaderboardScopeKey };

@@ -177,12 +177,34 @@
   color: #e11d48;
 }
 
-/* The gem is the reward, deliberately smaller than the value it sits beside. */
-.statGem {
+/* The gem is the reward, deliberately smaller than the value it sits beside.
+   The source renders (public/images/statistics/achievements/*.jpg) are photographic and have
+   no transparency — every one sits on its own solid white square. mix-blend-mode: multiply
+   was tried first and rejected (it desaturates/darkens the gem's own highlights against a dark
+   page, so the render itself looks washed out — not just the background). Instead the white is
+   treated as a deliberate part of the badge: a small light plate behind a circular crop, with a
+   ring, so it reads as a coin/medallion in BOTH themes rather than either a stray white box or a
+   muddy blended one. */
+.statGemFrame {
   width: 28px;
   height: 28px;
-  object-fit: contain;
+  border-radius: 50%;
+  background: #f4f1ea;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   justify-self: end;
+}
+
+.statGem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.18);
 }
 
 .rankingsButton {
@@ -253,10 +275,25 @@
   gap: 6px;
 }
 
-.legendGem {
+.legendGemFrame {
   width: 48px;
   height: 48px;
-  object-fit: contain;
+  border-radius: 50%;
+  background: #f4f1ea;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legendGem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.18);
 }
 
 .legendName {

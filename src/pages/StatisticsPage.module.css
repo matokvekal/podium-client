@@ -1,0 +1,127 @@
+/* Page-specific rules for StatisticsPage.tsx — shared gem/tab/progress/hero rules live in
+   StatisticsShared.module.css. */
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.profileAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+}
+
+.profileName {
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--space-4);
+  background: linear-gradient(160deg, var(--surface), var(--surface-raised));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.tileIcon {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  color: var(--accent-strong);
+  margin-bottom: 2px;
+}
+
+.tileValue {
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.tileLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+}
+
+.milestoneCard,
+.goalsCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+}
+
+.milestoneLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.viewAll {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+}
+
+.milestoneBody {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.milestoneGemName {
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.leaderboardLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}
+
+.goalRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.goalLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.goalPercent {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+  width: 32px;
+  text-align: right;
+}
+
+.goalDone {
+  color: #10b981;
+  font-weight: var(--weight-bold);
+  width: 32px;
+  text-align: right;
+}

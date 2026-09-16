@@ -448,6 +448,7 @@ textarea {
   font-size: 0.8rem;
   color: var(--accent);
   text-align: left;
+  text-decoration: none;
   background: none;
   border: none;
   cursor: pointer;
@@ -455,6 +456,32 @@ textarea {
 
 .drawer__nav-subaction:hover {
   text-decoration: underline;
+}
+
+.drawer__nav-subaction[aria-current="page"] {
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+}
+
+/* A group heading (e.g. "Statistics" above its "My Statistics" / "Leaderboard" subactions) —
+   same row shape/icon slot as .drawer__nav-item, but not a link: it does nothing on its own,
+   so it gets none of the item's hover/active/pointer affordances. */
+.drawer__nav-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.drawer__nav-heading svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .card {

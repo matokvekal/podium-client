@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<rect width="128" height="128" rx="64" fill="#a86139"/>
+<circle cx="64" cy="44" r="24" fill="#fff" opacity=".9"/>
+<path d="M24 113c4-28 20-43 40-43s36 15 40 43" fill="#fff" opacity=".9"/>
+<text x="64" y="121" font-size="18" text-anchor="middle" font-family="Arial" fill="#a86139" font-weight="700">T</text>
+</svg>

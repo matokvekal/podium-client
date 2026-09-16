@@ -1,7 +1,8 @@
 /**
- * Find Tracks — the route-planning tool. Map first, then a compact filter, then results one
- * card at a time (prev/next, not a scrolled list — see plan/server-tasks.md and the plan file
- * this was built from for why).
+ * Find Tracks — the route-planning tool. Map first, then a compact filter, then results as an
+ * infinite-scroll list (was prev/next arrows over a single fetched page; the server's real
+ * page/pageSize paging in tracksStore now backs a scroll-triggered loadMore instead, the same
+ * IntersectionObserver-over-a-sentinel pattern as TrackGallerySheet).
  *
  * Route:    /routes
  * Loads:    store/tracksStore.ts, which returns an empty list until GET /tracks is built.
@@ -25,8 +26,6 @@
 import {
   Bike,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Heart,
   MapPin,
   Minus,
@@ -37,7 +36,7 @@ import {
   Waves,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RangeSlider } from "../app/RangeSlider";
 import { TrackCard } from "../app/TrackCard";
 import {
@@ -90,9 +89,12 @@ const CLIMB_PRESETS: {
 
 export function TracksPage() {
   const tracks = useTracksStore((state) => state.tracks);
+  const total = useTracksStore((state) => state.total);
   const loading = useTracksStore((state) => state.loading);
+  const loadingMore = useTracksStore((state) => state.loadingMore);
   const error = useTracksStore((state) => state.error);
   const loadTracks = useTracksStore((state) => state.loadTracks);
+  const loadMore = useTracksStore((state) => state.loadMore);
   const toggleFavoriteTrack = useTracksStore((state) => state.toggleFavoriteTrack);
   const favoriteIds = useTracksStore((state) => state.favoriteIds);
 
@@ -110,7 +112,9 @@ export function TracksPage() {
 
   const [surfaceOpen, setSurfaceOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [index, setIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef(new Map<number, HTMLDivElement>());
 
   // Only what GET /routes/public accepts (routeLibrary.schemas.ts). A slider still at its
   // extreme is NOT sent: the server compares against distance_km / elevation_m, so sending a
@@ -124,7 +128,7 @@ export function TracksPage() {
       minClimbM: climbRange[0] > CLIMB_MIN ? climbRange[0] : undefined,
       maxClimbM: climbRange[1] < CLIMB_MAX ? climbRange[1] : undefined,
     });
-    setIndex(0);
+    setSelectedId(null);
   }, [location, routeType, distanceRange, climbRange, loadTracks]);
 
   const visibleTracks = useMemo(
@@ -132,12 +136,24 @@ export function TracksPage() {
     [tracks, favoritesOnly, favoriteIds],
   );
 
-  // Clamp rather than reset via an effect — visibleTracks can also shrink from the favorites
-  // toggle, not just the filter-driven loadTracks() above, and this covers both without a
-  // second effect whose only job is calling setIndex.
-  const clampedIndex = Math.min(index, Math.max(visibleTracks.length - 1, 0));
-  const current = visibleTracks[clampedIndex] ?? null;
+  const current = visibleTracks.find((t) => t.id === selectedId) ?? null;
   const selectedType = ROUTE_TYPE_FILTERS.find((t) => t.value === routeType);
+
+  // Page in the next batch as the sentinel comes into view. `root: null` scrolls the viewport
+  // itself — this list isn't in its own scroll region the way TrackGallerySheet's modal is.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const hasMore = tracks.length < total;
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [tracks.length, total, loadMore]);
 
   return (
     <div className="stack">
@@ -220,9 +236,11 @@ export function TracksPage() {
       </div>
 
       <div>
-        <h1 style={{ margin: 0 }}>{current?.name ?? "Browse tracks"}</h1>
+        <h1 style={{ margin: 0 }}>Browse tracks</h1>
         <p className="muted" style={{ margin: 0 }}>
-          {visibleTracks.length} track{visibleTracks.length === 1 ? "" : "s"} found
+          {favoritesOnly || visibleTracks.length >= total
+            ? `${visibleTracks.length} track${visibleTracks.length === 1 ? "" : "s"} found`
+            : `${visibleTracks.length} of ${total} tracks`}
         </p>
       </div>
 
@@ -235,8 +253,8 @@ export function TracksPage() {
             tracks={visibleTracks}
             selectedTrackId={current?.id ?? null}
             onSelectTrack={(id) => {
-              const found = visibleTracks.findIndex((t) => t.id === id);
-              if (found >= 0) setIndex(found);
+              setSelectedId(id);
+              cardRefs.current.get(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
             }}
           />
         </Suspense>
@@ -336,41 +354,37 @@ export function TracksPage() {
           {favoritesOnly ? "No favorites yet." : "No tracks match those filters."}
         </p>
       ) : (
-        current && (
-          <div className="stack">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <button
-                type="button"
-                className="button button--quiet"
-                disabled={clampedIndex === 0}
-                onClick={() => setIndex(Math.max(0, clampedIndex - 1))}
-                aria-label="Previous track"
-              >
-                <ChevronLeft width={18} height={18} aria-hidden="true" />
-              </button>
-              <span className="muted">
-                {clampedIndex + 1} of {visibleTracks.length}
-              </span>
-              <button
-                type="button"
-                className="button button--quiet"
-                disabled={clampedIndex === visibleTracks.length - 1}
-                onClick={() => setIndex(Math.min(visibleTracks.length - 1, clampedIndex + 1))}
-                aria-label="Next track"
-              >
-                <ChevronRight width={18} height={18} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div key={current.id} className={styles.cardSlide}>
+        <div className="stack">
+          {visibleTracks.map((track) => (
+            <div
+              key={track.id}
+              ref={(el) => {
+                if (el) cardRefs.current.set(track.id, el);
+                else cardRefs.current.delete(track.id);
+              }}
+              className={track.id === selectedId ? styles.cardSelected : undefined}
+            >
               <TrackCard
-                track={current}
-                favorite={favoriteIds.includes(current.id)}
+                track={track}
+                favorite={favoriteIds.includes(track.id)}
                 onToggleFavorite={toggleFavoriteTrack}
               />
             </div>
-          </div>
-        )
+          ))}
+
+          {/* Only wired to the server-fed "all" list — favoritesOnly is a client-side filter
+              over whatever has already loaded, so there's nothing further to page in for it. */}
+          {!favoritesOnly && tracks.length < total && (
+            <div ref={sentinelRef} aria-hidden="true" />
+          )}
+
+          {loadingMore && (
+            <div className="row" style={{ justifyContent: "center" }}>
+              <span className="spinner" aria-hidden="true" />
+              <span className="muted">Loading more…</span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

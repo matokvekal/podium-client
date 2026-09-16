@@ -1,12 +1,13 @@
-// Starter country list for the registration/profile country picker.
+// Country list for the registration/profile country picker.
 //
-// Deliberately short (top 20, not the full ISO-3166 list) — this is the first checkpoint of
-// a bigger "filter rides by country" feature; the full list and server-side wiring land once
-// the server/DB changes are in.
+// ~40 countries — the most common ones for cycling/riding, not the full ISO-3166 list. Still
+// not exhaustive: the full list and server-side wiring land once that becomes a real need (see
+// sql/030-country.sql — country is a free CHAR(2) with no server-side allow-list, so adding a
+// country here is a client-only change, nothing to migrate).
 //
-// `code` is the ISO 3166-1 alpha-2 country code — this becomes the value stored once the
-// profile's country field exists server-side, so it stays stable even if `name` wording changes.
-// The flag is derived from `code` (regional indicator symbols), not stored separately.
+// `code` is the ISO 3166-1 alpha-2 country code — this is the value stored in users.country /
+// events.country, so it stays stable even if `name` wording changes. The flag is derived from
+// `code` (regional indicator symbols), not stored separately.
 //
 // The order of this array is NOT the order shown in the picker. The picker puts the default
 // country (a saved pick, else the device/browser locale, else Israel) first and every other
@@ -19,26 +20,46 @@ export interface Country {
 }
 
 export const COUNTRIES: Country[] = [
-  { code: "AU", name: "Australia" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "AR", name: "Argentina" },
   { code: "AT", name: "Austria" },
+  { code: "AU", name: "Australia" },
   { code: "BE", name: "Belgium" },
   { code: "BR", name: "Brazil" },
   { code: "CA", name: "Canada" },
-  { code: "DK", name: "Denmark" },
-  { code: "FR", name: "France" },
+  { code: "CH", name: "Switzerland" },
+  { code: "CO", name: "Colombia" },
+  { code: "CZ", name: "Czech Republic" },
   { code: "DE", name: "Germany" },
+  { code: "DK", name: "Denmark" },
+  { code: "EE", name: "Estonia" },
+  { code: "ES", name: "Spain" },
+  { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" },
+  { code: "GB", name: "United Kingdom" },
   { code: "GR", name: "Greece" },
+  { code: "HR", name: "Croatia" },
+  { code: "HU", name: "Hungary" },
+  { code: "IE", name: "Ireland" },
   { code: "IL", name: "Israel" },
+  { code: "IS", name: "Iceland" },
   { code: "IT", name: "Italy" },
+  { code: "JP", name: "Japan" },
+  { code: "LT", name: "Lithuania" },
+  { code: "LU", name: "Luxembourg" },
+  { code: "MX", name: "Mexico" },
   { code: "NL", name: "Netherlands" },
   { code: "NO", name: "Norway" },
+  { code: "NZ", name: "New Zealand" },
   { code: "PL", name: "Poland" },
   { code: "PT", name: "Portugal" },
-  { code: "ES", name: "Spain" },
   { code: "SE", name: "Sweden" },
-  { code: "CH", name: "Switzerland" },
-  { code: "GB", name: "United Kingdom" },
+  { code: "SI", name: "Slovenia" },
+  { code: "SK", name: "Slovakia" },
+  { code: "TR", name: "Turkey" },
+  { code: "TW", name: "Taiwan" },
   { code: "US", name: "United States" },
+  { code: "ZA", name: "South Africa" },
 ];
 
 /** Where the picker lands when the device locale gives us no region we recognise. */
@@ -125,6 +146,34 @@ const TIME_ZONE_COUNTRY: Record<string, string> = {
   "America/Cuiaba": "BR",
   "America/Campo_Grande": "BR",
   "America/Porto_Velho": "BR",
+  "Asia/Dubai": "AE",
+  "America/Argentina/Buenos_Aires": "AR",
+  "America/Argentina/Cordoba": "AR",
+  "America/Argentina/Salta": "AR",
+  "America/Argentina/Mendoza": "AR",
+  "America/Bogota": "CO",
+  "Europe/Prague": "CZ",
+  "Europe/Tallinn": "EE",
+  "Europe/Helsinki": "FI",
+  "Europe/Zagreb": "HR",
+  "Europe/Budapest": "HU",
+  "Europe/Dublin": "IE",
+  "Atlantic/Reykjavik": "IS",
+  "Asia/Tokyo": "JP",
+  "Europe/Vilnius": "LT",
+  "Europe/Luxembourg": "LU",
+  "America/Mexico_City": "MX",
+  "America/Cancun": "MX",
+  "America/Tijuana": "MX",
+  "America/Monterrey": "MX",
+  "America/Chihuahua": "MX",
+  "Pacific/Auckland": "NZ",
+  "Pacific/Chatham": "NZ",
+  "Europe/Ljubljana": "SI",
+  "Europe/Bratislava": "SK",
+  "Europe/Istanbul": "TR",
+  "Asia/Taipei": "TW",
+  "Africa/Johannesburg": "ZA",
 };
 
 /**

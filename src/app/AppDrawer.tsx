@@ -1,6 +1,6 @@
 /**
  * Slide-out navigation drawer, opened from the hamburger button in AppShell's header.
- *test
+ *
  * Mirrors race-pwa's HeaderMain drawer pattern: an avatar row that says who (if anyone) is
  * signed in, then nav items, then either "Register / Login" or "Account" + "Sign out"
  * depending on that. Deliberately does not carry over race-pwa's theme/language/skin
@@ -118,8 +118,14 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               me-vs-myself history) and "Leaderboard" (the national me-vs-everyone-else
               championship, StatisticsLeaderboardPage.tsx) are different screens, asked for
               directly as a nested pair under one "Statistics" heading rather than two
-              unrelated-looking top-level items. */}
-          {status === "signed-in" && (
+              unrelated-looking top-level items.
+
+              PREVIEW GATE: Statistics isn't ready for every rider yet, so the menu entry is
+              hidden for everyone except the account(s) in the server's
+              STATISTICS_PREVIEW_EMAILS list (user.controller.ts) — menu visibility only, the
+              API itself is unaffected. Delete `&& profile?.canSeeStatistics === true` (keep
+              just the signed-in check) once Statistics is ready for every rider. */}
+          {status === "signed-in" && profile?.canSeeStatistics === true && (
             <div className="drawer__nav-group">
               <div className="drawer__nav-heading">
                 <BarChart3 aria-hidden="true" />
@@ -131,18 +137,10 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               <NavLink to="/stats/year" className="drawer__nav-subaction" onClick={onClose}>
                 Year View
               </NavLink>
-              <NavLink
-                to="/stats/achievements"
-                className="drawer__nav-subaction"
-                onClick={onClose}
-              >
+              <NavLink to="/stats/achievements" className="drawer__nav-subaction" onClick={onClose}>
                 Achievements
               </NavLink>
-              <NavLink
-                to="/stats/leaderboard"
-                className="drawer__nav-subaction"
-                onClick={onClose}
-              >
+              <NavLink to="/stats/leaderboard" className="drawer__nav-subaction" onClick={onClose}>
                 Leaderboard
               </NavLink>
             </div>

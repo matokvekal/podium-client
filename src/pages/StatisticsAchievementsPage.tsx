@@ -49,6 +49,7 @@ import {
   STAT_ORDER,
   type StatKey,
 } from "../lib/statistics-timeline-mock";
+import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsAchievementsPage.module.css";
 
 const STAT_ICON: Record<StatKey, ReactNode> = {
@@ -154,6 +155,11 @@ export function StatisticsAchievementsPage() {
           Year
         </button>
       </div>
+
+      <MockDataNotice>
+        Sample timeline — this whole page is placeholder data until period-by-period gems have a
+        real source.
+      </MockDataNotice>
 
       <p className={styles.sectionEyebrow}>MY RESULTS</p>
 

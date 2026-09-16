@@ -48,6 +48,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { MOCK_RIDER_STATS } from "../lib/rider-stats-mock";
+import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsYearPage.module.css";
 
 const HERO_IMAGE = "/statistics-year-header.png";
@@ -200,6 +201,12 @@ export function StatisticsYearPage() {
                     <ChevronRightIcon />
                   </button>
                 </div>
+              </div>
+
+              <div style={{ margin: "-4px 0 var(--space-3)" }}>
+                <MockDataNotice>
+                  This whole page is sample data — not wired to your account yet.
+                </MockDataNotice>
               </div>
 
               {/* STATS */}

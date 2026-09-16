@@ -37,16 +37,44 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { useMyIdentity } from "../app/useMyIdentity";
+import { MOCK_RIDER_STATS, type StatTotals } from "../lib/rider-stats-mock";
 import { tierColor } from "../lib/rider-stats-ui";
+import type { RiderStatsPayload, StatYearTotals } from "../store/statisticsStore";
 import { useStatisticsStore } from "../store/statisticsStore";
+import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsPage.module.css";
 import shared from "./StatisticsShared.module.css";
 
 type MainTab = "me" | "year";
 
+/** MOCK_RIDER_STATS predates the real store's field names (ridesCount/totalKm/totalClimbM,
+ *  no hours) — mapped here rather than changed at the source, since StatisticsYearPage.tsx
+ *  still reads the original shape directly. `hours` has no mock equivalent to carry over, so
+ *  it is estimated from distance at a plausible average speed — fine for a value that is
+ *  already, visibly, sample data (see MockDataBadge.tsx), never done for a real number. */
+function toMockYearStats(year: number, totals: StatTotals): StatYearTotals {
+  return {
+    year,
+    rides: totals.ridesCount,
+    distanceKm: totals.totalKm,
+    climbM: totals.totalClimbM,
+    hours: Math.round((totals.totalKm / 22) * 10) / 10,
+    calories: totals.totalCalories,
+  };
+}
+
+const MOCK_PAYLOAD: RiderStatsPayload = {
+  userId: 0,
+  generatedAt: new Date().toISOString(),
+  weightKg: MOCK_RIDER_STATS.weightKg,
+  lifetime: toMockYearStats(0, MOCK_RIDER_STATS.lifetime),
+  byYear: MOCK_RIDER_STATS.perYear.map((y) => toMockYearStats(y.year, y.totals)),
+  achievements: MOCK_RIDER_STATS.achievements,
+};
+
 export function StatisticsPage() {
   const me = useMyIdentity();
-  const data = useStatisticsStore((s) => s.me);
+  const real = useStatisticsStore((s) => s.me);
   const loading = useStatisticsStore((s) => s.meLoading);
   const loadMyStatistics = useStatisticsStore((s) => s.loadMyStatistics);
   const [tab, setTab] = useState<MainTab>("me");
@@ -55,6 +83,13 @@ export function StatisticsPage() {
   useEffect(() => {
     if (me.userId != null) void loadMyStatistics(me.userId);
   }, [me.userId, loadMyStatistics]);
+
+  // While the real fetch has never once succeeded (not "genuinely zero rides" — that has its
+  // own honest welcome card below — but the request itself failing, e.g. the backend
+  // migrations not being live anywhere yet), show what this page looks like with sample data
+  // rather than a bare "unavailable" card. Delete once GET /statistics/me can answer for real.
+  const usingMock = !loading && !real;
+  const data = real ?? (usingMock ? MOCK_PAYLOAD : null);
 
   const year = data?.byYear[yearIndex];
   const hero = data
@@ -70,32 +105,12 @@ export function StatisticsPage() {
           </div>
           <p className={shared.heroSubtitle}>Ride. Explore. Progress.</p>
         </div>
-        {loading ? (
-          <div className={shared.emptyState}>
-            <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
-              <RefreshCw aria-hidden="true" />
-            </span>
-            <p className={shared.emptyTitle}>Loading your statistics…</p>
-          </div>
-        ) : (
-          <div className={`card ${shared.emptyState}`}>
-            <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
-              <RefreshCw aria-hidden="true" />
-            </span>
-            <p className={shared.emptyTitle}>Statistics are unavailable right now</p>
-            <p className={shared.emptyBody}>
-              We couldn't reach the server. Your numbers are safe — check your connection and try
-              again.
-            </p>
-            <button
-              type="button"
-              className="button"
-              onClick={() => me.userId != null && void loadMyStatistics(me.userId)}
-            >
-              Try again
-            </button>
-          </div>
-        )}
+        <div className={shared.emptyState}>
+          <span className={`${shared.emptyIcon} ${shared.emptyIconMuted}`}>
+            <RefreshCw aria-hidden="true" />
+          </span>
+          <p className={shared.emptyTitle}>Loading your statistics…</p>
+        </div>
       </div>
     );
   }
@@ -111,6 +126,27 @@ export function StatisticsPage() {
         </div>
         <p className={shared.heroSubtitle}>Ride. Explore. Progress.</p>
       </div>
+
+      {usingMock && (
+        <MockDataNotice>
+          Sample numbers — we couldn't load your real statistics.{" "}
+          <button
+            type="button"
+            onClick={() => me.userId != null && void loadMyStatistics(me.userId)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--accent-strong)",
+              font: "inherit",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Try again
+          </button>
+        </MockDataNotice>
+      )}
 
       <div className={shared.tabs} role="tablist" aria-label="Statistics view">
         <button

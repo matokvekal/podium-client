@@ -79,8 +79,16 @@ export interface RiderStatsMock {
 const IL = "🇮🇱";
 
 const RIDERS = [
-  "Daniel Cohen", "Noa Kaplan", "Tomer Israeli", "Maya Levi", "Ofer Ben David",
-  "Itay Shachar", "Roni Marcus", "Gal Friedman", "Yuval Katz", "Lior Bar",
+  "Daniel Cohen",
+  "Noa Kaplan",
+  "Tomer Israeli",
+  "Maya Levi",
+  "Ofer Ben David",
+  "Itay Shachar",
+  "Roni Marcus",
+  "Gal Friedman",
+  "Yuval Katz",
+  "Lior Bar",
 ];
 
 function makeLeaderboard(
@@ -212,6 +220,43 @@ export const MOCK_RIDER_STATS: RiderStatsMock = {
     climbM: makeLeaderboard(142000, 6200, 38450, 214, "3,100 m to #213"),
     calories: makeLeaderboard(620000, 28000, 142000, 288, "9,000 to #287"),
   },
+};
+
+/** Mock rows for StatisticsLeaderboardPage's real store shape (rides/distanceKm/climbM/hours —
+ *  not the same 4 categories as the personal-stats mock above, which has km/calories instead).
+ *  Used only when the real leaderboard for a category comes back empty — see MockDataBadge. */
+export interface StoreLeaderboardEntry {
+  userId: number;
+  displayName: string;
+  avatarUrl: string | null;
+  value: number;
+  rank: number;
+}
+
+export type StoreLeaderboardCategory = "rides" | "distanceKm" | "climbM" | "hours";
+
+function makeStoreLeaderboardEntries(peakValue: number, step: number): StoreLeaderboardEntry[] {
+  return RIDERS.map((name, i) => ({
+    userId: i + 1,
+    displayName: name,
+    avatarUrl: null,
+    rank: i + 1,
+    value: Math.round(peakValue - i * step),
+  }));
+}
+
+export const MOCK_LEADERBOARD_ENTRIES: Record<StoreLeaderboardCategory, StoreLeaderboardEntry[]> = {
+  rides: makeStoreLeaderboardEntries(842, 24),
+  distanceKm: makeStoreLeaderboardEntries(8420, 210),
+  climbM: makeStoreLeaderboardEntries(142000, 6200),
+  hours: makeStoreLeaderboardEntries(410, 12),
+};
+
+export const MOCK_LEADERBOARD_ME: Record<StoreLeaderboardCategory, StoreLeaderboardEntry> = {
+  rides: { userId: 999, displayName: "You", avatarUrl: null, value: 84, rank: 327 },
+  distanceKm: { userId: 999, displayName: "You", avatarUrl: null, value: 2840, rank: 327 },
+  climbM: { userId: 999, displayName: "You", avatarUrl: null, value: 38450, rank: 214 },
+  hours: { userId: 999, displayName: "You", avatarUrl: null, value: 96, rank: 214 },
 };
 
 export const CATEGORY_LABEL: Record<StatCategory, string> = {

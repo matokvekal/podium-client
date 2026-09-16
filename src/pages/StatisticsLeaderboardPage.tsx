@@ -26,17 +26,19 @@
  *          ranked outside it — the server sends only the top 50 plus my own row, not everyone.
  */
 
-import { ChevronLeft, Flag, LocateFixed, RefreshCw, Trophy } from "lucide-react";
+import { ChevronLeft, Flag, LocateFixed, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { useMyIdentity } from "../app/useMyIdentity";
+import { MOCK_LEADERBOARD_ENTRIES, MOCK_LEADERBOARD_ME } from "../lib/rider-stats-mock";
 import {
   type LeaderboardCategory,
   leaderboardScopeKey,
   leaderboardSlot,
   useStatisticsStore,
 } from "../store/statisticsStore";
+import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsLeaderboardPage.module.css";
 import shared from "./StatisticsShared.module.css";
 
@@ -71,10 +73,18 @@ export function StatisticsLeaderboardPage() {
   }, [me.userId, category, year, loadLeaderboard]);
 
   const unit = CATEGORY_META[category].unit;
-  const rows = data?.top ?? [];
+  const noCountry = data != null && data.country === "";
+  const hasRealRows = (data?.top.length ?? 0) > 0;
+  // While the real backend has nothing to show for this scope (no ranked riders yet, or the
+  // migrations behind it haven't run anywhere yet so the fetch itself failed), show sample
+  // rows instead of a bare page — always with MockDataNotice visible, never mistakeable for
+  // real rankings. See MockDataBadge.tsx's own header: delete this fallback the moment the
+  // real leaderboard can be non-empty on its own.
+  const usingMock = !loading && !noCountry && !hasRealRows;
+  const rows = usingMock ? MOCK_LEADERBOARD_ENTRIES[category] : (data?.top ?? []);
   const podium = [rows[0], rows[1], rows[2]];
   const rest = rows.slice(3);
-  const currentRider = data?.me ?? null;
+  const currentRider = usingMock ? MOCK_LEADERBOARD_ME[category] : (data?.me ?? null);
   const currentRowRef = useRef<HTMLDivElement | null>(null);
 
   function scrollToMe() {
@@ -143,7 +153,7 @@ export function StatisticsLeaderboardPage() {
         </div>
       </div>
 
-      {data && data.country === "" ? (
+      {noCountry ? (
         <div className={`card ${shared.emptyState}`}>
           <span className={shared.emptyIcon}>
             <Flag aria-hidden="true" />
@@ -164,21 +174,13 @@ export function StatisticsLeaderboardPage() {
           </span>
           <p className={shared.emptyTitle}>Loading the leaderboard…</p>
         </div>
-      ) : rows.length === 0 ? (
-        <div className={`card ${shared.emptyState}`}>
-          <span className={shared.emptyIcon}>
-            <Trophy aria-hidden="true" />
-          </span>
-          <p className={shared.emptyTitle}>No champions yet</p>
-          <p className={shared.emptyBody}>
-            Nobody in your country has finished a ride yet — be the first name on this board.
-          </p>
-          <Link to="/" className="button">
-            Find a ride
-          </Link>
-        </div>
       ) : (
         <>
+          {usingMock && (
+            <MockDataNotice>
+              Sample rankings — nobody in your country is ranked here yet.
+            </MockDataNotice>
+          )}
           <div className={styles.podium}>
             {PODIUM_ORDER.map((rowIndex, position) => {
               const row = podium[rowIndex];

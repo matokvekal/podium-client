@@ -1,0 +1,444 @@
+/*
+ * Carried over from the provided reference component (statisics/year/YearStatisticsMock.tsx)
+ * as closely as possible — same class names (kept as literal "yni-*" strings, accessed via
+ * bracket notation from the .tsx file), same values, same structure. Two removals only, both
+ * explained in StatisticsYearPage.tsx's header: the fake phone-frame/status-bar chrome, and the
+ * decorative bottom nav bar (neither is real app UI). Everything else below is the source
+ * CSS almost verbatim.
+ */
+
+/* BUG FIX: this was a bare `* { box-sizing: border-box; }` copied verbatim from the source
+   component's embedded <style> tag. CSS Modules only scope CLASS/ID selectors — a bare universal
+   selector is NOT scoped and leaks out to the entire application, overriding box-sizing on every
+   element on every page. Scoped to this component's own subtree instead. */
+.yni-phone,
+.yni-phone * {
+  box-sizing: border-box;
+}
+
+/* ONE explicit centering parent for the whole page, rather than relying on the card's own
+   margin: auto alone — a real flex row that centers its single child, so there is exactly one
+   place responsible for horizontal centering and nothing upstream (the app shell, .app-main)
+   needs to be trusted to get it right on its own. */
+.yni-stats-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.yni-phone {
+  --navy: #10233b;
+  --green: #31c76b;
+  --blue: #4ea1ff;
+  --lime: #45d37d;
+  --orange: #ff6c36;
+  --muted: #6e7c8e;
+
+  /* Restored from the source component's own width/shape constraints — these are what make
+     the stat cards square-ish and the hero read at the right proportion; they are NOT part of
+     the fake phone-frame chrome that was correctly dropped (the status bar, the bottom nav). A
+     wide desktop viewport gets a centered ~420px card (matching the reference's own look on a
+     screen wider than a phone); at real mobile widths it goes edge-to-edge, per the source's
+     own `@media (max-width: 430px)` rule below. */
+  width: min(420px, 100%);
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 70px rgba(25, 48, 68, 0.2),
+    0 3px 10px rgba(25, 48, 68, 0.08);
+
+  color: var(--navy);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  position: relative;
+}
+
+/* Edge-to-edge on a real phone — cancels .app-main's own padding (tokens.css --space-4) so the
+   hero/footer can bleed to the true screen edge, the same way every other full-bleed header in
+   this app does it, and drops the floating-card shape that only makes sense with room around
+   it. Threshold matches the source component's own breakpoint. */
+@media (max-width: 430px) {
+  .yni-phone {
+    width: 100%;
+    margin: calc(var(--space-4) * -1);
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+.yni-phone svg {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.yni-hero {
+  min-height: 200px;
+  padding: 11px 14px 0;
+  color: white;
+  /* Zoomed and pushed hard toward the left edge — the image carries its own baked-in "Keep
+     riding" text and EL NIÑO logo on its right ~40%, which would double up with the real HTML
+     text below. This crop keeps only the cyclist/mountain scenery on the left in frame. */
+  background-position: 0% 35%;
+  background-size: 230% auto;
+  background-repeat: no-repeat;
+  background-color: #173b57;
+  position: relative;
+}
+
+.yni-topbar {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  min-height: 46px;
+}
+
+.yni-name {
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.2px;
+  text-align: center;
+}
+
+.yni-icon-btn,
+.yni-mini-btn,
+.yni-tab,
+.yni-edit-btn {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.yni-icon-btn {
+  color: white;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+}
+
+.yni-icon-btn svg {
+  width: 23px;
+  height: 23px;
+}
+
+.yni-topbar .yni-icon-btn:last-child {
+  justify-self: end;
+}
+
+.yni-hero-copy {
+  position: absolute;
+  right: 28px;
+  bottom: 49px;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 750;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.yni-tabs-shell {
+  position: relative;
+  z-index: 4;
+  margin-top: -19px;
+  padding: 0 7px;
+}
+
+.yni-tabs {
+  height: 48px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  /* Light/frosted, not the heavy near-black bar this was before — asked for directly: a
+     premium, translucent control that separates from the photo without going dark. */
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(7, 29, 46, 0.18);
+}
+
+.yni-tab {
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.yni-tab-active {
+  background: white;
+  color: var(--navy);
+  text-shadow: none;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.12);
+}
+
+.yni-content {
+  padding: 8px 6px 10px;
+}
+
+.yni-season-card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 3px 12px rgba(31, 51, 68, 0.11);
+}
+
+.yni-season-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.yni-season-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.yni-season-title svg {
+  width: 22px;
+  height: 22px;
+}
+
+.yni-season-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yni-mini-btn {
+  color: var(--navy);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.yni-mini-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.yni-mini-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.yni-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.yni-stat-card {
+  min-height: 100px;
+  border-radius: 14px;
+  background: #f7f8fa;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yni-stat-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.yni-stat-icon svg {
+  width: 40px;
+  height: 40px;
+  stroke-width: 1.85;
+}
+
+/* The provided bike/calorie icon PNGs are opaque (no alpha channel, solid white square
+   background) — multiply blends white into whatever's behind it (the stat card's own
+   near-white #f7f8fa) so the icon reads as if it were transparent, without needing a
+   re-exported asset. */
+.yni-icon-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+.yni-green {
+  color: #22c665;
+}
+.yni-blue {
+  color: #4e9cff;
+}
+.yni-lime {
+  color: #3ecf72;
+}
+.yni-orange {
+  color: #ff6533;
+}
+
+.yni-stat-copy {
+  min-width: 0;
+}
+
+.yni-stat-value {
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.45px;
+  color: var(--navy);
+}
+
+.yni-stat-label {
+  margin-top: 6px;
+  color: #45536b;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.yni-goals-title-row {
+  margin-top: 18px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.yni-goals-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.yni-edit-btn {
+  color: #397deb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.yni-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.yni-goal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.yni-goal-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.yni-goal-value {
+  color: #4b5b73;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.yni-goal-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yni-progress-track {
+  height: 11px;
+  background: #dce3e8;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.yni-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #20c965, #45cf75);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.yni-done {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #28c96a;
+  color: white;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.yni-done svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 3;
+}
+
+.yni-percent {
+  width: 36px;
+  text-align: right;
+  font-size: 13px;
+  color: #3d4c62;
+  font-weight: 800;
+}
+
+/* Decorative only, not primary content (Hero/Tabs/Season/Stats/Goals are) — kept short on
+   purpose so it never forces a scroll just to see it. */
+.yni-quote-card {
+  margin-top: 8px;
+  height: 96px;
+  border-radius: 14px;
+  background-position: 35% 30%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-color: #274b66;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.yni-quote {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.05;
+  font-style: italic;
+  font-weight: 700;
+  transform: rotate(-4deg);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
+}
+
+.yni-brand {
+  position: absolute;
+  right: 17px;
+  bottom: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+}

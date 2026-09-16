@@ -7,6 +7,7 @@
 // closest point on the track.
 
 import { elevationGainFromSeries, elevationSeriesOrNull } from "./elevation";
+import type { EventRoute } from "./event-route";
 import type { ParsedTrack } from "./track-csv";
 
 function nearestPointIndex(points: [number, number][], target: [number, number]): number {
@@ -110,4 +111,72 @@ export function parseTrackGpx(text: string): ParsedTrack | null {
     elevationGainM: elevationGainFromSeries(elevations),
     elevations: elevationSeriesOrNull(elevations),
   };
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * The write side of this file — a ride's route, turned back into a GPX a rider can save to
+ * their phone and load into whatever bike computer or nav app they use. Deliberately the
+ * simplest valid GPX: one <trk>/<trkseg> of <trkpt>s, <ele> only where the route actually has
+ * a per-point elevation reading (see EventRoute.elevations's doc comment — absent, not
+ * invented, for a route saved before the server kept the series). No waypoints are written
+ * back out: rest stops are this app's own read of the source file, not something every GPX
+ * consumer expects to receive round-tripped.
+ */
+export function buildGpxFile(route: Pick<EventRoute, "points" | "elevations">, name: string): string {
+  const trkpts = route.points
+    .map(([lat, lon], i) => {
+      const ele = route.elevations?.[i];
+      const eleTag = ele != null ? `\n        <ele>${ele}</ele>` : "";
+      return `      <trkpt lat="${lat}" lon="${lon}">${eleTag}\n      </trkpt>`;
+    })
+    .join("\n");
+
+  const safeName = escapeXml(name);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ElNino" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${safeName}</name>
+  </metadata>
+  <trk>
+    <name>${safeName}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+}
+
+/** Filesystem-safe stem for the downloaded file — the ride's own name, or a generic fallback
+ * when it's blank, so a title made of nothing but punctuation never produces an empty file. */
+export function gpxFilenameFor(name: string): string {
+  const stem = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${stem || "route"}.gpx`;
+}
+
+/** Saves a GPX string to the rider's device — a plain Blob + temporary link click, the same
+ * mechanism every browser (including on a phone) treats as a real file download. */
+export function downloadGpxFile(filename: string, gpxContent: string): void {
+  const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

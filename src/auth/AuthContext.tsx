@@ -47,6 +47,13 @@ export interface Profile {
    */
   country?: string | null;
   /**
+   * The rider's body weight in kg (40-120) — or null when never set. Presence of the key is
+   * how the app detects the server supports it at all (see serverSupportsWeight), same pattern
+   * as country. Drives Rider Statistics' personal calorie estimate only; a rider with no weight
+   * set sees `calories: null` there rather than an invented number. Changeable on AccountPage.
+   */
+  weightKg?: number | null;
+  /**
    * The Google profile photo, straight from the sign-in token — the same flat field every
    * event/participant endpoint already sends for OTHER people (see EventOwner.avatarUrl in
    * lib/local-db.ts). Optional because the server does not populate `users.avatar_url` on the
@@ -94,6 +101,14 @@ export interface Profile {
    * start) and must NOT be treated as a denial — see lib/user-mode.ts `shouldForceRiderMode`.
    */
   canOrganize?: boolean;
+  /**
+   * Rider Statistics preview gate — hides the drawer's Statistics entry for everyone except
+   * the account(s) in the server's STATISTICS_PREVIEW_EMAILS list while the feature is still
+   * being finished (user.controller.ts). Menu visibility only, nothing else — the API stays
+   * reachable either way. Remove this field (and the drawer's check) once Statistics is ready
+   * for every rider.
+   */
+  canSeeStatistics?: boolean;
 }
 
 interface AuthResponse {

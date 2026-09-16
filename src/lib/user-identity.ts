@@ -258,3 +258,8 @@ export function serverSupportsCountry(profile: object | null | undefined): boole
   if (!profile) return false;
   return "country" in profile;
 }
+
+export function serverSupportsWeight(profile: object | null | undefined): boolean {
+  if (!profile) return false;
+  return "weightKg" in profile;
+}

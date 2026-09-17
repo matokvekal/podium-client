@@ -75,6 +75,14 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
+
+  /* CONTAINS LEAFLET — the same rule, for the same reason, as TrackGalleryCard.module.css's
+     own `.card`, which is where this was first worked out. A Leaflet map sets z-index 400-800
+     on its own panes and controls, and with no stacking context on the card those numbers
+     compete with the whole page: the app drawer (z-index 61, global.css) opened UNDERNEATH
+     these maps. It surfaced here late because these cards used to draw a map only for a reader
+     who could already see the ride — which, on a link sent to someone new, was nobody. */
+  isolation: isolate;
 }
 
 .card:hover {

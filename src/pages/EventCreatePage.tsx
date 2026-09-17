@@ -2294,6 +2294,16 @@ export function EventCreatePage() {
                     Riders list visible
                   </span>
                 </label>
+                {/* The switch reads as "hide the riders", which sounds like it hides them from
+                    the organizer too — it never has. Say whose view it governs, so turning it
+                    off on a private ride is not a decision made in the dark. The rule itself
+                    lives on the ride page (EventDetailPage.tsx's canSeeRiders) and is enforced
+                    server-side (participant.service.ts). */}
+                <p className={styles.hint}>
+                  {ridersListVisible
+                    ? "Everyone who can open this ride sees who is riding."
+                    : "Only you see who is riding — the list is hidden from riders and visitors. You always see your own start list on the ride page, private ride or not."}
+                </p>
                 {/* Accessibility marker — the organizer's claim that the ride is planned for
                     riders who need assistance or adaptive equipment. A browsing rider who needs
                     that sees it as a chip on the card / detail. */}

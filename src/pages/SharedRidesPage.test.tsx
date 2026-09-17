@@ -52,6 +52,8 @@ vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({ status: authStatus, profile: null }),
 }));
 
+vi.mock("../app/TrackMiniMap", () => ({ default: () => null }));
+
 const { SharedRidesPage } = await import("./SharedRidesPage");
 
 function ride(overrides: Record<string, unknown> = {}) {
@@ -278,5 +280,85 @@ describe("when the link does not resolve", () => {
     renderPage();
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.queryByText(/Which one are you riding\?/)).toBeNull();
+  });
+});
+
+describe("a card whose map this reader may not have", () => {
+  it("⚠ settles instead of spinning forever when the route request is refused", async () => {
+    // Rides are PRIVATE by default, and a private ride in a group is now offered to whoever
+    // holds the link while its geometry stays behind the ride's own rule — so a refused
+    // /route is the ordinary case here, not an edge one. Nothing on this page asks a second
+    // time, so a card left in the "still loading" state would spin for good.
+    const { ApiError } = await import("../lib/api-client");
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.startsWith("/events/share/")) {
+        return { linkGroupId: "g1", owner: { id: 7, name: "Dan Cohen" }, rides: [LONG, SHORT] };
+      }
+      if (path.includes("/route")) throw new ApiError(404, "Event not found");
+      return undefined;
+    });
+
+    const { container } = renderPage();
+
+    expect(await screen.findByText("Long loop")).toBeTruthy();
+    await waitFor(() => expect(container.querySelectorAll(".spinner")).toHaveLength(0));
+    // The cards are still there and still pickable — a missing map is not a missing ride.
+    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("the map on each card", () => {
+  const LINE: [number, number][] = [
+    [32.1, 34.8],
+    [32.2, 34.9],
+    [32.3, 34.7],
+  ];
+
+  it("⚠ draws the line the group payload carried, without asking for it per card", async () => {
+    // The maps used to be fetched one per card from GET /events/:id/route, which refuses a
+    // private ride — the default — to exactly the reader this link was sent to, leaving every
+    // thumbnail on a spinner. The line now arrives with the group.
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.startsWith("/events/share/")) {
+        return {
+          linkGroupId: "g1",
+          owner: { id: 7, name: "Dan Cohen" },
+          rides: [
+            { ...LONG, route: { points: LINE, distanceKm: 120, elevationM: 1200 } },
+            { ...SHORT, route: { points: LINE, distanceKm: 60, elevationM: 400 } },
+          ],
+        };
+      }
+      return undefined;
+    });
+
+    const { container } = renderPage();
+
+    expect(await screen.findByText("Long loop")).toBeTruthy();
+    await waitFor(() => expect(container.querySelectorAll("polyline").length).toBeGreaterThan(0));
+    expect(container.querySelectorAll(".spinner")).toHaveLength(0);
+    expect(apiRequest.mock.calls.every(([path]) => !String(path).includes("/route"))).toBe(true);
+  });
+
+  it("takes a null route as an answer — that ride has no track, so it never spins", async () => {
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.startsWith("/events/share/")) {
+        return {
+          linkGroupId: "g1",
+          owner: { id: 7, name: "Dan Cohen" },
+          rides: [
+            { ...LONG, route: null },
+            { ...SHORT, route: null },
+          ],
+        };
+      }
+      return undefined;
+    });
+
+    const { container } = renderPage();
+
+    expect(await screen.findByText("Long loop")).toBeTruthy();
+    await waitFor(() => expect(container.querySelectorAll(".spinner")).toHaveLength(0));
+    expect(apiRequest.mock.calls.every(([path]) => !String(path).includes("/route"))).toBe(true);
   });
 });

@@ -1,11 +1,13 @@
 /**
  * "Connect rides" — the organizer picks which of their OWN rides that day share one link.
  *
- * Opened from the organizer action sheet on EventDetailPage. Ticking a ride and saving turns
- * this ride's share link from `/join/<code>` into `/share/<codeA>-<codeB>`, which opens a
- * chooser instead of landing the reader on one of the rides. The rides themselves are not
- * merged, moved or altered in any way — participants, results, live tracking and ride groups
- * are all untouched. Only the LINK changes. See server sql/037-event-link-groups.sql.
+ * Opened from the organizer action sheet on EventDetailPage. Ticking a ride and saving GIVES
+ * this ride a second link — `/share/<codeA>-<codeB>`, which opens a chooser — alongside the
+ * `/join/<code>` it already had. ShareEventSheet then offers both and the organizer picks per
+ * message; connecting rides never takes the single-ride link away, which is why this sheet
+ * says so out loud. The rides themselves are not merged, moved or altered in any way —
+ * participants, results, live tracking and ride groups are all untouched. Only the LINKS
+ * change. See server sql/037-event-link-groups.sql.
  *
  * WHY THE CANDIDATES COME OUT OF THE STORE AND NOT AN ENDPOINT
  *   `eventsStore.myRides` already holds everything GET /events?filter=mine returns, and the
@@ -107,9 +109,9 @@ export function ConnectRidesSheet({ event, onSaved, onClose }: ConnectRidesSheet
   }
 
   /**
-   * `ids` is passed in rather than read off state: "Share this ride on its own" clears the
-   * selection and saves in the same handler, and a save that read `selected` would still see
-   * the old value on that render.
+   * `ids` is passed in rather than read off state: "Disconnect" clears the selection and saves
+   * in the same handler, and a save that read `selected` would still see the old value on that
+   * render.
    */
   const save = useCallback(
     async (ids: string[]) => {
@@ -172,9 +174,12 @@ export function ConnectRidesSheet({ event, onSaved, onClose }: ConnectRidesSheet
 
         <div className={styles.body}>
           <p className={styles.intro}>
-            Share <strong>{event.name}</strong> together with your other rides
-            {day ? ` on ${day}` : " that day"}. They stay separate rides — riders get one link and
-            choose which one they're riding.
+            Pick your other rides{day ? ` on ${day}` : " that day"} to connect to{" "}
+            <strong>{event.name}</strong>. They stay separate rides — connecting them only adds a
+            second link you can send: one that shows all of them and lets each rider choose.
+          </p>
+          <p className={styles.introNote}>
+            You keep the link to <strong>{event.name}</strong> on its own — Share offers both.
           </p>
 
           {!event.startsAt && (
@@ -240,7 +245,11 @@ export function ConnectRidesSheet({ event, onSaved, onClose }: ConnectRidesSheet
               disabled={busy || unchanged || !event.startsAt}
               onClick={() => void save(selected)}
             >
-              {busy ? "Saving…" : selected.length > 0 ? "Share as one link" : "Save"}
+              {busy
+                ? "Saving…"
+                : selected.length > 0
+                  ? `Connect ${selected.length + 1} rides`
+                  : "Save"}
             </button>
             {alreadyLinked.length > 0 && (
               <button
@@ -255,7 +264,7 @@ export function ConnectRidesSheet({ event, onSaved, onClose }: ConnectRidesSheet
                 }}
               >
                 <Unlink width={16} height={16} aria-hidden="true" style={{ marginRight: 6 }} />
-                Share this ride on its own
+                Disconnect — no shared link at all
               </button>
             )}
           </div>

@@ -128,3 +128,61 @@
   justify-content: center;
   gap: 6px;
 }
+
+/* --- which link am I sending? (a connected ride only) ----------------------------------
+   Two buttons side by side rather than a dropdown: there are exactly two answers, and the
+   organizer should be able to read both without opening anything. Same data-active pill
+   vocabulary as EventCreatePage's visibility / cover pickers, so this reads as the app's
+   own control and not as a new widget. */
+.modeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+/* A <fieldset>, so the pair is one choice without ARIA — which means undoing the chrome the
+   browser gives fieldsets by default. min-width: 0 is the one that is not obvious: a fieldset
+   refuses to shrink below its content otherwise, and a long ride count would push the sheet
+   into a horizontal scroll on a phone. */
+.modeRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modeButton {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modeButton[data-active="true"] {
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+/* States what the SELECTED link does, in the recipient's terms — the label alone cannot say
+   "and choose the one they're riding". */
+.modeHint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}

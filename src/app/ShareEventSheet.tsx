@@ -19,17 +19,27 @@
  * message for pasting into a chat, "Copy link" is the bare URL for a form, a poster or a
  * calendar entry.
  *
- * ONE LINK FOR SEVERAL RIDES (`linkedCodes`, server sql/037)
- *   When this ride is connected to the organizer's other rides that day, the link becomes
- *   `/share/<codeA>-<codeB>` and the invitation names all of them, because that is the whole
- *   point: the recipient has to see both options before they tap. The QR encodes the same URL,
- *   so a printed code at the start line still works for a pair of rides.
+ * ONE LINK FOR SEVERAL RIDES (`linkedRides`, server sql/037)
+ *   When this ride is connected to the organizer's other rides that day, this sheet offers
+ *   TWO links and the organizer picks which one they are sending:
  *
- *   With no `linkedCodes` every byte of this sheet's output is what it always was — a ride
- *   shared on its own must not change at all.
+ *     • all the rides    -> /share/<codeA>-<codeB>, which opens the chooser ("which one are
+ *                           you riding?"). The default, because it is why they connected them.
+ *     • only this ride   -> /join/<code>, exactly the link a ride shared on its own gets.
+ *
+ *   Both are real, and both are needed on the same day: the group link goes into the club
+ *   chat, and the single-ride link goes to the person who is already on the short ride and
+ *   must not be asked to choose again. Deciding for the organizer — which this sheet used to
+ *   do, always handing out the group link — made the second case impossible.
+ *
+ *   The QR, the previewed invitation, the copy buttons and the native share all follow the
+ *   chosen link, so what the organizer sees is what they send.
+ *
+ *   With no `linkedRides` there is no choice to make and every byte of this sheet's output is
+ *   what it always was — a ride shared on its own must not change at all.
  */
 
-import { Check, Copy, Link2, Share2, X } from "lucide-react";
+import { Bike, Check, Copy, Layers, Link2, Share2, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { config } from "../lib/config";
@@ -72,7 +82,18 @@ export function ShareEventSheet({
   const [copied, setCopied] = useState<"invite" | "link" | null>(null);
 
   const siblings = linkedRides ?? [];
-  const isGroup = siblings.length > 0;
+  const connected = siblings.length > 0;
+
+  /**
+   * Which of the two links this sheet is currently handing out.
+   *
+   * Defaults to "all" for a connected ride: the organizer connected these rides so that one
+   * link would cover them, so that is what they are most likely sending. "this" is one tap
+   * away and changes everything below it.
+   */
+  const [mode, setMode] = useState<"all" | "this">("all");
+  const isGroup = connected && mode === "all";
+  const rideCount = siblings.length + 1;
 
   // Always the production origin (config.shareBaseUrl) — a shared link / printed QR must open
   // the real app, never a localhost dev server.
@@ -165,7 +186,7 @@ export function ShareEventSheet({
       <div className={`${styles.sheet} ${styles.sheetOpen}`}>
         <div className={styles.sheetHeader}>
           <h2 style={{ margin: 0 }}>
-            {isGroup ? `Share ${groupRides.length} rides` : "Share event"}
+            {connected ? (isGroup ? `Share ${rideCount} rides` : `Share ${eventName}`) : "Share event"}
           </h2>
           <button
             type="button"
@@ -177,6 +198,45 @@ export function ShareEventSheet({
           </button>
         </div>
         <div className={`stack ${styles.sheetBody}`}>
+          {/* The choice, first: everything under it — the QR, the invitation, both copy
+              buttons — is whichever link is selected here. Two plain buttons rather than a
+              dropdown, because there are exactly two answers and the organizer should be able
+              to see both without opening anything. */}
+          {connected && (
+            <div className={styles.modeBlock}>
+              {/* A real fieldset rather than role="group": the two buttons are one choice,
+                  and the element that says so natively needs no ARIA. Its default chrome is
+                  reset in the stylesheet. */}
+              <fieldset className={styles.modeRow} aria-label="What this link opens">
+                <button
+                  type="button"
+                  className={styles.modeButton}
+                  data-active={mode === "all"}
+                  aria-pressed={mode === "all"}
+                  onClick={() => setMode("all")}
+                >
+                  <Layers width={15} height={15} aria-hidden="true" />
+                  All {rideCount} rides
+                </button>
+                <button
+                  type="button"
+                  className={styles.modeButton}
+                  data-active={mode === "this"}
+                  aria-pressed={mode === "this"}
+                  onClick={() => setMode("this")}
+                >
+                  <Bike width={15} height={15} aria-hidden="true" />
+                  Only this ride
+                </button>
+              </fieldset>
+              <p className={styles.modeHint}>
+                {isGroup
+                  ? `Riders open one link, see all ${rideCount} rides and choose the one they're riding.`
+                  : `Riders go straight to ${eventName} — nothing to choose.`}
+              </p>
+            </div>
+          )}
+
           <div className={styles.qrWrap}>
             {qrDataUrl ? (
               <img

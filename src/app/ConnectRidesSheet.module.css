@@ -67,6 +67,18 @@
   line-height: 1.5;
 }
 
+/* The one thing organizers got wrong about this sheet: they read "connect" as "give up the
+   link I already sent". Quieter than the intro, but on screen before they decide. */
+.introNote {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .empty {
   margin: 0;
   padding: var(--space-4);

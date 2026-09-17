@@ -86,6 +86,23 @@ export interface EventSummary {
    */
   activityType?: SurfaceType | null;
   level?: RiderLevel | null;
+  /**
+   * How technical the GROUND is, 1-5 (server sql/038-event-terrain-grade.sql) — the number
+   * only; the words are per-discipline and live in lib/terrain-grade.ts (mtb S1-S5, gravel
+   * G1-G5).
+   *
+   * ⚠ ORTHOGONAL TO `level`. `level` is who the ride is pitched at; this is what is under the
+   * tyre. Both are shown, as "Level" and "Terrain" — a beginners-pace ride over S3 singletrack
+   * is a real ride, and collapsing the two would mislead whoever turns up on 32mm tyres.
+   *
+   * Collected and displayed for mtb/gravel only (terrainApplies), but the value is kept when an
+   * organizer switches discipline rather than cleared, so switching back restores it.
+   *
+   * Optional / nullable for the usual reasons: a cached row predates it, and a server without
+   * sql/038 applied reads the column as null. null means "not stated" — a card shows a dash,
+   * never a 1.
+   */
+  terrainGrade?: number | null;
   organizerGroup?: string | null;
   teamId?: string | null;
   /**
@@ -93,6 +110,18 @@ export interface EventSummary {
    * Lives entirely in this cache; see toggleFavorite. Optional because a fresh row straight
    * off the network never has it set until toggled.
    */
+  /**
+   * Which /share link group this ride belongs to, or null when it is shared on its own
+   * (server: sql/037-event-link-groups.sql). On the summary so the organizer's "Created" list
+   * can mark the rides that share a link without a detail call per card.
+   *
+   * The group's MEMBERS are not here — that is EventDetail.linkedRides. A list card only needs
+   * to know THAT a ride is connected, never to what.
+   *
+   * Optional / nullable for the usual reasons: a cached row predates it, and a server without
+   * sql/037 applied reads the column as null.
+   */
+  linkGroupId?: string | null;
   favorite?: boolean;
   /**
    * Route + roster summary, sent by GET /events and GET /events/public (server's
@@ -119,6 +148,23 @@ export interface EventSummary {
    * its own per-card `?preview=1` fetch. Optional / nullable for the same reasons.
    */
   downloads?: number | null;
+  /**
+   * The ATTACHED TRACK's id (routes.id), from toEventSummary. Likes and hearts belong to the
+   * track, not the ride — one `routes` row is shared by every ride built on it — so this is
+   * what the card posts to, and why two rides on the same track show one count. Null when the
+   * ride has no route; absent on a cached v1 row or an older server.
+   */
+  routeId?: number | null;
+  /**
+   * Likes on the attached TRACK, and whether THIS rider has already liked / hearted it
+   * (sql/036). ONLY GET /events/public fills these in.
+   *
+   * `null` is not `0` and not `false`: it means the server did not answer — a guest, an older
+   * server, or a cached row. The card holds the slot rather than claiming nobody has liked it.
+   */
+  likes?: number | null;
+  likedByMe?: boolean | null;
+  favoritedByMe?: boolean | null;
   /** @deprecated device-local mirror of climb (store/eventExtrasStore.ts) — read
    *  `elevationGain` first. Kept so an older cached row still resolves. */
   climbM?: number;
@@ -232,6 +278,31 @@ export interface EventDetail extends EventSummary {
    */
   copiedFromEventId?: string | null;
   copiedFromRouteId?: number | null;
+  /**
+   * The OTHER rides sharing this ride's one /share link (server: sql/037-event-link-groups.sql)
+   * — what the "1 of 2 rides that day · Switch ride" chip is built from. `[]` for a ride shared
+   * on its own, which is almost every ride.
+   *
+   * Already filtered server-side to the siblings THIS viewer may see, so the chip can never
+   * count a ride the chooser would then refuse to show. Do not re-filter it here.
+   *
+   * ⚠ READ THIS OFF THE DETAIL RESPONSE ONLY, never off a summary row. EventDetailPage pushes
+   * the whole detail into eventsStore via upsertRide, so a stale copy can linger on a summary
+   * after the organizer has dissolved the group.
+   *
+   * Optional for the usual two reasons: a row cached before this existed omits it, and a server
+   * that has not shipped it does not send it — same rule as `groupCount` above.
+   */
+  linkedRides?: LinkedRide[];
+}
+
+/** A sibling ride in a shared link — just enough to render a link and a label. The chooser
+ *  page fetches the full cards itself. */
+export interface LinkedRide {
+  eventId: string;
+  code: string;
+  name: string;
+  startsAt: string | null;
 }
 
 /** One GET /events/:eventId/participants row, as far as any UI here needs it. */

@@ -43,12 +43,36 @@ export const RUNNING_PACE_LABEL: Record<RiderLevel, string> = {
   world_tour: "3 min/km",
 };
 
+/**
+ * The same five paces as numbers, minutes per kilometre — what RUNNING_PACE_LABEL says in
+ * words. Kept immediately next to it so the two can never drift: the label is what a runner
+ * reads, this is what lib/ride-duration.ts's estimate divides by.
+ *
+ * `beginner` is 7.5 rather than 7: its label is "7+ min/km", and an estimate should sit inside
+ * the range a rider was promised rather than at its fastest edge.
+ */
+export const RUNNING_PACE_MIN_PER_KM: Record<RiderLevel, number> = {
+  beginner: 7.5,
+  intermediate: 6,
+  masters: 5,
+  elite: 4,
+  world_tour: 3,
+};
+
 /** The label to show for one level on one kind of event. */
 export function levelLabelFor(level: RiderLevel, activityType: SurfaceType | null): string {
   return activityType === "running" ? RUNNING_PACE_LABEL[level] : LEVEL_LABEL[level];
 }
 
-/** What the difficulty tile is called for this kind of event. */
+/**
+ * What this tile is called for this kind of event.
+ *
+ * ⚠ IT SAYS "Level", NOT "Difficulty", AND THAT IS DELIBERATE. Off-road rides now also carry a
+ * terrain grade (lib/terrain-grade.ts) shown as "Terrain", and two tiles both called some kind
+ * of difficulty is exactly the confusion that field exists to remove. This one answers WHO THE
+ * RIDE IS PITCHED AT; Terrain answers what the ground is. Renaming it here changes every render
+ * site at once — card, tile and ride page — which is the point of the helper.
+ */
 export function levelHeadingFor(activityType: SurfaceType | null): string {
-  return activityType === "running" ? "Pace" : "Difficulty";
+  return activityType === "running" ? "Pace" : "Level";
 }

@@ -34,6 +34,7 @@ import {
   Clock,
   Coffee,
   Heart,
+  Link2,
   MapPin,
   MapPinned,
   Mountain,
@@ -46,9 +47,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
-import { formatDuration } from "../lib/ride-duration";
+import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
+import {
+  asTerrainGrade,
+  TERRAIN_GRADES,
+  terrainApplies,
+  terrainDescriptionFor,
+  terrainLabelFor,
+} from "../lib/terrain-grade";
 import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -121,10 +129,40 @@ export function EventCard({
   const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
   const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const riderCount = event.participantCount ?? null;
-  // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
-  // slot that read a hard-coded "soon" until now.
-  const durationText = formatDuration(event.durationMin);
+  // Ride plan (sql/022) — server-only, no local fallback.
   const restStops = event.restStops ?? null;
+
+  /**
+   * How technical the ground is (sql/038). Shown only where a scale exists to read it against:
+   * on a road ride the surface is the road, and "3" would be noise. Server-only — a grade is
+   * not something this device can know about someone else's ride.
+   */
+  const terrainGrade = terrainApplies(activityType) ? asTerrainGrade(event.terrainGrade) : null;
+
+  /**
+   * "Est. Time": the organizer's own figure, else the app's estimate, else "soon".
+   *
+   * The order is the rule — an organizer who stated a time is never second-guessed, and the
+   * estimate only fills a blank. `formatEstimatedDuration` is what marks it as a guess, and it
+   * is the ONLY way a derived time reaches a screen. See lib/ride-duration.ts.
+   */
+  const statedDuration = formatDuration(event.durationMin);
+  const estimatedMin = statedDuration
+    ? null
+    : estimateDurationMin({
+        distanceKm,
+        climbM,
+        activityType,
+        terrainGrade,
+        level,
+        restStops,
+      });
+  const durationText = statedDuration || formatEstimatedDuration(estimatedMin);
+  const durationTitle = statedDuration
+    ? undefined
+    : estimatedMin
+      ? "Estimated from distance, climb and terrain — the organizer hasn't stated a time yet"
+      : undefined;
 
   const when = dateParts(event.startsAt);
   // The organizer's own cover when they have one, else this event's local cover, else the
@@ -206,6 +244,21 @@ export function EventCard({
           </div>
 
           <div className={styles.chipRow}>
+            {/* This ride shares one share-link with another of the organizer's rides that day
+                (server: sql/037). On the card so the "Created" list shows at a glance which
+                rides are connected, instead of the organizer having to open each one to find
+                out. Deliberately just a marker: WHICH rides it is connected to is the ride
+                page's business (EventDetail.linkedRides), and a list card has no use for it. */}
+            {event.linkGroupId && (
+              <span
+                className={styles.chip}
+                data-kind="linked"
+                title="Shares one link with another of your rides"
+              >
+                <Link2 width={12} height={12} aria-hidden="true" />
+                Linked
+              </span>
+            )}
             {activityType && TypeIcon && (
               <span className={styles.chip} data-kind="surface" data-surface={activityType}>
                 <TypeIcon width={12} height={12} aria-hidden="true" />
@@ -246,7 +299,10 @@ export function EventCard({
         </div>
       </div>
 
-      <div className={styles.stats}>
+      {/* Four tiles normally; five when the ride has a terrain grade, and then the grid drops
+          to three columns so it wraps cleanly as 3 + 2 (Distance/Elevation/Est.Time, then
+          Level/Terrain) rather than squeezing "Intermediate" into a fifth of the card. */}
+      <div className={styles.stats} data-tiles={terrainGrade ? 5 : 4}>
         <div className={styles.stat}>
           <DistanceIcon className={styles.statIcon} aria-hidden="true" />
           <span className={styles.statValue}>{distanceKm != null ? `${distanceKm} km` : "—"}</span>
@@ -259,7 +315,11 @@ export function EventCard({
         </div>
         {/* Est. time: the organizer's own estimate (events.duration_min, sql/022), never
             derived from distance. "soon" only while the organizer left it blank. */}
-        <div className={styles.stat} data-pending={durationText ? undefined : "true"}>
+        <div
+          className={styles.stat}
+          data-pending={durationText ? undefined : "true"}
+          title={durationTitle}
+        >
           <Timer className={styles.statIcon} aria-hidden="true" />
           <span className={styles.statValue}>{durationText || NOT_YET}</span>
           <span className={styles.statLabel}>Est. Time</span>
@@ -288,6 +348,25 @@ export function EventCard({
             </>
           )}
         </div>
+        {/* TERRAIN — what the ground is, which the Level tile above does not answer. Rendered
+            only for mtb/gravel, and only once the organizer has stated a grade: an empty
+            five-bar scale reads as "easiest", which is the one wrong answer. */}
+        {terrainGrade && (
+          <div className={styles.stat} title={terrainDescriptionFor(terrainGrade, activityType)}>
+            <span className={styles.levelBars} aria-hidden="true">
+              {TERRAIN_GRADES.map((grade, i) => (
+                <span
+                  key={grade}
+                  className={styles.terrainBar}
+                  data-filled={grade <= terrainGrade}
+                  style={{ height: `${5 + i * 3}px` }}
+                />
+              ))}
+            </span>
+            <span className={styles.statValue}>{terrainLabelFor(terrainGrade, activityType)}</span>
+            <span className={styles.statLabel}>Terrain</span>
+          </div>
+        )}
       </div>
 
       <div className={styles.footer}>

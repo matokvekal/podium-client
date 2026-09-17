@@ -28,6 +28,9 @@
  *
  * This app does not transmit GPS. Joining here puts the rider on the start list; the
  * Android app is the only GPS source in v1.
+ *
+ * A scanned QR may also be a MULTI-RIDE link (/share/<codeA>-<codeB>, server sql/037). Those
+ * are handed to the chooser page rather than resolved here — see extractScanned below.
  */
 
 import jsQR from "jsqr";
@@ -38,27 +41,10 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { findEventByCode } from "../lib/event-code";
 import type { EventSummary } from "../lib/local-db";
+import { extractScanned } from "../lib/scanned-target";
 import { useEventsStore } from "../store/eventsStore";
 import { type InviteSource, useInvitedEventsStore } from "../store/invitedEventsStore";
 import styles from "./JoinPage.module.css";
-
-/**
- * The QR encodes a full join URL ({origin}/join/{code}), same as ShareEventSheet.tsx
- * generates. Pull just the code back out of it — the last path segment, URL-decoded — so a
- * bare code string (someone's homemade QR, or a future non-URL format) still works.
- */
-function extractCode(scannedText: string): string {
-  const text = scannedText.trim();
-  try {
-    const url = new URL(text);
-    const segments = url.pathname.split("/").filter(Boolean);
-    const last = segments[segments.length - 1];
-    if (last) return decodeURIComponent(last);
-  } catch {
-    // Not a URL — treat the scanned text itself as the code.
-  }
-  return text;
-}
 
 /**
  * Resolve a code from the public list, for the one case by-code cannot serve: a ride that has
@@ -267,10 +253,17 @@ export function JoinPage() {
           const imageData = context?.getImageData(0, 0, canvas.width, canvas.height);
           const result = imageData && jsQR(imageData.data, imageData.width, imageData.height);
           if (result?.data) {
-            const extracted = extractCode(result.data);
-            setCode(extracted);
+            const scanned = extractScanned(result.data);
             setScanning(false); // closes the sheet; the cleanup below stops the camera
-            void lookUp(extracted, "qr");
+            if (scanned.kind === "share") {
+              // Several rides under one link: the chooser is the only honest destination —
+              // looking any one of these codes up here would pick a ride for the rider.
+              // `via=qr` is carried through so the greeting still knows this was a scan.
+              navigate(`/share/${scanned.codes.join("-")}?via=qr`);
+              return;
+            }
+            setCode(scanned.code);
+            void lookUp(scanned.code, "qr");
             return; // decoded — stop the loop instead of scheduling another frame
           }
         }
@@ -286,7 +279,7 @@ export function JoinPage() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (stream) for (const track of stream.getTracks()) track.stop();
     };
-  }, [scanning, lookUp]);
+  }, [scanning, lookUp, navigate]);
 
   async function join(submitEvent: FormEvent) {
     submitEvent.preventDefault();

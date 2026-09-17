@@ -101,6 +101,36 @@ export function formatLocalMonthYear(utcIso: string | Date | null | undefined): 
   return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
+/**
+ * Are these two instants the same day for the person looking at the screen?
+ *
+ * The one calendar comparison in this app, and it belongs here rather than in the sheet that
+ * needs it: the rule of this file is that nothing else converts or compares dates.
+ *
+ * ⚠ LOCAL, NOT UTC, AND THAT IS THE WHOLE POINT. This decides which rides an organizer is
+ * offered when connecting two rides under one share link (ConnectRidesSheet). "Same day" means
+ * the day THEY are living in — a 22:00 ride and an 06:00 one are different days to them even
+ * though the pair may share a UTC date, and a Saturday-evening ride in UTC-5 is already Sunday
+ * in UTC. The server deliberately does not try to reproduce this (it has no timezone for the
+ * organizer) and enforces only a coarse 24-hour span; the precise answer is this function's.
+ *
+ * Either side missing is false, not "maybe": a ride with no start time cannot be on the same
+ * day as anything, and the server refuses to group one.
+ */
+export function isSameLocalDay(
+  a: string | Date | null | undefined,
+  b: string | Date | null | undefined,
+): boolean {
+  const first = toDate(a);
+  const second = toDate(b);
+  if (!first || !second) return false;
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
+}
+
 /** "4 min ago" — how fresh a rider's position is. Deliberately coarse. */
 export function formatAge(utcIso: string | Date | null | undefined, now = Date.now()): string {
   const date = toDate(utcIso);

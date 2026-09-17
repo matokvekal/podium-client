@@ -91,38 +91,56 @@
 
 /* --- controls --- */
 
+/* ONE ROW, ALWAYS — asked for directly. Everything here is a fixed-width control except the
+   search box, which absorbs whatever is left, so the toolbar never wraps to a second line even
+   on a narrow phone. That is what keeps the grid itself as tall as possible. */
 .controls {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  flex-wrap: nowrap;
+  gap: var(--space-2);
   align-items: center;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .sourceToggle {
   display: flex;
-  gap: var(--space-2);
+  flex: none;
+  gap: 4px;
 }
 
+/* "All" / "My" rather than "All rides" / "My rides": the full labels are on aria-label, and
+   two words each is what pushed this row onto a second line. */
+.sourceToggle > button {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+}
+
+/* The only elastic control. Allowed to shrink well below its content width — a cramped search
+   box is better than a wrapped toolbar. */
 .searchWrap {
   position: relative;
-  flex: 1 1 180px;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
 }
 
 /* --- filter / sort trigger buttons --- */
 
+/* Icon-only. The word stays in the DOM but hidden — the aria-label is what carries the meaning
+   — so the button collapses to a square tap target. */
 .iconBtn {
+  position: relative;
   display: flex;
   flex: none;
   gap: 6px;
   align-items: center;
   justify-content: center;
+  min-width: var(--tap-target);
   min-height: var(--tap-target);
-  padding: 0 var(--space-3);
+  padding: 0;
   font: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -137,18 +155,26 @@
   transform: translateY(1px);
 }
 
-.iconGlyph {
-  width: 15px;
-  height: 15px;
+.iconLabel {
+  display: none;
 }
 
+.iconGlyph {
+  width: 18px;
+  height: 18px;
+}
+
+/* A corner badge now rather than a chip beside the word, since there is no word. */
 .iconCount {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   font-size: 11px;
   font-weight: var(--weight-bold);
   line-height: 1;

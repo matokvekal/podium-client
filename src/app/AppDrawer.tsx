@@ -134,9 +134,6 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               <NavLink to="/stats" end className="drawer__nav-subaction" onClick={onClose}>
                 My Statistics
               </NavLink>
-              <NavLink to="/stats/year" className="drawer__nav-subaction" onClick={onClose}>
-                Year View
-              </NavLink>
               <NavLink to="/stats/achievements" className="drawer__nav-subaction" onClick={onClose}>
                 Achievements
               </NavLink>
@@ -145,12 +142,15 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               </NavLink>
             </div>
           )}
-          {isOrganizer && (
-            <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
-              <MapIcon aria-hidden="true" />
-              Find Tracks
-            </NavLink>
-          )}
+          {/* Ungated, like Find Rides and Join: browsing the track library is a rider activity,
+              not an organizer one. Gating this link was the other half of why Find Tracks was
+              effectively invisible — the page itself was behind RequireOrganizer too (App.tsx),
+              so a rider could neither see the link nor reach the URL. Only the "Ride it" button
+              on a card stays organizer-only. */}
+          <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
+            <MapIcon aria-hidden="true" />
+            Find Tracks
+          </NavLink>
           {status === "signed-in" && (
             <NavLink to="/teams" className="drawer__nav-item" onClick={onClose}>
               <Users aria-hidden="true" />

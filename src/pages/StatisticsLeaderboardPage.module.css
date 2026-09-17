@@ -1,141 +1,316 @@
-/* National Champions — visual language adapted from the supplied reference package
-   (statisics/board/NationalLeaderboardMock.css), fitted into this app's shared Statistics hero
-   (StatisticsShared.module.css) instead of owning a full-viewport page of its own. */
+/* National Champions (/stats/leaderboard) — laid out against the board.JPG reference: photo
+   header carrying the brand mark, title, country pill, four category cards and three filter
+   pills; a podium stage over the same photography; the ranked table lifted over it; and the
+   rider's own row as a green card underneath.
 
-.hero {
-  /* shared.hero's gradient is the stand-in photo everywhere else; here a real asset exists
-     (the reference's mountain-bg.svg), so it replaces the gradient rather than sitting under
-     it — the gradient's dark-to-photo fade is kept as a scrim so the header text and filters
-     stay legible over it. */
-  background:
-    linear-gradient(180deg, rgba(3, 24, 38, 0.35), rgba(3, 17, 27, 0.92) 75%, #08131b 100%),
-    url("/images/statistics/leaderboard/mountain-bg.svg") top center / cover no-repeat;
+   The page owns its own header rather than reusing StatisticsShared's .hero — that hero is a
+   two-line title block, and this screen's header is four stacked rows of controls. The shared
+   module is still used for the empty/loading states, which are identical across Statistics. */
+
+.header {
+  /* Full-bleed: cancels .app-main's own padding so the photo reaches the screen edge, the same
+     way every other photo header in this app does it. */
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  color: #fff;
+  /* Placeholder scenery — a real photo dropped in at this same path replaces it with no layout
+     change (see the page header). The scrim keeps every control above it legible. */
+  background:
+    linear-gradient(180deg, rgba(3, 22, 36, 0.55), rgba(4, 20, 32, 0.86)),
+    url("/images/statistics/leaderboard/mountain-bg.svg") center / cover no-repeat;
+  background-color: #0b1d29;
 }
 
-.heroTitleBlock {
-  flex: 1;
+/* --- title row ---------------------------------------------------------------------------- */
+
+.titleRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.brandLogo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.titleBlock {
+  min-width: 0;
   text-align: center;
 }
 
-.heroTrophy {
-  width: 34px;
-  height: 34px;
+.title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.15;
+}
+
+.title img {
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
 }
 
+.subtitle {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.countryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 34vw;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(8, 31, 48, 0.7);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.countryPill span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- category cards ----------------------------------------------------------------------- */
+
+.categories {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.categoryCard,
+.categoryCardActive {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 9px 3px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.categoryCard img,
+.categoryCardActive img {
+  width: 22px;
+  height: 22px;
+}
+
+.categoryLabel {
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+}
+
+.categorySub {
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 0.72;
+}
+
+.categoryCardActive {
+  background: #ccf6d2;
+  border-color: #46d07a;
+  color: #0f3625;
+  box-shadow: 0 6px 20px rgba(74, 255, 122, 0.22);
+}
+
+/* --- filter pills ------------------------------------------------------------------------- */
+
 .filters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
+  grid-template-columns: 1.3fr 1fr 1.2fr;
+  gap: 6px;
 }
 
 .filterSelect {
   width: 100%;
-  padding: 9px 10px;
+  min-width: 0;
+  padding: 8px 8px;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   color: #fff;
-  background: rgba(8, 31, 48, 0.78);
+  background: rgba(8, 31, 48, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-md);
+  border-radius: 999px;
+}
+
+/* The rider-set pill has exactly one option (see the page header) — it states the scope, so it
+   must not read as a broken/greyed control. */
+.filterSelect:disabled {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .filterSelect option {
   color: #14243c;
 }
 
-/* Category tabs — same shape as shared.darkTabs, but each tab carries its own icon above the
-   label (the reference's board.JPG / NationalLeaderboardMock.tsx layout), so they get their
-   own rule rather than reusing the shared one-line tab. */
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+/* --- podium ------------------------------------------------------------------------------- */
+
+.podiumStage {
+  position: relative;
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  /* Room above for the crowns and laurels, which sit outside their pedestal. */
+  padding: 58px var(--space-3) 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 20, 32, 0.86) 0,
+      rgba(6, 26, 40, 0.34) 30%,
+      rgba(6, 26, 40, 0.5) 100%
+    ),
+    url("/images/statistics/leaderboard/mountain-bg.svg") center 30% / cover no-repeat;
+  background-color: #12303f;
+  overflow: hidden;
 }
 
-.tab,
-.tabActive {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 9px 4px;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 11px;
+/* The reference's handwritten "Stronger Riders Brighter Days" mark. Decorative only — it is
+   aria-hidden, and it tucks behind the podium rather than reserving layout space. */
+.script {
+  position: absolute;
+  top: 44px;
+  right: 10px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
   font-weight: var(--weight-bold);
-  background: rgba(255, 255, 255, 0.1);
+  font-size: 15px;
+  line-height: 1;
   color: #fff;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transform: rotate(-7deg);
+  pointer-events: none;
 }
 
-.tab img,
-.tabActive img {
-  width: 24px;
-  height: 24px;
+.scriptUnderline {
+  margin-top: 4px;
+  width: 58px;
+  height: 3px;
+  border-radius: 999px;
+  background: #3ad06f;
 }
-
-.tabActive {
-  background: #c8ffd0;
-  color: #0f3625;
-  box-shadow: 0 6px 20px rgba(74, 255, 122, 0.22);
-}
-
-/* --- podium --------------------------------------------------------------------------- */
 
 .podium {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-columns: 1fr 1.18fr 1fr;
   align-items: end;
-  gap: var(--space-2);
-  padding: var(--space-5) var(--space-2) 0;
+  gap: 6px;
 }
 
 .podiumSpot {
   position: relative;
   text-align: center;
-  padding: var(--space-3) 5px;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   color: #fff;
 }
 
-.podiumSpot[data-place="1"] {
-  min-height: 150px;
-  background: linear-gradient(#e4b930, #9b6510);
+.podiumHead {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 6px;
 }
 
-.podiumSpot[data-place="2"] {
-  min-height: 120px;
-  background: linear-gradient(#dfe7ec, #737e87);
+.podiumSpot[data-place="1"] .podiumHead {
+  width: 92px;
+  height: 92px;
 }
 
-.podiumSpot[data-place="3"] {
-  min-height: 108px;
-  background: linear-gradient(#dc9a70, #8f4e2c);
+.crown {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 32px;
+  height: 22px;
+  transform: translateX(-50%);
+  fill: #cfd8de;
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 1;
 }
 
-/* The mocked current rider never actually lands on the podium (rank 237), but the rule stays
-   here so a future real leaderboard where they DO place still gets the same highlight the list
-   row below uses — one "this is you" treatment, not two. */
-.podiumSpot[data-me] {
-  outline: 3px solid #4ade80;
-  outline-offset: -3px;
+.podiumSpot[data-place="1"] .crown {
+  top: -25px;
+  width: 40px;
+  height: 27px;
+  fill: #f5c542;
+}
+
+.podiumSpot[data-place="3"] .crown {
+  fill: #d8955f;
+}
+
+.laurel {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  color: #e6edf1;
+  opacity: 0.95;
+}
+
+.podiumSpot[data-place="1"] .laurel {
+  color: #f0cb5c;
+}
+
+.podiumSpot[data-place="3"] .laurel {
+  color: #dda173;
 }
 
 .podiumRing {
-  width: 64px;
-  height: 64px;
-  margin: -38px auto 8px;
+  position: absolute;
+  inset: 11px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.88);
   border-radius: 999px;
-}
-
-.podiumSpot[data-place="1"] .podiumRing {
-  width: 76px;
-  height: 76px;
-  margin-top: -46px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .podiumAvatar {
@@ -145,31 +320,64 @@
   width: 100%;
   height: 100%;
   border-radius: 999px;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: var(--weight-bold);
   color: #fff;
 }
 
+.pedestal {
+  position: relative;
+  padding: 18px 5px var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: linear-gradient(#dfe7ec, #737e87);
+  min-height: 108px;
+}
+
+.podiumSpot[data-place="1"] .pedestal {
+  min-height: 146px;
+  background: linear-gradient(#e9c243, #9b6510);
+}
+
+.podiumSpot[data-place="3"] .pedestal {
+  min-height: 96px;
+  background: linear-gradient(#dc9a70, #8f4e2c);
+}
+
+/* The mocked current rider never actually lands on the podium, but the rule stays so a future
+   real leaderboard where they DO place gets the same highlight the list row below uses — one
+   "this is you" treatment, not two. */
+.podiumSpot[data-me] .pedestal {
+  outline: 3px solid #4ade80;
+  outline-offset: -3px;
+}
+
 .podiumPlace {
   position: absolute;
-  top: 20px;
+  top: -16px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.92);
   color: #13202a;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: var(--weight-bold);
 }
 
 .podiumName {
-  margin: 6px 0 3px;
+  margin: 4px 0 3px;
   font-size: 12px;
   font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podiumSpot[data-place="1"] .podiumName {
+  font-size: 13px;
 }
 
 .podiumValue {
@@ -177,20 +385,31 @@
   font-size: 14px;
 }
 
-/* --- ranked list ------------------------------------------------------------------------ */
+.podiumSpot[data-place="1"] .podiumValue {
+  font-size: 16px;
+}
+
+/* --- ranked table ------------------------------------------------------------------------- */
 
 .listCard {
+  position: relative;
+  z-index: 1;
+  /* Lifted over the podium stage, as in the reference, so the table's top corners cut into the
+     photo instead of sitting on a seam. */
+  margin-top: calc(var(--space-4) * -1);
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
 .listHeader {
   display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3) var(--space-2);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
@@ -198,13 +417,17 @@
 }
 
 .listHeader span:first-child {
-  width: 22px;
+  width: 24px;
 }
 
-/* Capped, not "all 300 at once" — the whole list is real DOM (no virtualisation yet, 300 rows
-   is cheap), just scrolled within a bounded card instead of growing the page forever. */
+.listHeaderRider {
+  flex: 1;
+}
+
+/* Capped, not "all 50 at once" — the whole list is real DOM (no virtualisation yet, 50 rows is
+   cheap), just scrolled within a bounded card instead of growing the page forever. */
 .listScroll {
-  max-height: 60vh;
+  max-height: 46vh;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
@@ -213,27 +436,32 @@
 .listRowMe {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 8px var(--space-3);
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
   border-top: 1px solid var(--border);
+}
+
+.listScroll > .listRow:first-child,
+.listScroll > .listRowMe:first-child {
+  border-top: none;
 }
 
 .listRowMe {
   background: color-mix(in srgb, #4ade80 16%, transparent);
   outline: 2px solid #4ade80;
   outline-offset: -2px;
-  border-radius: var(--radius-sm);
 }
 
 .listRank {
-  width: 22px;
+  width: 24px;
   flex-shrink: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
 }
 
-.listAvatar {
+.listAvatar,
+.meAvatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,6 +472,12 @@
   font-size: 12px;
   font-weight: var(--weight-bold);
   color: #fff;
+}
+
+.listFlag {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .listName {
@@ -265,33 +499,94 @@
   white-space: nowrap;
 }
 
-/* --- floating "Where am I?" --------------------------------------------------------------- */
+/* The reference's "…" between the top of the table and the rider's own, far-off rank — only
+   drawn when the rider really is outside the rows above it. */
+.listBreak {
+  padding: 6px 0 10px;
+  text-align: center;
+  letter-spacing: 4px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
 
-.findMe {
-  position: fixed;
-  left: 50%;
-  /* Sits above the app's own real fixed footer (global.css's --footer-height), not the
-     viewport edge — the reference assumed no footer of its own. */
-  bottom: calc(var(--footer-height) + var(--space-3));
-  transform: translateX(-50%);
-  z-index: 5;
-  width: min(calc(100% - var(--space-5)), 380px);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+/* --- my own row --------------------------------------------------------------------------- */
+
+.meCard {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 12px var(--space-4);
-  border: none;
+  width: 100%;
+  padding: 10px var(--space-3);
+  border: 1px solid #56d98a;
   border-radius: var(--radius-lg);
-  background: #bffbc9;
-  color: #0e3f28;
+  background: color-mix(in srgb, #4ade80 18%, var(--surface));
+  color: var(--text);
   font: inherit;
-  font-weight: var(--weight-bold);
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
+  text-align: left;
+  cursor: default;
   -webkit-tap-highlight-color: transparent;
 }
 
-.findMe span {
-  text-align: left;
+button.meCard {
+  cursor: pointer;
+}
+
+.meRank {
+  flex-shrink: 0;
+  min-width: 30px;
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+}
+
+.meCopy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.meCopy b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.meCopy span {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.meDelta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: #17803d;
+  text-align: right;
+}
+
+.meDelta svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.meChevron {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

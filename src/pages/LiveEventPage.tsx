@@ -107,6 +107,16 @@ interface LiveEventInfo {
   myParticipant: { id: number } | null;
   status: EventStatus;
   effectiveStatus: EventStatus;
+  /**
+   * The other rides sharing this ride's one share link (server: sql/037). Used only to build
+   * that link, so the share button behaves the same here as it does on the ride page — a
+   * latecomer chasing the peloton mid-ride is exactly who needs to be asked WHICH group.
+   *
+   * Absent on the cached-summary path below, which degrades to the single-ride link. That is
+   * correct rather than merely tolerable: the group is server state, and an offline device has
+   * no way to know whether it still holds.
+   */
+  linkedRides?: { code: string; name: string; startsAt: string | null }[];
 }
 
 function liveInfoFromCachedSummary(summary: EventSummary, viewerId: number | null): LiveEventInfo {
@@ -891,6 +901,10 @@ export function LiveEventPage() {
             eventCode={event.code}
             startsAt={event.startsAt}
             location={event.location}
+            /* Same link everywhere. The server drops finished and cancelled members from a
+               shared link, so the chooser can never offer a sibling that ended an hour ago —
+               one rule, in one place, rather than a second "but not on the live page" rule. */
+            linkedRides={event.linkedRides}
             onClose={() => setShareOpen(false)}
           />
         </Suspense>

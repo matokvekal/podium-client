@@ -18,6 +18,14 @@ export default defineConfig({
   // building; this file only exists to configure tests. The React plugin is still needed, so
   // JSX in a .tsx test is transformed the same way the app's is.
   plugins: [react()],
+  /**
+   * The app's build injects this (vite.config.ts, from package.json), and lib/config.ts reads
+   * it at module scope. Without it here, ANY test that imports something reaching config.ts —
+   * which includes lib/api-client.ts, and therefore every page — died on
+   * "__APP_VERSION__ is not defined" before a single test ran. The value itself is never
+   * asserted on; it only has to exist.
+   */
+  define: { __APP_VERSION__: JSON.stringify("test") },
   test: {
     environment: "node",
     // React Testing Library's auto-cleanup hooks into these globals; without it a component

@@ -62,10 +62,17 @@ interface SharedOwner {
   avatarUrl?: string | null;
 }
 
+/**
+ * One card. `route` is the thinned line the SERVER hands over with the group — see the note on
+ * `requestRoute` for why it is not fetched per card any more. Optional only so a client running
+ * against a server that predates it still draws its maps the old way.
+ */
+type SharedRide = EventSummary & { route?: EventRoute | null };
+
 interface SharedRidesResponse {
   linkGroupId: string | null;
   owner: SharedOwner | null;
-  rides: EventSummary[];
+  rides: SharedRide[];
 }
 
 export function SharedRidesPage() {
@@ -132,14 +139,17 @@ export function SharedRidesPage() {
   }, [codes, navigate, via]);
 
   /**
-   * Per-card geometry, the same shape useTrackGallery.requestRoute uses: fetched once per
-   * ride, and settled either way — see the catch.
+   * THE FALLBACK, not the normal path any more.
    *
-   * ⚠ NOT `anonymous`, unlike the public gallery. A signed-in rider on a PRIVATE ride in this
-   * group is entitled to its map, and dropping their token would hide it from them. There are
-   * at most three cards here, so none of the 401-burst risk that made the gallery anonymous
-   * applies. The endpoint runs the server's own getEventForViewer, so a stranger still gets
-   * nothing for a private ride — this page cannot leak a map it should not show.
+   * ⚠ ASKING GET /events/:id/route FOR THESE CARDS IS WHAT BROKE THE MAPS.
+   *   That endpoint refuses a ride the viewer cannot otherwise see, and rides are private by
+   *   default — so the reader this link was sent to got a 404 per card and every thumbnail
+   *   sat on a spinner. The line now arrives WITH the group (server: toSharedRideRoute), under
+   *   the same decision that listed the ride at all, and this runs only for a ride whose card
+   *   carried no `route` key — i.e. against a server older than that change.
+   *
+   * Not `anonymous`, unlike the public gallery: a signed-in rider is entitled to their own
+   * ride's map, and dropping their token would hide it from them.
    */
   const requestRoute = useCallback((eventId: string) => {
     if (inFlight.current.has(eventId)) return;
@@ -164,8 +174,22 @@ export function SharedRidesPage() {
     })();
   }, []);
 
+  // The line the server sent with each card, taken as the answer — including an explicit null,
+  // which says "this ride has no track" rather than "not loaded yet". Only a card that carried
+  // no `route` key at all is asked for separately.
   useEffect(() => {
-    for (const ride of group?.rides ?? []) requestRoute(ride.id);
+    if (!group) return;
+    const served = group.rides.filter((ride) => ride.route !== undefined);
+    if (served.length > 0) {
+      setRoutes((prev) => {
+        const next = new Map(prev);
+        for (const ride of served) next.set(ride.id, ride.route ?? null);
+        return next;
+      });
+    }
+    for (const ride of group.rides) {
+      if (ride.route === undefined) requestRoute(ride.id);
+    }
   }, [group, requestRoute]);
 
   /** The ride in this group the reader is already on, if any. */

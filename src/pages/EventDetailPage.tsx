@@ -1041,6 +1041,33 @@ export function EventDetailPage() {
   // closes the editor too, if the event finishes while it is open).
   const canQuickEdit = showOrganizerUi && displayStatus !== "finished";
 
+  // Is the viewer this ride's creator — by ANY signal the page has, not just the server's
+  // `isOwner`. The server computes isOwner as events.owner_id === viewer, so it is false for a
+  // legacy ride whose owner_id is null, and the cached-summary fallback above has to guess it
+  // from a summary that may carry no ownerId at all (detailFromCachedSummary). Either way the
+  // organizer would drop to "some other viewer" on their OWN ride, which is exactly how the
+  // riders card below can vanish for the person who created it. Widening it here costs
+  // nothing: every rule this feeds is a display rule, and the server re-decides all of them.
+  const viewerOwnsRide =
+    event.isOwner ||
+    (profile?.id != null && (event.ownerId === profile.id || event.owner?.id === profile.id));
+
+  /**
+   * "even if private and not see riders, the owner (the ride creator) always can see riders,
+   * but hide from other" — asked for directly.
+   *
+   * The creator ALWAYS sees their own start list: not the "Riders list visible" switch, not
+   * `private`, not being absent from their own start list, changes that. The switch is what
+   * the organizer hands to everyone ELSE, and for them it is the only gate — a ride with it
+   * off shows them no riders card at all, rather than an empty one that invites a guess at
+   * who is on it.
+   *
+   * The server enforces the same split independently (participant.service.ts's
+   * listParticipantsForViewer, authz/policy.ts "event:view_participants"): a non-owner asking
+   * anyway gets a 403, so this only decides what is DRAWN.
+   */
+  const canSeeRiders = viewerOwnsRide || event.showParticipants;
+
   const routePoint = results?.route?.points[0] ?? null;
   // "not all events have team so each event can be ready if have name date /place" — asked
   // for directly, and this is where that lands: a published event offers Start outright, with
@@ -1849,10 +1876,10 @@ export function EventDetailPage() {
             )}
 
             {/* "if riders are published we will see them" — the organizer's own "Riders list
-                open to view" switch (EventCreatePage.tsx) gates this for everyone else; the
+                visible" switch (EventCreatePage.tsx) gates this for everyone else; the
                 organizer still sees their own start list regardless, same as every other
-                owner-only visibility rule on this page. */}
-            {(event.isOwner || event.showParticipants) && (
+                owner-only visibility rule on this page. See canSeeRiders above for the rule. */}
+            {canSeeRiders && (
               <div className="card stack">
                 <div className={styles.ridersHeader}>
                   <p className={styles.infoLabel}>

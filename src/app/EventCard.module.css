@@ -26,6 +26,11 @@
      alert — "subtle, not visually aggressive" — and every warm and bright colour on this row
      already means something else (surface, visibility, accessibility). */
   --chip-support: #475569;
+  /* Rides sharing one link. Slate like the support chip, and for the same reason: it is a
+     fact about how the ride is SHARED, not a property of the riding, and the saturated hues
+     on this row are all spoken for. Only the organizer ever sees it. */
+  --chip-linked: #475569;
+  --chip-terrain: #a16207;
 
   /* My Rides border signal: fluorescent blue = an upcoming ride, pink = a past one. Declared
      here (and re-lit for dark below) so the glow colour tracks the theme like the chips do. */
@@ -65,6 +70,8 @@
     --chip-public: #60a5fa;
     --chip-accessible: #38bdf8;
     --chip-support: #94a3b8;
+    --chip-linked: #94a3b8;
+    --chip-terrain: #fbbf24;
     --edge-upcoming: #4ddbff;
   }
 }
@@ -79,6 +86,8 @@
   --chip-public: #60a5fa;
   --chip-accessible: #38bdf8;
   --chip-support: #94a3b8;
+  --chip-linked: #94a3b8;
+  --chip-terrain: #fbbf24;
   --edge-upcoming: #4ddbff;
 }
 
@@ -327,6 +336,9 @@
 .chip[data-kind="support"] {
   --chip-hue: var(--chip-support);
 }
+.chip[data-kind="linked"] {
+  --chip-hue: var(--chip-linked);
+}
 
 .chip {
   color: var(--chip-hue, var(--text-muted));
@@ -343,6 +355,14 @@
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+}
+
+/* An off-road ride carries a fifth tile (Terrain). Three columns, not five: at five a phone
+   gives each tile about a fifth of the card and "Intermediate" has nowhere to go. Three wraps
+   as Distance / Elevation / Est.Time, then Level / Terrain - which is how the two hardness
+   answers end up side by side, where they are meant to be read together. */
+.stats[data-tiles="5"] {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .stat {
@@ -394,6 +414,21 @@
   border-radius: 1px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
+}
+
+/* Terrain uses the same five-bar shape as Level so the two read as one family, but its own
+   colour: they are different questions, and identical bars side by side would look like one
+   scale drawn twice. */
+.terrainBar {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.terrainBar[data-filled="true"] {
+  background: var(--chip-terrain);
+  border-color: var(--chip-terrain);
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {

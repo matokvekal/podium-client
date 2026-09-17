@@ -24,14 +24,28 @@
  * SCROLL-WHEEL ZOOM IS HANDED OVER ON HOVER, not held all the time. Left permanently on, a
  * flick of the wheel anywhere over the gallery zooms whatever map happens to be under the
  * pointer instead of scrolling the list — the classic embedded-map trap. The map takes the
- * wheel while the pointer is over it and gives it straight back on leave. Dragging,
- * double-click zoom, the zoom buttons and pinch-zoom on touch are live the whole time, so no
- * map ability is actually withheld — and touch devices, which have no hover and no wheel, are
- * unaffected either way.
+ * wheel while the pointer is over it and gives it straight back on leave.
+ *
+ * TOUCH HAS THE SAME TRAP, AND IT IS WORSE. On a phone the finger is the scroll gesture, so a
+ * draggable map in a feed steals every swipe that happens to start on a card's picture — the
+ * list stops dead and the map slides instead. There is no hover to key off, so the map starts
+ * INERT to touch and is unlocked by a deliberate tap:
+ *
+ *   - `dragging` is off at construction on a touch device, and a transparent overlay sits over
+ *     the map with `touch-action: pan-y`, so a vertical swipe scrolls the feed and never
+ *     reaches Leaflet at all. A tap on that overlay enables dragging and removes it.
+ *   - the unlock is per card and dies with it: these maps are windowed, so scrolling a card
+ *     away destroys its map and the next time it appears it is locked again. No bookkeeping.
+ *   - on a pointing device nothing changes — dragging is live from the start, because a mouse
+ *     drag was never in competition with the scroll wheel.
+ *
+ * Double-click zoom, the zoom buttons and pinch-zoom stay live throughout: a pinch is a
+ * two-finger gesture that no scroll can be mistaken for.
  */
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Hand } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { config } from "../lib/config";
 import { bearingDeg, finishIcon, startIcon } from "./map-icons";
@@ -40,6 +54,18 @@ import { thinPoints } from "./track-thumbnail";
 
 /** Points kept per card map. See the thinning note in the effect for why this is not 3,000. */
 const MAP_POINT_TARGET = 400;
+
+/**
+ * Whether this device drives the map with a finger. Read once per mount rather than stored
+ * module-side, so a hybrid laptop that is being used as a tablet gets the right answer.
+ *
+ * `(hover: hover) and (pointer: fine)` is the mouse/trackpad case. Everything else — phones,
+ * tablets, touchscreens — is treated as touch and gets the locked map.
+ */
+function prefersTouchInteraction(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
 
 interface TrackMiniMapProps {
   points: [number, number][];
@@ -51,10 +77,18 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [wheelEnabled, setWheelEnabled] = useState(false);
+  // Read once, on mount, and never changed — the map is constructed from it.
+  const [isTouch] = useState(prefersTouchInteraction);
+  const [touchUnlocked, setTouchUnlocked] = useState(false);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper || points.length === 0) return;
+
+    // Re-lock whenever the map is (re)built. A fresh L.map below starts with dragging off on a
+    // touch device, so the React state has to agree — otherwise a re-used instance handed a
+    // different track would show no "tap to explore" over a map that cannot actually be panned.
+    setTouchUnlocked(false);
 
     const drawPoints = thinPoints(points, MAP_POINT_TARGET);
 
@@ -83,6 +117,9 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       zoomControl: true,
       attributionControl: true,
       scrollWheelZoom: false,
+      // OFF on touch until the rider taps to unlock — see the box at the top of this file.
+      // Live from the start with a mouse, where dragging never competed with scrolling.
+      dragging: !isTouch,
       // Leaflet's own tap handler fights vertical scrolling inside a scroll container on iOS;
       // dragging still works, and this keeps a swipe over a card scrolling the gallery.
       tapHold: false,
@@ -159,7 +196,15 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       }
       host.remove();
     };
-  }, [points]);
+  }, [points, isTouch]);
+
+  // The tap that hands the map over on a touch device. Separate from construction so unlocking
+  // does not rebuild the map — the tiles already fetched stay fetched.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !touchUnlocked) return;
+    map.dragging.enable();
+  }, [touchUnlocked]);
 
   // The wheel handover described in the file comment.
   useEffect(() => {
@@ -169,14 +214,37 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
     else map.scrollWheelZoom.disable();
   }, [wheelEnabled]);
 
+  const locked = isTouch && !touchUnlocked;
+
   return (
-    <div
-      ref={wrapperRef}
-      className={styles.map}
-      role="application"
-      aria-label={`Map of ${label}`}
-      onMouseEnter={() => setWheelEnabled(true)}
-      onMouseLeave={() => setWheelEnabled(false)}
-    />
+    <div className={styles.frame}>
+      <div
+        ref={wrapperRef}
+        className={styles.map}
+        role="application"
+        aria-label={`Map of ${label}`}
+        onMouseEnter={() => setWheelEnabled(true)}
+        onMouseLeave={() => setWheelEnabled(false)}
+      />
+      {locked && (
+        // `touch-action: pan-y` (in the stylesheet) is what makes this work: the browser keeps
+        // vertical scrolling for itself and the overlay only ever sees a tap. Leaflet is
+        // underneath and receives nothing at all until the tap lands.
+        //
+        // A real <button> so it is reachable by keyboard and announced — though a keyboard user
+        // is on a pointing device and will never see it.
+        <button
+          type="button"
+          className={styles.unlock}
+          onClick={() => setTouchUnlocked(true)}
+          aria-label={`Explore the map of ${label}`}
+        >
+          <span className={styles.unlockPill}>
+            <Hand className={styles.unlockIcon} aria-hidden="true" />
+            Tap to explore
+          </span>
+        </button>
+      )}
+    </div>
   );
 }

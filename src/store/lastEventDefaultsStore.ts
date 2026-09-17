@@ -30,6 +30,15 @@ export interface LastEventDefaults {
   /** Expected riders (sql/028) — a recurring ride tends to draw a similar turnout. Optional so
    *  an older persisted blob still loads. */
   expectedParticipants?: number | null;
+  /**
+   * The country of the last ride created on this device (sql/030-country.sql).
+   *
+   * Unlike the rest of this blob it is not only a convenience: it is the ONLY record of where
+   * this organiser creates rides that exists the instant after a create, before My Rides has
+   * been refetched, so it is a fallback in lib/default-ride-country.ts rather than the answer.
+   * Optional so an older persisted blob still loads.
+   */
+  country?: string;
 }
 
 interface LastEventDefaultsState {

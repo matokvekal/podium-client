@@ -137,6 +137,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -148,7 +149,8 @@ import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
-import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import { flagEmoji, orderedCountries } from "../lib/countries";
+import { defaultRideCountry } from "../lib/default-ride-country";
 import { effectiveLimits } from "../lib/entitlements";
 import {
   DESCRIPTION_COUNTER_VISIBLE_FROM,
@@ -164,11 +166,7 @@ import {
   putCachedEventDetail,
   viewerKey,
 } from "../lib/local-db";
-import {
-  nextWeekdayStart,
-  parseQuickAdd,
-  toDatetimeLocalValue,
-} from "../lib/quick-add-parser";
+import { nextWeekdayStart, parseQuickAdd, toDatetimeLocalValue } from "../lib/quick-add-parser";
 import { classifyRegion, IL_REGIONS } from "../lib/regions";
 import {
   DURATION_HOUR_OPTIONS,
@@ -178,8 +176,15 @@ import {
   splitDuration,
 } from "../lib/ride-duration";
 import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
-import { useMediaQuery } from "../lib/use-media-query";
 import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
+import {
+  asTerrainGrade,
+  type TerrainGrade,
+  terrainApplies,
+  terrainOptionsFor,
+  terrainScaleNameFor,
+} from "../lib/terrain-grade";
+import { useMediaQuery } from "../lib/use-media-query";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -212,6 +217,9 @@ interface ExistingEvent {
    *  the client started sending them; the edit form then falls back to the device-local copy. */
   activityType?: SurfaceType | null;
   level?: RiderLevel | null;
+  /** How technical the ground is, 1-5 (sql/038-event-terrain-grade.sql). Absent on an older
+   *  server or a ride created before this existed; edit mode then starts the picker unset. */
+  terrainGrade?: number | null;
   /** EFFECTIVE elevation gain (m) the server persists — the organizer's manual/imported value,
    *  else the attached route's climb. Prefills the Climb field in edit mode. See
    *  sql/021-events-elevation-gain.sql. */
@@ -364,6 +372,15 @@ export function EventCreatePage() {
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
   const setLastDefaults = useLastEventDefaultsStore((s) => s.setDefaults);
+  // Rides this organiser has ALREADY CREATED — the evidence behind the Country default (see the
+  // `country` state below and lib/default-ride-country.ts). `myRides` is owned + joined merged,
+  // so it is narrowed by ownerId here: a ride they joined tells us where someone else organises.
+  // Empty while editing, where the ride's own stored country is the only right answer.
+  const myRides = useEventsStore((s) => s.myRides);
+  const ownedRides = useMemo(
+    () => (isEditing || !profile ? [] : myRides.filter((ride) => ride.ownerId === profile.id)),
+    [isEditing, myRides, profile],
+  );
 
   // What the organizer will actually show up as on the start list. Mirrors the server's
   // PARTICIPANT_DISPLAY_COLUMNS — COALESCE(ep.name, first+last, nickname) — with ep.name NULL
@@ -394,6 +411,15 @@ export function EventCreatePage() {
     lastDefaults?.activityType ?? "mtb",
   );
   const [level, setLevel] = useState<RiderLevel | null>(lastDefaults?.level ?? "intermediate");
+  /**
+   * How technical the ground is, 1-5 (sql/038) — mtb/gravel only.
+   *
+   * Starts unset rather than at a middle value, unlike `level` above: guessing a rider level
+   * wrong is a mild mis-pitch, but guessing a terrain grade wrong sends someone onto rock
+   * gardens on 32mm tyres. NOT carried over from the last ride's defaults for the same reason —
+   * yesterday's gravel road says nothing about today's trail.
+   */
+  const [terrainGrade, setTerrainGrade] = useState<TerrainGrade | null>(null);
   // Distance/climb — near the difficulty picker below, same "no server column, persisted via
   // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
   // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
@@ -475,9 +501,17 @@ export function EventCreatePage() {
    * to say so and no way to correct it afterwards. Find Rides filters on this column, so a
    * wrong stamp is what puts a Swedish ride in front of every Israeli rider.
    *
-   * Seeded from the organiser's own country — right nearly every time — and overridable.
+   * Seeded from where this organiser ALREADY creates rides, else their own country — see
+   * lib/default-ride-country.ts for the full order — and overridable either way.
    */
-  const [country, setCountry] = useState<string>(detectDefaultCountryCode());
+  const [country, setCountry] = useState<string>(() =>
+    defaultRideCountry({
+      // myRides is not read here: this runs once, before the store has necessarily loaded, and
+      // the effect below is what applies it. The device-local memory of the last create is
+      // available synchronously, so the field is right on first paint for a returning organiser.
+      lastUsedCountry: lastDefaults?.country,
+    }),
+  );
   // Same "never clobber a value that is already settled" rule as regionEdited/startsAtEdited:
   // set once the organiser picks a country, or once an edit loads the ride's stored one.
   const [countrySettled, setCountrySettled] = useState(false);
@@ -641,6 +675,9 @@ export function EventCreatePage() {
           setActivityType(found.activityType);
           serverHasActivity = true;
         }
+        // Server-only: a terrain grade is not something this device can know about a ride it
+        // did not create, so there is no local-extras fallback for it.
+        setTerrainGrade(asTerrainGrade(found.terrainGrade));
         // Server-persisted effective elevation wins — it survives logout/login and is the
         // same on every device, and `serverHasElevation` keeps the stale local extras below
         // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
@@ -777,15 +814,32 @@ export function EventCreatePage() {
   // The organizer's own per-event rider cap — shown next to "Expected riders" so they know the
   // ceiling, but it is never sent to viewers (it is not the "/ N" on the ride page).
   const planMaxParticipants = effectiveLimits(profile).maxParticipantsPerEvent;
-  // The organiser's own country, once the profile resolves — a better default than the browser
-  // locale, which is only a guess about the device. One-shot: a rider who has picked Sweden for
-  // this ride keeps Sweden, and an edit keeps whatever the ride already said.
+  // Where this organiser actually puts rides, once My Rides and the profile have resolved —
+  // asked for directly ("if he already created rides at some country that country will have to
+  // be the default"). The rule itself is lib/default-ride-country.ts; only rides they OWN are
+  // passed, because a ride they merely joined says where someone ELSE organises.
+  //
+  // It RE-DERIVES as inputs arrive rather than settling on the first one, and this matters:
+  // /users/me and My Rides land independently, and the profile usually wins that race. An
+  // effect that stopped after its first run would therefore stamp the organiser's HOME country
+  // on a cold start and then ignore the ten Swedish rides that arrived a moment later —
+  // exactly the case this was asked for. Re-running is free: setCountry with the value it
+  // already holds is a no-op in React.
+  //
+  // `countrySettled` is what makes it stop, and it means what it always did — the organiser
+  // picked a country for this ride, or an edit loaded the ride's own. Neither is ever
+  // overwritten by a late-arriving list.
   useEffect(() => {
     if (countrySettled) return;
-    if (!profile?.country) return;
-    setCountry(profile.country);
-    setCountrySettled(true);
-  }, [countrySettled, profile?.country]);
+    if (ownedRides.length === 0 && !profile?.country) return;
+    setCountry(
+      defaultRideCountry({
+        ownRides: ownedRides,
+        lastUsedCountry: lastDefaults?.country,
+        profileCountry: profile?.country,
+      }),
+    );
+  }, [countrySettled, ownedRides, lastDefaults?.country, profile?.country]);
 
   const hasRidesUsage = weekRides != null || profile?.usage != null;
   const ridesLimitReached = !isEditing && hasRidesUsage && ridesUsed >= ridesMax;
@@ -1240,6 +1294,10 @@ export function EventCreatePage() {
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
             expectedParticipants: expectedParticipantsValue,
+            // Terrain grade (sql/038). Always sent, and null when the picker is cleared OR the
+            // ride is no longer off-road — switching an MTB ride to road must not leave an S3
+            // claim standing on a ride that no longer has a scale to read it against.
+            terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
           },
         });
         await saveExtras(eventId);
@@ -1303,6 +1361,8 @@ export function EventCreatePage() {
           hasSupportVehicle,
           // Expected riders (sql/028) — null when the organizer left the field blank.
           expectedParticipants: expectedParticipantsValue,
+          // Terrain grade (sql/038) — off-road rides only, null otherwise.
+          terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1338,6 +1398,9 @@ export function EventCreatePage() {
         isAccessible,
         hasSupportVehicle,
         expectedParticipants: expectedParticipantsValue,
+        // Where they just created a ride — the next create opens on it even before My Rides
+        // has been refetched. See lib/default-ride-country.ts.
+        country,
       });
       // Small delayed success state before redirecting home: requested as a short green
       // confirmation moment, not an instant route jump right after tapping Save.
@@ -1757,8 +1820,7 @@ export function EventCreatePage() {
                         type="button"
                         className={styles.quickPickBtn}
                         data-active={
-                          (startsAt !== "" && Number(startsAt.slice(11, 13)) === hour) ||
-                          undefined
+                          (startsAt !== "" && Number(startsAt.slice(11, 13)) === hour) || undefined
                         }
                         onClick={() => pickStartsAtTime(hour)}
                       >
@@ -1865,9 +1927,14 @@ export function EventCreatePage() {
 
             <div className={styles.colSide}>
               <div className={styles.field}>
+                {/* "Rider level", not "Difficulty": an off-road ride now also carries a
+                    terrain grade below, and two fields both called difficulty is exactly the
+                    confusion that field exists to remove. This one is who the ride is pitched
+                    at; Terrain is what the ground is. Matches the "Level" tile on every card
+                    (lib/rider-level.ts levelHeadingFor). */}
                 <span className={styles.fieldLabel} id="levelLabel">
                   <Gauge aria-hidden="true" />
-                  Difficulty class
+                  Rider level
                 </span>
                 {/* Signal-bars picker, not a dropdown — asked for directly: short stair-step
                     bars like a phone's cellular reception icon, colored like a storm-intensity
@@ -1926,6 +1993,48 @@ export function EventCreatePage() {
                   </div>
                 )}
               </div>
+
+              {/* TERRAIN GRADE — off-road rides only (sql/038).
+                  
+                  A plain <select> on every screen width, unlike the bar picker above: each
+                  option's value is its DESCRIPTION ("S3 — Tight switchbacks, drops, rock
+                  sections"), and that is the part an organizer needs in order to choose
+                  honestly. Five bars with no words would make them guess what S3 means, which
+                  is how a grade ends up wrong.
+
+                  Rendered only for mtb/gravel — the surface of a road ride is the road. The
+                  stored value survives a discipline switch (the server keeps it; see sql/038),
+                  so flipping to road and back restores what was set, while the payload sends
+                  null for a road ride so no stale claim is shown. */}
+              {terrainApplies(activityType) && (
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel} id="terrainLabel">
+                    <Mountain aria-hidden="true" />
+                    Terrain — {terrainScaleNameFor(activityType)}
+                  </span>
+                  <select
+                    className={styles.input}
+                    aria-labelledby="terrainLabel"
+                    value={terrainGrade ?? ""}
+                    onChange={(e) =>
+                      setTerrainGrade(
+                        e.target.value === "" ? null : asTerrainGrade(Number(e.target.value)),
+                      )
+                    }
+                  >
+                    <option value="">Not specified</option>
+                    {terrainOptionsFor(activityType).map((option) => (
+                      <option key={option.grade} value={option.grade}>
+                        {option.label} — {option.terrain}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={styles.hint}>
+                    What the ground is like, not how fit you need to be — riders use it to pick
+                    tyres.
+                  </p>
+                </div>
+              )}
 
               {/* Distance/climb, near the difficulty picker above — auto-filled from whatever
                   route gets picked/uploaded (see applyRouteDistanceClimb), editable by hand at

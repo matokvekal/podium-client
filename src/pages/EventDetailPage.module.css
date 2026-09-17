@@ -218,6 +218,31 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
+/* "1 of 2 rides that day · Switch ride" — sits over the hero image with the organizer row,
+   so it uses the same light-on-dark treatment rather than the page's surface tokens. Quiet on
+   purpose: it is an aside, not a call to action competing with I'M IN. */
+.linkedChip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(5, 11, 22, 0.45);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  backdrop-filter: blur(2px);
+}
+
+.linkedChip:hover {
+  background: rgba(5, 11, 22, 0.65);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 .avatar {
   display: flex;
   align-items: center;
@@ -317,6 +342,21 @@
   border-radius: 1px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
+}
+
+/* Terrain: the same five-bar shape as Level, so they read as one family, in its own earthy
+   colour so they do not read as one scale drawn twice. Level's bars are colour-coded per level
+   below; terrain is one hue at five heights, because the scale is a ramp, not five categories. */
+.terrainBar {
+  width: 6px;
+  border-radius: 1px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.terrainBar[data-filled="true"] {
+  background: #c9873a;
+  border-color: #c9873a;
 }
 
 .levelBar[data-level="beginner"][data-filled="true"] {

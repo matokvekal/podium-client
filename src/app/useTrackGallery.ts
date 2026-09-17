@@ -97,6 +97,10 @@ export function useTrackGallery(
   sort: TrackGallerySort,
 ): UseTrackGalleryResult {
   const { status } = useAuth();
+  // Read through a ref inside fetchPage so a sign-in does not change that callback's identity
+  // and re-fire every in-flight page; the next fetch picks the new value up.
+  const signedInRef = useRef(status === "signed-in");
+  signedInRef.current = status === "signed-in";
   const myRides = useEventsStore((s) => s.myRides);
   const myRidesLoading = useEventsStore((s) => s.myRidesLoading);
   const loadMyRides = useEventsStore((s) => s.loadMyRides);
@@ -164,8 +168,18 @@ export function useTrackGallery(
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
 
+      // AUTHENTICATED WHEN THERE IS SOMEONE TO AUTHENTICATE, anonymous otherwise.
+      //
+      // The list itself is public and the token changes nothing about which rides come back.
+      // It is sent so the server can answer the two questions only this rider can be asked —
+      // have I liked this track, have I saved it — and so `favoritesOnly` has someone to scope
+      // to. Without it every heart renders empty however many the rider has saved.
+      //
+      // This is ONE request per page, not one per card, so it does not reopen the 401-burst
+      // problem described below: apiRequest refreshes and retries a single expired token
+      // quietly, which is exactly what it is for.
       const page = await apiRequestPaged<EventSummary>(`/events/public?${params.toString()}`, {
-        anonymous: true,
+        anonymous: !signedInRef.current,
       });
       if (thisRequest !== requestIdRef.current) return;
 

@@ -1,0 +1,146 @@
+/* Bottom-sheet pattern shared with SafetySheet.module.css / CopyTrackSheet.module.css —
+   same z-index scale (overlay 1000, panel 1001), so these never fight each other. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(5 11 22 / 0.75);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform 220ms ease;
+  overflow-y: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+
+.headerIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-strong);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole row is the label, so the tap target is the card and not just the box —
+   --tap-target is the app's minimum for anything touched on a phone mid-glove. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+
+.row:has(input:checked) {
+  border-color: var(--accent);
+}
+
+/* Held at the 2-ride cap: still readable, so the organizer can see what to untick first
+   rather than wondering why nothing responds. */
+.rowDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rowName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.rowCheck {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-strong);
+  flex: none;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

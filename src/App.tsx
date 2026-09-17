@@ -19,10 +19,10 @@ import { JoinPage } from "./pages/JoinPage";
 import { LiveEventPage } from "./pages/LiveEventPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
+import { SharedRidesPage } from "./pages/SharedRidesPage";
 import { StatisticsAchievementsPage } from "./pages/StatisticsAchievementsPage";
 import { StatisticsLeaderboardPage } from "./pages/StatisticsLeaderboardPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
-import { StatisticsYearPage } from "./pages/StatisticsYearPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -235,14 +235,10 @@ export function App() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/stats/year"
-        element={
-          <RequireAuth>
-            <StatisticsYearPage />
-          </RequireAuth>
-        }
-      />
+      {/* /stats/year was the year-view design's own route while /stats showed an older layout.
+          The design now IS /stats (see StatisticsPage.tsx's header) — this keeps the old URL,
+          and anything still linking to it, working. */}
+      <Route path="/stats/year" element={<Navigate to="/stats" replace />} />
       {/* Teams (clubs) — a shared schedule of rides + membership, owner-only for management.
           Entirely client-only, genuinely new territory — see store/teamsStore.ts and
           plan/server-tasks.md. */}
@@ -262,17 +258,16 @@ export function App() {
           </RequireAuth>
         }
       />
-      {/* Find Tracks — the route planner. Public, same as everything else browse-shaped.
-          No data source yet — GET /tracks is unbuilt, so this lists nothing. Real routes/hazards/POI/air
-          quality — see plan/server-tasks.md. */}
+      {/* Find Tracks — the public track library. OpenHome, NOT RequireOrganizer: browsing
+          tracks is the app's front door, and gating it behind organizer mode is what kept it
+          invisible to the riders it is for. Only the "Ride it" button inside is organizer-only
+          (TrackGalleryCard), the same way TrackCard has always gated "Plan a ride". */}
       <Route
         path="/routes"
         element={
-          <RequireOrganizer>
-            <OpenHome>
-              <TracksPage />
-            </OpenHome>
-          </RequireOrganizer>
+          <OpenHome>
+            <TracksPage />
+          </OpenHome>
         }
       />
       <Route
@@ -306,6 +301,26 @@ export function App() {
         element={
           <OpenHome>
             <JoinPage />
+          </OpenHome>
+        }
+      />
+
+      {/* One link over 2-3 rides on the same day (server: sql/037).
+
+          OPEN, exactly like /join/:code above and for the same reason: this is the first thing
+          a stranger sees of the app. An organizer who created a long ride and a short one
+          shares ONE link, and this is the chooser it opens — "<Owner> created 2 rides, which
+          one are you riding?" — with nothing pre-selected.
+
+          It joins nothing itself. Picking a card hands off to /join/:code, so the bib,
+          approval and sign-in rules keep their single implementation and this page cannot
+          drift from them. A link whose group has shrunk to one ride redirects straight there,
+          which is where it would have gone before the rides were ever connected. */}
+      <Route
+        path="/share/:codes"
+        element={
+          <OpenHome>
+            <SharedRidesPage />
           </OpenHome>
         }
       />

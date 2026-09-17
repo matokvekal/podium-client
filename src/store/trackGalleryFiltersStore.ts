@@ -43,6 +43,8 @@ const VALID_SORTS: TrackGallerySort[] = [
   "duration_desc",
   "downloads_desc",
   "downloads_asc",
+  "likes_desc",
+  "likes_asc",
   "name_asc",
 ];
 

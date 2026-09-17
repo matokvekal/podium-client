@@ -29,6 +29,8 @@ export type TrackGallerySort =
   | "duration_desc"
   | "downloads_desc"
   | "downloads_asc"
+  | "likes_desc"
+  | "likes_asc"
   | "name_asc";
 
 export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
@@ -42,6 +44,8 @@ export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
   duration_desc: "Duration: long → short",
   downloads_desc: "Most used",
   downloads_asc: "Least used",
+  likes_desc: "Most liked",
+  likes_asc: "Least liked",
   name_asc: "Name (A–Z)",
 };
 
@@ -60,6 +64,9 @@ export interface TrackGalleryCriteria {
   /** Effective climb, m. At [CLIMB_MIN, CLIMB_MAX] = "any". */
   climbM: [number, number];
   durationBuckets: DurationBucketKey[];
+  /** Only tracks this rider has hearted. Server-scoped to the caller's own favourites, so it
+   *  is meaningless — and hidden — when signed out. */
+  favoritesOnly: boolean;
 }
 
 export const DEFAULT_TRACK_GALLERY_CRITERIA: TrackGalleryCriteria = {
@@ -69,6 +76,7 @@ export const DEFAULT_TRACK_GALLERY_CRITERIA: TrackGalleryCriteria = {
   distanceKm: [DISTANCE_MIN, DISTANCE_MAX],
   climbM: [CLIMB_MIN, CLIMB_MAX],
   durationBuckets: [],
+  favoritesOnly: false,
 };
 
 const distanceNarrowed = (r: [number, number]) => r[0] > DISTANCE_MIN || r[1] < DISTANCE_MAX;
@@ -89,6 +97,7 @@ export function trackGalleryActiveFilterCount(
     (c.region ? 1 : 0) +
     c.surface.length +
     c.durationBuckets.length +
+    (c.favoritesOnly ? 1 : 0) +
     (distanceNarrowed(c.distanceKm) ? 1 : 0) +
     (climbNarrowed(c.climbM) ? 1 : 0)
   );
@@ -114,6 +123,7 @@ export function buildTrackGalleryQuery(
   params.set("sort", sort);
   params.set("uniqueTracks", "1");
 
+  if (criteria.favoritesOnly) params.set("favoritesOnly", "1");
   if (criteria.country) params.set("country", criteria.country);
   if (criteria.region) params.set("region", criteria.region);
   if (criteria.surface.length > 0) params.set("activityType", criteria.surface.join(","));
@@ -170,6 +180,10 @@ function compareForSort(a: EventSummary, b: EventSummary, sort: TrackGallerySort
       return byNum((e) => e.downloads, -1) || byNum(recency, -1);
     case "downloads_asc":
       return byNum((e) => e.downloads, 1) || byNum(recency, -1);
+    case "likes_desc":
+      return byNum((e) => e.likes, -1) || byNum(recency, -1);
+    case "likes_asc":
+      return byNum((e) => e.likes, 1) || byNum(recency, -1);
     case "name_asc":
       return a.name.localeCompare(b.name);
     default:
@@ -204,6 +218,9 @@ export function applyTrackGalleryCriteria(
     ) {
       return false;
     }
+    // "My rides" are the rider's own; a heart on one is still a heart, so this filters the
+    // in-memory source the same way the server filters the public one.
+    if (c.favoritesOnly && !e.favoritedByMe) return false;
     if (c.country && e.country !== c.country) return false;
     if (c.region && e.region !== c.region) return false;
     if (c.surface.length > 0 && !(e.activityType != null && c.surface.includes(e.activityType))) {

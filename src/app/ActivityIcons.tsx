@@ -11,12 +11,18 @@
  * to lucide's own grid so they sit correctly next to `Mountain`/`Timer` in the same stat strip:
  * 24x24 box, no fill, `currentColor` stroke, round caps and joins.
  *
- * The three share one frame (rear triangle, top tube, down tube) and differ only where a real
- * bike differs, which is what makes them readable at 14px:
+ * The three share one frame (rear triangle, top tube, down tube) and differ where a real bike
+ * differs. THE TELL IS BAR HEIGHT, not tyre width: stroke weight alone is nearly invisible at
+ * 14px, but where the rider's hands sit relative to the saddle is the silhouette everyone
+ * already knows.
  *
- *   road    thin tyres (1.5 stroke), big wheels, DROP bar hooking down past the head tube
- *   gravel  the same drop bar, fatter tyres (2.0) — a road bike that can leave the tarmac
- *   mtb     fat tyres (2.6), flat riser bar, and a kinked SUSPENSION fork
+ *   road    hands BELOW the saddle — a deep drop hooking down past the head tube, the racing
+ *           crouch. Big thin wheels (1.2 stroke) on a straight steep fork.
+ *   gravel  the same drop bar but level with the saddle, endurance height, on fatter tyres —
+ *           a road bike that can leave the tarmac.
+ *   mtb     hands ABOVE the saddle — a wide flat riser bar, upright. Fat tyres (2.8) and a
+ *           real TELESCOPIC fork: a crown across the top with the stanchion dropping out of
+ *           it, not just a bent line.
  *
  * Running and hiking keep the ruler: their distance is not ridden. See `DISTANCE_ICON`.
  */
@@ -88,16 +94,17 @@ const FRAME = (
 export function RoadBikeIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      {/* thin tyres — the whole difference between this and the MTB at 13px is stroke weight
-          and what is happening at the handlebar */}
-      <circle cx="5.4" cy="15" r="3.5" strokeWidth={1.5} />
-      <circle cx="18.6" cy="15" r="3.5" strokeWidth={1.5} />
+      {/* big, thin, fast — the largest wheels of the three on the lightest stroke */}
+      <circle cx="5.4" cy="15" r="3.8" strokeWidth={1.2} />
+      <circle cx="18.6" cy="15" r="3.8" strokeWidth={1.2} />
       {FRAME}
-      {/* fork: straight, raked forward to the hub */}
+      {/* fork: straight and steep, no rake to speak of */}
       <path d="M16 7 18.6 15" />
-      {/* stem, then the drop bar hooking forward and down */}
-      <path d="M16 7 16.5 5.6" />
-      <path d="M15.2 5.6h2.1a1.4 1.4 0 0 1 .2 2.4" />
+      {/* THE RACING CROUCH. Short stem angled down, then a deep drop curling forward and under
+          to finish BELOW the saddle (y 6.2). That inversion — hands lower than the seat — is
+          what makes this read as a race bike and not merely a bike with thin tyres. */}
+      <path d="M16 7 16.6 7.1" />
+      <path d="M15.4 7.1h2.2a1.5 1.5 0 0 1 .1 2.7" />
     </Icon>
   );
 }
@@ -105,13 +112,15 @@ export function RoadBikeIcon(props: IconProps) {
 export function GravelBikeIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      {/* a road bike that can leave the tarmac: same drop bar, fatter tyres */}
-      <circle cx="5.4" cy="15" r="3.4" strokeWidth={2} />
-      <circle cx="18.6" cy="15" r="3.4" strokeWidth={2} />
+      {/* a road bike that can leave the tarmac: drop bar still, fatter tyres */}
+      <circle cx="5.4" cy="15" r="3.5" strokeWidth={2} />
+      <circle cx="18.6" cy="15" r="3.5" strokeWidth={2} />
       {FRAME}
       <path d="M16 7 18.6 15" />
-      <path d="M16 7 16.5 5.6" />
-      <path d="M15.2 5.6h2.1a1.4 1.4 0 0 1 .2 2.4" />
+      {/* Endurance height: the drop sits LEVEL with the saddle rather than under it — between
+          the road bike's crouch and the MTB's upright bar, which is exactly where gravel is. */}
+      <path d="M16 7 16.5 6.2" />
+      <path d="M15.3 6.2h2.2a1.4 1.4 0 0 1 .1 2.4" />
     </Icon>
   );
 }
@@ -119,15 +128,23 @@ export function GravelBikeIcon(props: IconProps) {
 export function MtbBikeIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      {/* fat tyres */}
-      <circle cx="5.4" cy="15" r="3.2" strokeWidth={2.4} />
-      <circle cx="18.6" cy="15" r="3.2" strokeWidth={2.4} />
+      {/* the fattest tyres of the three, on the smallest rims — chunky rather than fast */}
+      <circle cx="5.4" cy="15" r="3.1" strokeWidth={2.8} />
+      <circle cx="18.6" cy="15" r="3.1" strokeWidth={2.8} />
       {FRAME}
-      {/* suspension fork: crown, then the stanchion kinked forward to the hub */}
-      <path d="M16 7 17.1 10 18.6 15" />
-      {/* stem, then a flat bar sweeping up at the grip */}
-      <path d="M16 7 16.3 6" />
-      <path d="M15 6h1.9l1-.7" />
+      {/* A REAL TELESCOPIC FORK, drawn as three strokes instead of one bent line: the crown
+          across the top, the short steerer into it, and the stanchion sliding out of it down
+          to the hub. Suspension is the thing that says mountain bike, so it is drawn as the
+          mechanism rather than implied by a kink. */}
+      <path d="M14.8 8.7h2.6" />
+      <path d="M16 7 16 8.7" />
+      <path d="M17.2 8.7 18.6 15" />
+      {/* UPRIGHT. A wide flat riser bar sitting ABOVE the saddle, with the grip kicked up —
+          the opposite silhouette to the road bike's drop, and the fastest way to tell them
+          apart at 14px. */}
+      <path d="M16 7 16 5.8" />
+      <path d="M14.1 6.2 17.5 5.5" />
+      <path d="M17.5 5.5 18.3 5" />
     </Icon>
   );
 }

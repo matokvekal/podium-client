@@ -18,13 +18,28 @@
  * Two copy actions, because they answer different questions: "Copy invitation" is the whole
  * message for pasting into a chat, "Copy link" is the bare URL for a form, a poster or a
  * calendar entry.
+ *
+ * ONE LINK FOR SEVERAL RIDES (`linkedCodes`, server sql/037)
+ *   When this ride is connected to the organizer's other rides that day, the link becomes
+ *   `/share/<codeA>-<codeB>` and the invitation names all of them, because that is the whole
+ *   point: the recipient has to see both options before they tap. The QR encodes the same URL,
+ *   so a printed code at the start line still works for a pair of rides.
+ *
+ *   With no `linkedCodes` every byte of this sheet's output is what it always was — a ride
+ *   shared on its own must not change at all.
  */
 
 import { Check, Copy, Link2, Share2, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { config } from "../lib/config";
-import { shareInviteMessage, shareInviteTitle } from "../lib/share-invite";
+import { shareLinkPath } from "../lib/link-group";
+import {
+  shareInviteMessage,
+  shareInviteMessageMulti,
+  shareInviteTitle,
+  shareInviteTitleMulti,
+} from "../lib/share-invite";
 import styles from "./ShareEventSheet.module.css";
 
 interface ShareEventSheetProps {
@@ -34,6 +49,14 @@ interface ShareEventSheetProps {
    *  invitation simply drops its date line rather than printing a placeholder. */
   startsAt?: string | null;
   location?: string | null;
+  /**
+   * The OTHER rides sharing this ride's link, from EventDetail.linkedRides. Empty or absent for
+   * the normal case, and then this sheet behaves exactly as it always has.
+   *
+   * Codes, not ids: the /share URL is built from codes so it stays readable, and the sibling
+   * names/times below are only used to write the invitation.
+   */
+  linkedRides?: { code: string; name: string; startsAt: string | null }[];
   onClose: () => void;
 }
 
@@ -42,14 +65,24 @@ export function ShareEventSheet({
   eventCode,
   startsAt,
   location,
+  linkedRides,
   onClose,
 }: ShareEventSheetProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<"invite" | "link" | null>(null);
 
+  const siblings = linkedRides ?? [];
+  const isGroup = siblings.length > 0;
+
   // Always the production origin (config.shareBaseUrl) — a shared link / printed QR must open
   // the real app, never a localhost dev server.
-  const joinUrl = `${config.shareBaseUrl}/join/${encodeURIComponent(eventCode)}`;
+  //
+  // A connected ride links to the CHOOSER (/share/<a>-<b>), not to one of its rides: sending a
+  // link that lands on the long ride would quietly pick for the reader. This ride's own code
+  // leads, so the link reads as "this ride, plus the others".
+  const joinUrl = isGroup
+    ? `${config.shareBaseUrl}${shareLinkPath([eventCode, ...siblings.map((ride) => ride.code)])}`
+    : `${config.shareBaseUrl}/join/${encodeURIComponent(eventCode)}`;
 
   /**
    * The QR encodes the same URL plus `?via=qr`; the link above stays clean.
@@ -76,16 +109,31 @@ export function ShareEventSheet({
     };
   }, [qrUrl]);
 
+  // This ride first, then the others — the same order as the link, and the order the chooser
+  // shows them in once it sorts by start time. Keyed on the `linkedRides` PROP rather than on
+  // the `siblings` array derived from it, whose identity changes every render.
+  const groupRides = useMemo(
+    () => [{ name: eventName, startsAt: startsAt ?? null }, ...(linkedRides ?? [])],
+    [eventName, startsAt, linkedRides],
+  );
+
   // The invitation as the recipient will read it. Two shapes of the same message: the clipboard
   // has no separate URL field so its copy carries the link inline, while navigator.share passes
   // `url` on its own — putting it in both would print the link twice in the chat bubble.
+
   const messageForChat = useMemo(
-    () => shareInviteMessage({ eventName, startsAt, location }),
-    [eventName, startsAt, location],
+    () =>
+      isGroup
+        ? shareInviteMessageMulti({ rides: groupRides, location })
+        : shareInviteMessage({ eventName, startsAt, location }),
+    [isGroup, groupRides, eventName, startsAt, location],
   );
   const messageWithLink = useMemo(
-    () => shareInviteMessage({ eventName, startsAt, location, url: joinUrl }),
-    [eventName, startsAt, location, joinUrl],
+    () =>
+      isGroup
+        ? shareInviteMessageMulti({ rides: groupRides, location, url: joinUrl })
+        : shareInviteMessage({ eventName, startsAt, location, url: joinUrl }),
+    [isGroup, groupRides, eventName, startsAt, location, joinUrl],
   );
 
   function flash(which: "invite" | "link") {
@@ -105,7 +153,7 @@ export function ShareEventSheet({
 
   async function nativeShare() {
     await navigator.share({
-      title: shareInviteTitle(eventName),
+      title: isGroup ? shareInviteTitleMulti(groupRides.length) : shareInviteTitle(eventName),
       text: messageForChat,
       url: joinUrl,
     });
@@ -116,7 +164,9 @@ export function ShareEventSheet({
       <div className={styles.sheetOverlay} onClick={onClose} aria-hidden="true" />
       <div className={`${styles.sheet} ${styles.sheetOpen}`}>
         <div className={styles.sheetHeader}>
-          <h2 style={{ margin: 0 }}>Share event</h2>
+          <h2 style={{ margin: 0 }}>
+            {isGroup ? `Share ${groupRides.length} rides` : "Share event"}
+          </h2>
           <button
             type="button"
             className="button button--quiet"
@@ -129,7 +179,16 @@ export function ShareEventSheet({
         <div className={`stack ${styles.sheetBody}`}>
           <div className={styles.qrWrap}>
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt={`QR code to join ${eventName}`} width={240} height={240} />
+              <img
+                src={qrDataUrl}
+                alt={
+                  isGroup
+                    ? `QR code to choose between ${groupRides.length} rides`
+                    : `QR code to join ${eventName}`
+                }
+                width={240}
+                height={240}
+              />
             ) : (
               <div className={styles.qrPlaceholder}>
                 <span className="spinner" aria-hidden="true" />
@@ -171,9 +230,21 @@ export function ShareEventSheet({
             </button>
           </div>
 
+          {/* The single-ride wording names a code, which would contradict a group link: a
+              /share link belongs to no one code, and telling someone to "join Long loop with
+              code 19092026A" quietly picks one of the two rides for them. */}
           <p className="muted" style={{ fontSize: "0.85rem" }}>
-            Anyone who scans this or opens the link can find and join {eventName} with code{" "}
-            {eventCode}.
+            {isGroup ? (
+              <>
+                Anyone who scans this or opens the link can choose between your {groupRides.length}{" "}
+                rides and join the one they want.
+              </>
+            ) : (
+              <>
+                Anyone who scans this or opens the link can find and join {eventName} with code{" "}
+                {eventCode}.
+              </>
+            )}
           </p>
         </div>
       </div>

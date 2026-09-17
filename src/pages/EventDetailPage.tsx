@@ -49,6 +49,7 @@ import {
   Coffee,
   Download,
   LifeBuoy,
+  Link2,
   MapPin,
   MapPinned,
   Mountain,
@@ -81,6 +82,7 @@ import { config } from "../lib/config";
 
 import { useConnectivityStore } from "../lib/connectivity";
 import { inviteGreeting } from "../lib/invite-greeting";
+import { dayGroupOrder, shareLinkPath } from "../lib/link-group";
 import {
   type CachedParticipant,
   type EventDetail,
@@ -94,9 +96,16 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
-import { formatDuration } from "../lib/ride-duration";
+import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
+import {
+  asTerrainGrade,
+  TERRAIN_GRADES,
+  terrainApplies,
+  terrainDescriptionFor,
+  terrainLabelFor,
+} from "../lib/terrain-grade";
 import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
 import { buildGpxFile, downloadGpxFile, gpxFilenameFor } from "../lib/track-gpx";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
@@ -155,6 +164,12 @@ const ShareEventSheet = lazy(() =>
   import("../app/ShareEventSheet").then((m) => ({
     default: m.ShareEventSheet,
   })),
+);
+
+/** Organizer-only and rarely opened, so it stays out of the page's bundle — same lazy
+ *  treatment ShareEventSheet gets above. */
+const ConnectRidesSheet = lazy(() =>
+  import("../app/ConnectRidesSheet").then((m) => ({ default: m.ConnectRidesSheet })),
 );
 
 // EventDetail (the GET /events/:eventId shape) and CachedParticipant (one
@@ -381,6 +396,7 @@ export function EventDetailPage() {
   const invite = useInvitedEventsStore((state) =>
     eventId ? (state.byEventId[eventId] ?? null) : null,
   );
+  const [connectOpen, setConnectOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
@@ -1068,8 +1084,34 @@ export function EventDetailPage() {
   const levelIndex = level ? LEVELS.findIndex((l) => l.value === level) : -1;
   // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
   // tile that read a hard-coded "soon" until now; rest stops / accessibility show as chips.
-  const durationText = formatDuration(event.durationMin);
   const restStops = event.restStops ?? null;
+
+  /** How technical the ground is (sql/038) — mtb/gravel only, where a scale exists to read it
+   *  against. Orthogonal to `level` above: that one is who the ride is pitched at. */
+  const terrainGrade = terrainApplies(activityType) ? asTerrainGrade(event.terrainGrade) : null;
+
+  /** The organizer's own figure first, the app's estimate only to fill a blank, "soon" if even
+   *  that is impossible. formatEstimatedDuration is what marks a derived time as derived. */
+  const statedDuration = formatDuration(event.durationMin);
+  const estimatedMin = statedDuration
+    ? null
+    : estimateDurationMin({
+        distanceKm,
+        climbM,
+        activityType,
+        terrainGrade,
+        level,
+        restStops,
+      });
+  const durationText = statedDuration || formatEstimatedDuration(estimatedMin);
+
+  /** This ride's place in its day's shared link — "2 of 3". Derived, never a literal 1: every
+   *  ride in the group renders the chip below. See lib/link-group.ts. */
+  const linkedSiblings = event.linkedRides ?? [];
+  const dayGroup = dayGroupOrder(
+    { eventId: event.id, startsAt: event.startsAt },
+    linkedSiblings.map((ride) => ({ eventId: ride.eventId, startsAt: ride.startsAt })),
+  );
   // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
   // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
   // under), but the avatar only ever comes from a real account, never from a club string.
@@ -1259,6 +1301,24 @@ export function EventDetailPage() {
               Organized by {organizer}
             </div>
           )}
+          {/* One of several rides the organizer runs that day (server: sql/037).
+              
+              Shown to EVERYONE, not just the person who arrived through the shared link: a
+              rider who bookmarked this ride, or was sent it on its own, has exactly the same
+              reason to know there is a shorter option and one tap to reach it. Built from the
+              ride's own linkedRides, so it survives a refresh and needs nothing remembered
+              client-side. Links back to the chooser rather than to the sibling directly —
+              with two siblings there is no single "other ride" to send them to, and the
+              chooser is also where switching knows to move them off this one. */}
+          {linkedSiblings.length > 0 && (
+            <Link
+              className={styles.linkedChip}
+              to={shareLinkPath([event.code, ...linkedSiblings.map((ride) => ride.code)])}
+            >
+              <Link2 width={14} height={14} aria-hidden="true" />
+              {dayGroup.position} of {dayGroup.total} rides that day · Switch ride
+            </Link>
+          )}
         </div>
       </div>
 
@@ -1312,7 +1372,41 @@ export function EventDetailPage() {
             </span>
             <span className={styles.statTileLabel}>{levelHeadingFor(activityType)}</span>
           </div>
-          <div className={styles.statTile} data-pending={durationText ? undefined : true}>
+          {/* TERRAIN — what the ground is, which Level does not answer. The tile carries the
+              grade's own description ("Tight switchbacks, drops, rock sections") as its title,
+              because on the ride's own page a rider is deciding what tyres to fit. */}
+          {terrainGrade && (
+            <div
+              className={styles.statTile}
+              title={terrainDescriptionFor(terrainGrade, activityType)}
+            >
+              <span className={styles.levelBars} aria-hidden="true">
+                {TERRAIN_GRADES.map((grade, i) => (
+                  <span
+                    key={grade}
+                    className={styles.terrainBar}
+                    data-filled={grade <= terrainGrade}
+                    style={{ height: `${6 + i * 3}px` }}
+                  />
+                ))}
+              </span>
+              <span className={styles.statTileValue}>
+                {terrainLabelFor(terrainGrade, activityType)}
+              </span>
+              <span className={styles.statTileLabel}>Terrain</span>
+            </div>
+          )}
+          <div
+            className={styles.statTile}
+            data-pending={durationText ? undefined : true}
+            title={
+              statedDuration
+                ? undefined
+                : estimatedMin
+                  ? "Estimated from distance, climb and terrain — the organizer hasn't stated a time yet"
+                  : undefined
+            }
+          >
             <span className={styles.statTileValue}>{durationText || "soon"}</span>
             <span className={styles.statTileLabel}>Est. Time</span>
           </div>
@@ -1537,9 +1631,7 @@ export function EventDetailPage() {
         {/* --- description ------------------------------------------------------------------
             Clamped to a few lines and expanded in place. Whether "Read more" is drawn at all is
             measured from the rendered text, not guessed from its length — see RideDescription. */}
-        {event.description && (
-          <RideDescription key={event.description} text={event.description} />
-        )}
+        {event.description && <RideDescription key={event.description} text={event.description} />}
 
         {resultsLoading && !results && (
           <div className="row">
@@ -1684,10 +1776,7 @@ export function EventDetailPage() {
 
                 Each cell renders only with a real value, and the strip disappears when none of
                 them do. ------------------------------------------------------------------ */}
-            {(event.startsAt ||
-              event.location ||
-              event.area ||
-              event.participantCount != null) && (
+            {(event.startsAt || event.location || event.area || event.participantCount != null) && (
               <div className={styles.infoStrip}>
                 {event.startsAt && (
                   <div className={styles.infoCell}>
@@ -2061,7 +2150,34 @@ export function EventDetailPage() {
             eventCode={event.code}
             startsAt={event.startsAt}
             location={event.location}
+            /* Connected rides share ONE link, so the sheet hands out /share/<a>-<b> and an
+               invitation naming both. Absent/empty for a ride shared on its own, and then the
+               sheet is byte-for-byte what it always was. Read off the detail response only —
+               see EventDetail.linkedRides on why a summary copy can go stale.
+
+               Passed STRAIGHT THROUGH, not re-mapped into {code,name,startsAt} objects:
+               LinkedRide already structurally satisfies that prop, and a .map() here would
+               hand the sheet a brand-new array on every render — which is exactly what the
+               `groupRides` useMemo in ShareEventSheet.tsx keys on to avoid. */
+            linkedRides={event.linkedRides}
             onClose={() => setShareOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {connectOpen && (
+        <Suspense fallback={null}>
+          <ConnectRidesSheet
+            event={{
+              id: event.id,
+              name: event.name,
+              startsAt: event.startsAt,
+              linkedRides: event.linkedRides,
+            }}
+            /* Refetch rather than patch state from the response: the ride's own linkedRides is
+               what every surface here reads, and load() is the one path that writes it. */
+            onSaved={() => void load()}
+            onClose={() => setConnectOpen(false)}
           />
         </Suspense>
       )}
@@ -2120,6 +2236,27 @@ export function EventDetailPage() {
               <UsersRound width={16} height={16} aria-hidden="true" />
               Groups
             </Link>
+            {/* One link for several rides on the same day. Here rather than in the hero:
+                it is a sharing decision an organizer makes once, not a per-visit action. It
+                stays available while the ride is LIVE — the server's event:manage_link_group
+                allows that deliberately, because the morning of the ride is exactly when a
+                latecomer needs to be asked which group they are chasing. */}
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={() => {
+                setMenuOpen(false);
+                setConnectOpen(true);
+              }}
+            >
+              <Link2 width={16} height={16} aria-hidden="true" />
+              Connect rides
+              {(event.linkedRides?.length ?? 0) > 0 && (
+                <span className="badge" style={{ marginLeft: "auto" }}>
+                  {(event.linkedRides?.length ?? 0) + 1} linked
+                </span>
+              )}
+            </button>
             {CANCELLABLE.includes(displayStatus) && (
               <button
                 type="button"

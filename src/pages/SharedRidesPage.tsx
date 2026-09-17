@@ -133,7 +133,7 @@ export function SharedRidesPage() {
 
   /**
    * Per-card geometry, the same shape useTrackGallery.requestRoute uses: fetched once per
-   * ride, a failure left uncached so it retries.
+   * ride, and settled either way — see the catch.
    *
    * ⚠ NOT `anonymous`, unlike the public gallery. A signed-in rider on a PRIVATE ride in this
    * group is entitled to its map, and dropping their token would hide it from them. There are
@@ -149,7 +149,15 @@ export function SharedRidesPage() {
         const route = await apiRequest<EventRoute | null>(`/events/${eventId}/route?preview=1`);
         setRoutes((prev) => new Map(prev).set(eventId, route));
       } catch {
-        // Not "this ride has no track" — leave it uncached so it can be tried again.
+        // ⚠ A FAILURE IS RECORDED, NOT LEFT BLANK. `undefined` in this map means "still
+        //   loading" and draws a spinner, and nothing on this page ever asks a second time —
+        //   the effect below runs when the GROUP changes, not on a timer. Leaving it unset
+        //   therefore spun forever, which is exactly what a PRIVATE ride does here: its card
+        //   is offered to whoever holds the link (server: getSharedRideGroup), while its
+        //   geometry stays behind the ride's own rule and this request is refused. A card
+        //   with its placeholder gradient is the honest answer; a spinner claims a map is
+        //   coming that never will.
+        setRoutes((prev) => new Map(prev).set(eventId, null));
       } finally {
         inFlight.current.delete(eventId);
       }

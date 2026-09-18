@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
+import { FastResume } from "./app/FastResume";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
 import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
@@ -108,236 +109,242 @@ function OpenFullBleed({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <>
+      {/* Renders nothing. Restores the last route on a launch that landed on "/", and keeps
+          that route current as the rider moves. Disabled by one flag — see
+          lib/fast-resume.ts's FAST_RESUME_ENABLED. */}
+      <FastResume />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-      {/* Terms & Conditions — a standalone legal document, no shell, open to everyone. Linked
-          from the sign-in screen's "I agree" checkbox (LoginPage.tsx). */}
-      <Route path="/terms" element={<TermsPage />} />
+        {/* Terms & Conditions — a standalone legal document, no shell, open to everyone. Linked
+            from the sign-in screen's "I agree" checkbox (LoginPage.tsx). */}
+        <Route path="/terms" element={<TermsPage />} />
 
-      <Route
-        path="/account/setup"
-        element={
-          <RequireAuth>
-            <ProfileSetupPage />
-          </RequireAuth>
-        }
-      />
+        <Route
+          path="/account/setup"
+          element={
+            <RequireAuth>
+              <ProfileSetupPage />
+            </RequireAuth>
+          }
+        />
 
-      <Route
-        path="/"
-        element={
-          <OpenHome>
-            <EventsListPage />
-          </OpenHome>
-        }
-      />
-      <Route
-        path="/events/new"
-        element={
-          <RequireAuth>
-            <RequireOrganizer>
+        <Route
+          path="/"
+          element={
+            <OpenHome>
+              <EventsListPage />
+            </OpenHome>
+          }
+        />
+        <Route
+          path="/events/new"
+          element={
+            <RequireAuth>
+              <RequireOrganizer>
+                <EventCreatePage />
+              </RequireOrganizer>
+            </RequireAuth>
+          }
+        />
+        {/* Same component as /events/new — EventCreatePage.tsx detects an :eventId param and
+            switches to edit mode ("edit event take us to like the create so i change
+            anything"), loading and PATCHing that event instead of POSTing a new one.
+
+            NOT gated by RequireOrganizer: editing an event you already own is an OWNER action,
+            authorised server-side (PATCH /events/:eventId asserts ownership), not a browse-mode
+            concern — same reasoning as EventDetailPage's showOrganizerUi. The Edit button on the
+            detail page is shown to the owner in either mode, so this route must open for them.
+            RequireOrganizer stays on /events/new and /routes (starting something new). */}
+        <Route
+          path="/events/:eventId/edit"
+          element={
+            <RequireAuth>
               <EventCreatePage />
-            </RequireOrganizer>
-          </RequireAuth>
-        }
-      />
-      {/* Same component as /events/new — EventCreatePage.tsx detects an :eventId param and
-          switches to edit mode ("edit event take us to like the create so i change
-          anything"), loading and PATCHing that event instead of POSTing a new one.
+            </RequireAuth>
+          }
+        />
+        {/* Viewing is open — a public event's detail is readable by anyone, guest or not
+            (server: GET /events/:eventId now takes optionalAuth). Actions that mutate
+            (edit, status, join) check auth status inside EventDetailPage itself and route to
+            /login when attempted signed out, the same pattern the home page's "+ Add" uses.
+            Its route map and rider results render inline on this same page — no separate
+            click-through — using mock data (lib/mock-results.ts) until the server actually has
+            GET /events/:eventId/results; see plan/server-tasks.md. */}
+        <Route
+          path="/events/:eventId"
+          element={
+            <OpenHome>
+              <EventDetailPage />
+            </OpenHome>
+          }
+        />
+        {/* Participants — owner-only start list/check-in/approvals. Once an event is live this
+            doubles as the restricted "Manage" view (pause/resume, stop) — same page, not a
+            separate screen; see EventParticipantsPage.tsx's own doc comment. */}
+        <Route
+          path="/events/:eventId/participants"
+          element={
+            <RequireAuth>
+              <EventParticipantsPage />
+            </RequireAuth>
+          }
+        />
+        {/* The live map — fully separate from the event detail page on purpose (asked for
+            directly: "event page and live are 2 different pages... not same page with 2 maps").
+            Open, same as the detail page: a public event's live locations (if show_live_locations
+            allows it) are viewable by a guest, not just a signed-in participant. */}
+        <Route
+          path="/events/live/:eventId"
+          element={
+            <OpenFullBleed>
+              <LiveEventPage />
+            </OpenFullBleed>
+          }
+        />
+        {/* Ride groups (Elite/Masters etc.) — owner-only, same reasoning as Participants above.
+            Entirely client-only; no server concept of this exists yet at all — see
+            store/eventGroupsStore.ts and plan/server-tasks.md Part D. */}
+        <Route
+          path="/events/:eventId/groups"
+          element={
+            <RequireAuth>
+              <EventGroupsPage />
+            </RequireAuth>
+          }
+        />
+        {/* Rider Statistics — lifetime/yearly totals, achievements, leaderboard. Signed-in riders
+            only (like Teams): this is the rider's own participation history, not a browse
+            surface. See pages/StatisticsPage.tsx's own header for its current mock-data status. */}
+        <Route
+          path="/stats"
+          element={
+            <RequireAuth>
+              <StatisticsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/stats/achievements"
+          element={
+            <RequireAuth>
+              <StatisticsAchievementsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/stats/leaderboard"
+          element={
+            <RequireAuth>
+              <StatisticsLeaderboardPage />
+            </RequireAuth>
+          }
+        />
+        {/* /stats/year was the year-view design's own route while /stats showed an older layout.
+            The design now IS /stats (see StatisticsPage.tsx's header) — this keeps the old URL,
+            and anything still linking to it, working. */}
+        <Route path="/stats/year" element={<Navigate to="/stats" replace />} />
+        {/* Teams (clubs) — a shared schedule of rides + membership, owner-only for management.
+            Entirely client-only, genuinely new territory — see store/teamsStore.ts and
+            plan/server-tasks.md. */}
+        <Route
+          path="/teams"
+          element={
+            <RequireAuth>
+              <TeamsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/teams/:teamId"
+          element={
+            <RequireAuth>
+              <TeamDetailPage />
+            </RequireAuth>
+          }
+        />
+        {/* Find Tracks — the public track library. OpenHome, NOT RequireOrganizer: browsing
+            tracks is the app's front door, and gating it behind organizer mode is what kept it
+            invisible to the riders it is for. Only the "Ride it" button inside is organizer-only
+            (TrackGalleryCard), the same way TrackCard has always gated "Plan a ride". */}
+        <Route
+          path="/routes"
+          element={
+            <OpenHome>
+              <TracksPage />
+            </OpenHome>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <RequireAuth>
+              <AccountPage />
+            </RequireAuth>
+          }
+        />
 
-          NOT gated by RequireOrganizer: editing an event you already own is an OWNER action,
-          authorised server-side (PATCH /events/:eventId asserts ownership), not a browse-mode
-          concern — same reasoning as EventDetailPage's showOrganizerUi. The Edit button on the
-          detail page is shown to the owner in either mode, so this route must open for them.
-          RequireOrganizer stays on /events/new and /routes (starting something new). */}
-      <Route
-        path="/events/:eventId/edit"
-        element={
-          <RequireAuth>
-            <EventCreatePage />
-          </RequireAuth>
-        }
-      />
-      {/* Viewing is open — a public event's detail is readable by anyone, guest or not
-          (server: GET /events/:eventId now takes optionalAuth). Actions that mutate
-          (edit, status, join) check auth status inside EventDetailPage itself and route to
-          /login when attempted signed out, the same pattern the home page's "+ Add" uses.
-          Its route map and rider results render inline on this same page — no separate
-          click-through — using mock data (lib/mock-results.ts) until the server actually has
-          GET /events/:eventId/results; see plan/server-tasks.md. */}
-      <Route
-        path="/events/:eventId"
-        element={
-          <OpenHome>
-            <EventDetailPage />
-          </OpenHome>
-        }
-      />
-      {/* Participants — owner-only start list/check-in/approvals. Once an event is live this
-          doubles as the restricted "Manage" view (pause/resume, stop) — same page, not a
-          separate screen; see EventParticipantsPage.tsx's own doc comment. */}
-      <Route
-        path="/events/:eventId/participants"
-        element={
-          <RequireAuth>
-            <EventParticipantsPage />
-          </RequireAuth>
-        }
-      />
-      {/* The live map — fully separate from the event detail page on purpose (asked for
-          directly: "event page and live are 2 different pages... not same page with 2 maps").
-          Open, same as the detail page: a public event's live locations (if show_live_locations
-          allows it) are viewable by a guest, not just a signed-in participant. */}
-      <Route
-        path="/events/live/:eventId"
-        element={
-          <OpenFullBleed>
-            <LiveEventPage />
-          </OpenFullBleed>
-        }
-      />
-      {/* Ride groups (Elite/Masters etc.) — owner-only, same reasoning as Participants above.
-          Entirely client-only; no server concept of this exists yet at all — see
-          store/eventGroupsStore.ts and plan/server-tasks.md Part D. */}
-      <Route
-        path="/events/:eventId/groups"
-        element={
-          <RequireAuth>
-            <EventGroupsPage />
-          </RequireAuth>
-        }
-      />
-      {/* Rider Statistics — lifetime/yearly totals, achievements, leaderboard. Signed-in riders
-          only (like Teams): this is the rider's own participation history, not a browse
-          surface. See pages/StatisticsPage.tsx's own header for its current mock-data status. */}
-      <Route
-        path="/stats"
-        element={
-          <RequireAuth>
-            <StatisticsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/stats/achievements"
-        element={
-          <RequireAuth>
-            <StatisticsAchievementsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/stats/leaderboard"
-        element={
-          <RequireAuth>
-            <StatisticsLeaderboardPage />
-          </RequireAuth>
-        }
-      />
-      {/* /stats/year was the year-view design's own route while /stats showed an older layout.
-          The design now IS /stats (see StatisticsPage.tsx's header) — this keeps the old URL,
-          and anything still linking to it, working. */}
-      <Route path="/stats/year" element={<Navigate to="/stats" replace />} />
-      {/* Teams (clubs) — a shared schedule of rides + membership, owner-only for management.
-          Entirely client-only, genuinely new territory — see store/teamsStore.ts and
-          plan/server-tasks.md. */}
-      <Route
-        path="/teams"
-        element={
-          <RequireAuth>
-            <TeamsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/teams/:teamId"
-        element={
-          <RequireAuth>
-            <TeamDetailPage />
-          </RequireAuth>
-        }
-      />
-      {/* Find Tracks — the public track library. OpenHome, NOT RequireOrganizer: browsing
-          tracks is the app's front door, and gating it behind organizer mode is what kept it
-          invisible to the riders it is for. Only the "Ride it" button inside is organizer-only
-          (TrackGalleryCard), the same way TrackCard has always gated "Plan a ride". */}
-      <Route
-        path="/routes"
-        element={
-          <OpenHome>
-            <TracksPage />
-          </OpenHome>
-        }
-      />
-      <Route
-        path="/account"
-        element={
-          <RequireAuth>
-            <AccountPage />
-          </RequireAuth>
-        }
-      />
+        {/* Join by link, code or QR.
+            OPEN, not RequireAuth. This is the first thing a stranger ever sees of the app — the
+            organizer's shared link and printed QR both point here — and gating it sent them to
+            the login screen before they had any idea what they were being invited to. Looking a
+            code up is already unauthenticated (GET /events/by-code/:code, frozen), so a guest can
+            be shown the ride itself: JoinPage.tsx redirects them to /events/:eventId, which is
+            equally open, and the "Sign in to join" CTA there is where an identity first becomes
+            necessary. Signing in only guards the ACT of joining — POST /events/join is still
+            requireAuth server-side, which is the check that actually matters. */}
+        <Route
+          path="/join"
+          element={
+            <OpenHome>
+              <JoinPage />
+            </OpenHome>
+          }
+        />
+        <Route
+          path="/join/:code"
+          element={
+            <OpenHome>
+              <JoinPage />
+            </OpenHome>
+          }
+        />
 
-      {/* Join by link, code or QR.
-          OPEN, not RequireAuth. This is the first thing a stranger ever sees of the app — the
-          organizer's shared link and printed QR both point here — and gating it sent them to
-          the login screen before they had any idea what they were being invited to. Looking a
-          code up is already unauthenticated (GET /events/by-code/:code, frozen), so a guest can
-          be shown the ride itself: JoinPage.tsx redirects them to /events/:eventId, which is
-          equally open, and the "Sign in to join" CTA there is where an identity first becomes
-          necessary. Signing in only guards the ACT of joining — POST /events/join is still
-          requireAuth server-side, which is the check that actually matters. */}
-      <Route
-        path="/join"
-        element={
-          <OpenHome>
-            <JoinPage />
-          </OpenHome>
-        }
-      />
-      <Route
-        path="/join/:code"
-        element={
-          <OpenHome>
-            <JoinPage />
-          </OpenHome>
-        }
-      />
+        {/* One link over 2-3 rides on the same day (server: sql/037).
 
-      {/* One link over 2-3 rides on the same day (server: sql/037).
+            OPEN, exactly like /join/:code above and for the same reason: this is the first thing
+            a stranger sees of the app. An organizer who created a long ride and a short one
+            shares ONE link, and this is the chooser it opens — "<Owner> created 2 rides, which
+            one are you riding?" — with nothing pre-selected.
 
-          OPEN, exactly like /join/:code above and for the same reason: this is the first thing
-          a stranger sees of the app. An organizer who created a long ride and a short one
-          shares ONE link, and this is the chooser it opens — "<Owner> created 2 rides, which
-          one are you riding?" — with nothing pre-selected.
+            It joins nothing itself. Picking a card hands off to /join/:code, so the bib,
+            approval and sign-in rules keep their single implementation and this page cannot
+            drift from them. A link whose group has shrunk to one ride redirects straight there,
+            which is where it would have gone before the rides were ever connected. */}
+        <Route
+          path="/share/:codes"
+          element={
+            <OpenHome>
+              <SharedRidesPage />
+            </OpenHome>
+          }
+        />
 
-          It joins nothing itself. Picking a card hands off to /join/:code, so the bib,
-          approval and sign-in rules keep their single implementation and this page cannot
-          drift from them. A link whose group has shrunk to one ride redirects straight there,
-          which is where it would have gone before the rides were ever connected. */}
-      <Route
-        path="/share/:codes"
-        element={
-          <OpenHome>
-            <SharedRidesPage />
-          </OpenHome>
-        }
-      />
+        {/* Private analytics — not in any nav, reached by typing the URL. RequireAuth handles a
+            missing/expired session (401 -> /login); the page itself handles the server's 403 for
+            anyone who is not the configured admin. The URL is not the security — the server is. */}
+        <Route
+          path="/admin2026"
+          element={
+            <RequireAuth>
+              <AdminAnalyticsPage />
+            </RequireAuth>
+          }
+        />
 
-      {/* Private analytics — not in any nav, reached by typing the URL. RequireAuth handles a
-          missing/expired session (401 -> /login); the page itself handles the server's 403 for
-          anyone who is not the configured admin. The URL is not the security — the server is. */}
-      <Route
-        path="/admin2026"
-        element={
-          <RequireAuth>
-            <AdminAnalyticsPage />
-          </RequireAuth>
-        }
-      />
-
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }

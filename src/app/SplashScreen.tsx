@@ -24,6 +24,7 @@
 
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { APP_NAME, APP_SLOGAN } from "../lib/branding";
+import { fastResumeRoute } from "../lib/fast-resume";
 import "./splash-screen.css";
 
 /**
@@ -75,7 +76,14 @@ function markPlayed(): void {
 
 export function SplashScreen() {
   // Decided once, at mount, and never re-read — see SEEN_KEY above.
-  const [skipped] = useState(alreadyPlayedThisSession);
+  //
+  // Fast Resume is the second reason to skip: a rider who was in the app earlier today and has
+  // just reopened it is not arriving, they are coming back, and three seconds of video is the
+  // whole cost of checking one thing. `fastResumeRoute()` is a snapshot taken at boot, so it
+  // reads the same for this component and for app/FastResume.tsx; it is null whenever
+  // FAST_RESUME_ENABLED is off, which is what makes that flag restore this file's old
+  // behaviour exactly. Nothing about the session is decided here — see lib/fast-resume.ts.
+  const [skipped] = useState(() => alreadyPlayedThisSession() || fastResumeRoute() !== null);
   const [phase, setPhase] = useState<"visible" | "fading" | "done">(() =>
     skipped ? "done" : "visible",
   );

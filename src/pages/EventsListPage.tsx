@@ -130,10 +130,6 @@ export function EventsListPage() {
   // Pending invitations (opened a join link, not joined yet — store/invitedEventsStore.ts).
   // No longer a tab: they surface at the top of My Rides with an INVITED marker.
   const invitesByEventId = useInvitedEventsStore((s) => s.byEventId);
-  const pendingInvites = useMemo(
-    () => Object.values(invitesByEventId).sort((a, b) => b.invitedAt - a.invitedAt),
-    [invitesByEventId],
-  );
 
   // EventCreatePage.tsx lands back here after a successful create (rather than on the new
   // event's own page, asked for directly) and hands the event id/name along in router state
@@ -201,6 +197,16 @@ export function EventsListPage() {
     () => rawMyRides.filter((ride) => profile != null && ride.ownerId === profile.id),
     [rawMyRides, profile],
   );
+  const pendingInvites = useMemo(() => {
+    const owned = new Set(createdRides.map((ride) => ride.id));
+    return (
+      Object.values(invitesByEventId)
+        // Nobody invites you to a ride you organize: opening your own share link or QR (easy
+        // to do from the share sheet) records an invite for it, and it must not show up here.
+        .filter((invite) => !owned.has(invite.eventId))
+        .sort((a, b) => b.invitedAt - a.invitedAt)
+    );
+  }, [invitesByEventId, createdRides]);
   const createdSorted = useMemo(() => {
     const rank = (e: EventSummary) =>
       figmaStatus(e.status) === "live" ? 0 : figmaStatus(e.status) === "upcoming" ? 1 : 2;

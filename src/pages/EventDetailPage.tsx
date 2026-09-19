@@ -1183,7 +1183,7 @@ export function EventDetailPage() {
    * cannot be accepted at all, so both drop it. The date comes off the loaded event rather than
    * the stored invite, because the frozen by-code endpoint never sent one.
    */
-  const showInvite = invite != null && !event.myParticipant && canShare;
+  const showInvite = invite != null && !event.myParticipant && !event.isOwner && canShare;
   const inviteLine = showInvite
     ? inviteGreeting(event.name || invite.name, event.startsAt, invite.via)
     : null;

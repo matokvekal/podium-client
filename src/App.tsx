@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { FastResume } from "./app/FastResume";
+import { RequireStatisticsPreview } from "./app/statisticsPreview";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
 import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
@@ -216,12 +217,16 @@ export function App() {
         />
         {/* Rider Statistics — lifetime/yearly totals, achievements, leaderboard. Signed-in riders
             only (like Teams): this is the rider's own participation history, not a browse
-            surface. See pages/StatisticsPage.tsx's own header for its current mock-data status. */}
+            surface. See pages/StatisticsPage.tsx's own header for its current mock-data status.
+            PREVIEW: only Achievements is open to every signed-in rider; /stats and
+            /stats/leaderboard stay behind RequireStatisticsPreview (app/statisticsPreview.tsx). */}
         <Route
           path="/stats"
           element={
             <RequireAuth>
-              <StatisticsPage />
+              <RequireStatisticsPreview>
+                <StatisticsPage />
+              </RequireStatisticsPreview>
             </RequireAuth>
           }
         />
@@ -237,7 +242,9 @@ export function App() {
           path="/stats/leaderboard"
           element={
             <RequireAuth>
-              <StatisticsLeaderboardPage />
+              <RequireStatisticsPreview>
+                <StatisticsLeaderboardPage />
+              </RequireStatisticsPreview>
             </RequireAuth>
           }
         />

@@ -42,6 +42,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useCanSeeStatisticsPreview } from "../app/statisticsPreview";
 import { useMyIdentity } from "../app/useMyIdentity";
 import {
   formatStatValue,
@@ -69,6 +70,7 @@ const PAGE_SIZE = 6;
 
 export function StatisticsAchievementsPage() {
   const me = useMyIdentity();
+  const canSeeStatistics = useCanSeeStatisticsPreview();
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const slot = useStatisticsStore((s) => s.timelines[periodType]);
   const loadTimeline = useStatisticsStore((s) => s.loadTimeline);
@@ -125,7 +127,13 @@ export function StatisticsAchievementsPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link to="/stats" className={styles.iconButton} aria-label="Back to Statistics">
+        {/* /stats is preview-only (app/statisticsPreview.tsx): for everyone else "back" is home,
+            not a redirect bounce. */}
+        <Link
+          to={canSeeStatistics ? "/stats" : "/"}
+          className={styles.iconButton}
+          aria-label={canSeeStatistics ? "Back to Statistics" : "Back"}
+        >
           <ChevronLeft aria-hidden="true" />
         </Link>
         <h1>Statistics</h1>

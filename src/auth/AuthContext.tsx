@@ -102,11 +102,11 @@ export interface Profile {
    */
   canOrganize?: boolean;
   /**
-   * Rider Statistics preview gate — hides the drawer's Statistics entry for everyone except
-   * the account(s) in the server's STATISTICS_PREVIEW_EMAILS list while the feature is still
-   * being finished (user.controller.ts). Menu visibility only, nothing else — the API stays
-   * reachable either way. Remove this field (and the drawer's check) once Statistics is ready
-   * for every rider.
+   * Rider Statistics preview gate — everyone except the account(s) in the server's
+   * STATISTICS_PREVIEW_EMAILS list (user.controller.ts) gets only Achievements; My Statistics and
+   * the Leaderboard are hidden from the drawer and their routes bounce (app/statisticsPreview.tsx).
+   * Client-side only — the /statistics API stays reachable either way. Remove this field (and
+   * that file) once Statistics is ready for every rider.
    */
   canSeeStatistics?: boolean;
 }

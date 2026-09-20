@@ -46,7 +46,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Hand } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../lib/config";
 import { bearingDeg, finishIcon, startIcon } from "./map-icons";
 import styles from "./TrackMiniMap.module.css";
@@ -71,26 +71,81 @@ interface TrackMiniMapProps {
   points: [number, number][];
   /** Announced to screen readers, since the map itself is a picture to them. */
   label: string;
+  /**
+   * Called (at most once per mount) the first time the rider deliberately uses the map — taps
+   * "Tap to explore" on a touch device, or presses on the map with a pointer (drag, zoom
+   * buttons, double-click all begin with a press). This is the signal the gallery uses to fetch
+   * the DETAILED line: a card is drawn from a 60-point preview, which is right for a glance and
+   * angular once zoomed in. A rider who only scrolls past never triggers it.
+   */
+  onExplore?: () => void;
 }
 
-export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
+export default function TrackMiniMap({ points, label, onExplore }: TrackMiniMapProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  // The layer group holding the route line and its two markers. Kept apart from the map so a new
+  // line (the detailed one, once fetched) can replace it WITHOUT rebuilding the map — a rebuild
+  // would throw away the rider's pan/zoom and re-lock a touch map they had just unlocked.
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const drawnRef = useRef<[number, number][] | null>(null);
+  // Read from inside effects that must not re-run when the callback's identity changes.
+  const onExploreRef = useRef(onExplore);
+  onExploreRef.current = onExplore;
+  const exploredRef = useRef(false);
+  const notifyExplore = useCallback(() => {
+    if (exploredRef.current) return;
+    exploredRef.current = true;
+    onExploreRef.current?.();
+  }, []);
   const [wheelEnabled, setWheelEnabled] = useState(false);
   // Read once, on mount, and never changed — the map is constructed from it.
   const [isTouch] = useState(prefersTouchInteraction);
   const [touchUnlocked, setTouchUnlocked] = useState(false);
 
+  // Draws (or redraws) the route line and its two markers into the layer group. Never touches
+  // the view: the first draw follows a fitBounds in the effect below, and a later redraw (the
+  // detailed line replacing the preview) must leave wherever the rider has panned to alone.
+  const drawRoute = useCallback((group: L.LayerGroup, line: [number, number][]) => {
+    group.clearLayers();
+    drawnRef.current = line;
+    if (line.length === 0) return;
+
+    // THINNED before Leaflet ever sees it. Leaflet draws a polyline as a single SVG path with
+    // every point in its `d` attribute; on a card a couple of hundred pixels wide most points
+    // land on a pixel that is already painted. The gallery hands over a 60-point preview (or,
+    // after a tap, the detailed line of a few hundred), so this is a backstop — it keeps a
+    // hand-drawn 3,000-point route in SharedRidesPage cheap too.
+    const drawPoints = thinPoints(line, MAP_POINT_TARGET);
+
+    // The white casing is added FIRST and the coloured line second, so SVG paint order puts the
+    // line on top on its own. That replaces a .bringToBack() call — the one that crashed — with
+    // insertion order, which cannot be in the wrong state because there is no state to be in.
+    L.polyline(drawPoints, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(group);
+    L.polyline(drawPoints, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(group);
+
+    const heading = drawPoints.length > 1 ? bearingDeg(drawPoints[0], drawPoints[1]) : 0;
+    L.marker(drawPoints[0], { icon: startIcon(heading), interactive: false }).addTo(group);
+    L.marker(drawPoints[drawPoints.length - 1], {
+      icon: finishIcon(),
+      interactive: false,
+    }).addTo(group);
+  }, []);
+
+  // The map is built once per mount from the points current at that moment, read through a ref
+  // so a later change of `points` does not tear it down.
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
+
   useEffect(() => {
     const wrapper = wrapperRef.current;
-    if (!wrapper || points.length === 0) return;
+    const initial = pointsRef.current;
+    if (!wrapper || initial.length === 0) return;
 
     // Re-lock whenever the map is (re)built. A fresh L.map below starts with dragging off on a
     // touch device, so the React state has to agree — otherwise a re-used instance handed a
     // different track would show no "tap to explore" over a map that cannot actually be panned.
     setTouchUnlocked(false);
-
-    const drawPoints = thinPoints(points, MAP_POINT_TARGET);
 
     // LEAFLET GETS A NODE REACT DOES NOT OWN. This is the fix for
     // "Cannot read properties of undefined (reading 'parentNode')", which crashed the gallery
@@ -147,26 +202,12 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
     //
     // Bounds come from the points rather than from the polyline, precisely so no layer has to
     // exist before the view is set.
-    map.fitBounds(L.latLngBounds(drawPoints), { padding: [18, 18] });
+    const bounds = L.latLngBounds(thinPoints(initial, MAP_POINT_TARGET));
+    map.fitBounds(bounds, { padding: [18, 18] });
 
-    // THINNED before Leaflet ever sees it. A saved route here carries ~3,000 points, and
-    // Leaflet draws a polyline as a single SVG path with every one of them in its `d`
-    // attribute — on a card a couple of hundred pixels wide, where most land on a pixel that
-    // is already painted. With several maps alive at once that is megabytes of path data and a
-    // lot of geometry work for a difference nobody can see. 400 points keeps the shape at this
-    // size and cuts the per-map cost by roughly 8x.
-    //
-    // The white casing is added FIRST and the coloured line second, so SVG paint order puts the
-    // line on top on its own. That replaces a .bringToBack() call — the one that crashed — with
-    // insertion order, which cannot be in the wrong state because there is no state to be in.
-    L.polyline(drawPoints, { color: "#ffffff", weight: 7, opacity: 0.7 }).addTo(map);
-    L.polyline(drawPoints, { color: "#3f86e7", weight: 4, opacity: 0.95 }).addTo(map);
-
-    const heading = drawPoints.length > 1 ? bearingDeg(drawPoints[0], drawPoints[1]) : 0;
-    L.marker(drawPoints[0], { icon: startIcon(heading), interactive: false }).addTo(map);
-    L.marker(drawPoints[drawPoints.length - 1], { icon: finishIcon(), interactive: false }).addTo(
-      map,
-    );
+    const group = L.layerGroup().addTo(map);
+    routeLayerRef.current = group;
+    drawRoute(group, initial);
 
     // Leaflet mis-measures inside a flex/grid container until told to re-check its size, but
     // the callback MUST be cancelled on unmount. These maps are windowed — they mount and
@@ -178,12 +219,20 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       map.invalidateSize();
       // Re-fit once the container's real size is known. fitBounds above ran against whatever
       // Leaflet measured at construction, which inside a grid cell can be nothing at all.
-      map.fitBounds(L.latLngBounds(drawPoints), { padding: [18, 18] });
+      map.fitBounds(bounds, { padding: [18, 18] });
     });
 
+    // A press on the map is the start of every deliberate use of it (drag, zoom buttons,
+    // double-click). Capture phase, so it is seen before Leaflet's own handlers stop it.
+    const onPress = () => notifyExplore();
+    wrapper.addEventListener("pointerdown", onPress, true);
+
     return () => {
+      wrapper.removeEventListener("pointerdown", onPress, true);
       cancelAnimationFrame(frame);
       mapRef.current = null;
+      routeLayerRef.current = null;
+      drawnRef.current = null;
       // Guarded, and NOT to paper over the ownership bug above — that is fixed by `host`.
       // Leaflet's teardown touches tile images that may still be in flight, and a throw here
       // is a throw inside an unmount cleanup, which React escalates by unmounting the whole
@@ -196,7 +245,15 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
       }
       host.remove();
     };
-  }, [points, isTouch]);
+  }, [isTouch, drawRoute, notifyExplore]);
+
+  // A different line for the SAME map — the detailed geometry arriving after the rider explored.
+  // Swaps the layers in place and leaves the view exactly where the rider put it.
+  useEffect(() => {
+    const group = routeLayerRef.current;
+    if (!group || points.length === 0 || drawnRef.current === points) return;
+    drawRoute(group, points);
+  }, [points, drawRoute]);
 
   // The tap that hands the map over on a touch device. Separate from construction so unlocking
   // does not rebuild the map — the tiles already fetched stay fetched.
@@ -204,7 +261,8 @@ export default function TrackMiniMap({ points, label }: TrackMiniMapProps) {
     const map = mapRef.current;
     if (!map || !touchUnlocked) return;
     map.dragging.enable();
-  }, [touchUnlocked]);
+    notifyExplore();
+  }, [touchUnlocked, notifyExplore]);
 
   // The wheel handover described in the file comment.
   useEffect(() => {

@@ -180,3 +180,49 @@ export function downloadGpxFile(filename: string, gpxContent: string): void {
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * The file name from a Content-Disposition header. Prefers the RFC 5987 `filename*` form — that
+ * is how the server sends a Hebrew name — and falls back to the plain `filename`. `null` when
+ * there is neither, so the caller picks its own.
+ */
+export function filenameFromContentDisposition(header: string | null | undefined): string | null {
+  if (!header) return null;
+  const star = header.match(/filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // fall through to the plain form
+    }
+  }
+  const plain = header.match(/filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/);
+  const name = (plain?.[1] ?? plain?.[2] ?? "").trim();
+  return name || null;
+}
+
+/**
+ * Saves the ORIGINAL GPX of a stored track — the exact bytes that were imported, not a file
+ * rebuilt from the display line. Resolves `true` when a file was saved, `false` when this track
+ * has no stored original (every track that was not imported) or the request failed; the caller
+ * then falls back to buildGpxFile, which is what the button always did. Never throws.
+ */
+export async function downloadOriginalGpx(routeId: number, fallbackName: string): Promise<boolean> {
+  try {
+    const { apiRequestBlob } = await import("./api-client");
+    const file = await apiRequestBlob(`/routes/${routeId}/gpx`);
+    if (!file) return false;
+    const name = filenameFromContentDisposition(file.contentDisposition) ?? fallbackName;
+    const url = URL.createObjectURL(file.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -197,7 +197,14 @@ export function EventsListPage() {
     () => rawMyRides.filter((ride) => profile != null && ride.ownerId === profile.id),
     [rawMyRides, profile],
   );
+  const myRidesSettled = useEventsStore((state) => state.myRidesSettled);
+  // On a fresh load neither the session nor My Rides is known yet, so "rides I organize" is
+  // an empty set and every stored invite — including ones for the rider's own rides — would
+  // paint for a second before the filter below could catch them. Hold the list back until
+  // both are known; a guest owns nothing, so nothing to wait for there.
+  const ownershipKnown = status === "signed-out" || (authed && myRidesSettled);
   const pendingInvites = useMemo(() => {
+    if (!ownershipKnown) return [];
     const owned = new Set(createdRides.map((ride) => ride.id));
     return (
       Object.values(invitesByEventId)
@@ -206,7 +213,17 @@ export function EventsListPage() {
         .filter((invite) => !owned.has(invite.eventId))
         .sort((a, b) => b.invitedAt - a.invitedAt)
     );
-  }, [invitesByEventId, createdRides]);
+  }, [invitesByEventId, createdRides, ownershipKnown]);
+
+  // Drop stored invites for rides this rider owns, not just hide them: the entry would
+  // otherwise sit in localStorage and resurface anywhere else that reads the store.
+  useEffect(() => {
+    if (!ownershipKnown || createdRides.length === 0) return;
+    const { byEventId, removeInvite } = useInvitedEventsStore.getState();
+    for (const ride of createdRides) {
+      if (ride.id in byEventId) removeInvite(ride.id);
+    }
+  }, [ownershipKnown, createdRides]);
   const createdSorted = useMemo(() => {
     const rank = (e: EventSummary) =>
       figmaStatus(e.status) === "live" ? 0 : figmaStatus(e.status) === "upcoming" ? 1 : 2;

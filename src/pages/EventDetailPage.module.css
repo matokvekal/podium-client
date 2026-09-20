@@ -712,6 +712,14 @@
   background: color-mix(in srgb, var(--status-live) 16%, transparent);
 }
 
+/* An arrival the app recorded from the rider's own GPS (attendanceSource "auto"): the accent
+   colour, not the green above, so the organizer can tell "the app saw them at the start" from
+   "I ticked them". */
+.riderStatus[data-tone="auto"] {
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .riderStatus[data-tone="warn"] {
   color: var(--status-pending);
   background: color-mix(in srgb, var(--status-pending) 16%, transparent);

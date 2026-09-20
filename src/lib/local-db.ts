@@ -32,7 +32,7 @@
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
 import type { EventRoute } from "./event-route";
 import type { LiveRider } from "./live-types";
-import type { AttendanceStatus, RegistrationStatus } from "./participant-types";
+import type { AttendanceSource, AttendanceStatus, RegistrationStatus } from "./participant-types";
 import type { RiderLevel } from "./rider-level";
 import type { SurfaceType } from "./surface-types";
 import type { UserVisualAsset } from "./user-identity";
@@ -45,6 +45,14 @@ export type EventStatus =
   | "live"
   | "finished"
   | "cancelled";
+
+/** The tiny route preview a list row carries — see EventSummary.preview. */
+export interface EventPreview {
+  /** [lat, lng] pairs, at most 60. */
+  points: [number, number][];
+  /** Whole metres, one per point, null where a point had no reading. Absent = no elevation. */
+  elevations?: (number | null)[];
+}
 
 export interface EventSummary {
   id: string;
@@ -103,6 +111,15 @@ export interface EventSummary {
    * never a 1.
    */
   terrainGrade?: number | null;
+  /**
+   * How hard the TRACK is, when it is pleasant to ride, and how shaded (server sql/041). Stable
+   * English keys — the Hebrew words live in lib/trail-metadata.ts. Collected and shown for mtb /
+   * gravel only; null / absent on road rides and on a cached row or older server. Not the same
+   * as `level` (who the ride is pitched at) or `terrainGrade` (the ground).
+   */
+  routeDifficulty?: string | null;
+  season?: string | null;
+  shade?: string | null;
   organizerGroup?: string | null;
   teamId?: string | null;
   /**
@@ -144,10 +161,21 @@ export interface EventSummary {
   region?: string | null;
   /**
    * How many rides have been built on this ride's attached route (route_copies count). ONLY
-   * GET /events/public fills this in; absent elsewhere, and the track card then falls back to
-   * its own per-card `?preview=1` fetch. Optional / nullable for the same reasons.
+   * GET /events/public fills this in; absent elsewhere, and the track card then shows a dash.
+   * Optional / nullable for the same reasons.
    */
   downloads?: number | null;
+  /**
+   * The attached route's tiny card preview (server: routes.thumb_points, sql/046) — at most 60
+   * points plus a parallel whole-metre elevation series. Sent inside every row of GET /events and
+   * GET /events/public, so a Find Tracks / My Rides card draws its map and climb profile with NO
+   * request of its own. Display only: the detailed line is GET /events/:id/route (fetched when a
+   * rider explores a card's map) and the original file is GET /routes/:id/gpx.
+   *
+   * `null` = the ride has no drawable route (or the server has no preview yet); absent = a cached
+   * row or an older server. Either way the card simply draws no line — never a fabricated one.
+   */
+  preview?: EventPreview | null;
   /**
    * The ATTACHED TRACK's id (routes.id), from toEventSummary. Likes and hearts belong to the
    * track, not the ride — one `routes` row is shared by every ride built on it — so this is
@@ -185,6 +213,15 @@ export interface EventSummary {
    */
   hasSupportVehicle?: boolean;
   /**
+   * The organizer switched auto check-in on for this ride (server sql/040-auto-check-in.sql):
+   * riders on the start list are marked arrived automatically when they open the app near the
+   * start, around the start time. On the SUMMARY because lib/auto-check-in.ts decides from My
+   * Rides — before any detail page is opened — whether a ride is worth asking for a GPS fix.
+   * Optional: a cached row or an older server omits it, and absent means off. The radius and
+   * time window are NOT here; the server owns them (see config.autoCheckInWindowMin).
+   */
+  autoCheckIn?: boolean;
+  /**
    * How many riders the organizer expects (sql/028), or null/absent when they left it blank.
    * The event page shows "12 / 40" only when this is set; otherwise just the count. It is NOT
    * a capacity — the real cap is the organizer's plan limit and never comes down to the client.
@@ -209,6 +246,8 @@ export interface MyParticipant {
   id: number;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  /** How that attendance was recorded; absent on an older server or cached detail. */
+  attendanceSource?: AttendanceSource | null;
 }
 
 /**
@@ -316,6 +355,7 @@ export interface CachedParticipant {
   bib: string | null;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  attendanceSource?: AttendanceSource | null;
 }
 
 /** What a cache read hands back: the payload plus when the server last confirmed it. */

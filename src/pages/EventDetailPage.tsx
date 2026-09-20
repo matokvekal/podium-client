@@ -78,6 +78,7 @@ import { useOwnerCover } from "../app/useOwnerCover";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { arrivalLabel, isAutoArrival } from "../lib/arrival";
 import { config } from "../lib/config";
 
 import { useConnectivityStore } from "../lib/connectivity";
@@ -106,8 +107,22 @@ import {
   terrainDescriptionFor,
   terrainLabelFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTY_LABEL,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SHADE_LABEL,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
 import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
-import { buildGpxFile, downloadGpxFile, gpxFilenameFor } from "../lib/track-gpx";
+import {
+  buildGpxFile,
+  downloadGpxFile,
+  downloadOriginalGpx,
+  gpxFilenameFor,
+} from "../lib/track-gpx";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
@@ -236,7 +251,9 @@ function draftFromServer(rider: CachedParticipant): RiderDraft {
   };
 }
 
-type StatusTone = "ok" | "warn" | "bad";
+// "auto" is an arrival the rider's own GPS produced (attendanceSource "auto") — the accent colour,
+// so it is told apart from the green "ok" of an arrival an organizer ticked. See lib/arrival.ts.
+type StatusTone = "ok" | "auto" | "warn" | "bad";
 interface RiderStatus {
   text: string;
   tone: StatusTone;
@@ -263,22 +280,6 @@ function approvalStatus(registrationStatus: string): RiderStatus {
       return { text: "Rejected", tone: "bad" };
     default:
       return { text: registrationStatus, tone: "warn" };
-  }
-}
-
-function arrivalStatus(attendanceStatus: string): RiderStatus {
-  switch (attendanceStatus) {
-    case "present":
-      return { text: "✓ Arrived", tone: "ok" };
-    // Already out on the road — arrived, and then some.
-    case "started":
-      return { text: "✓ Arrived · started", tone: "ok" };
-    case "dns":
-      return { text: "Did not start", tone: "bad" };
-    case "unknown":
-      return { text: "Not arrived", tone: "warn" };
-    default:
-      return { text: attendanceStatus, tone: "warn" };
   }
 }
 
@@ -396,6 +397,13 @@ export function EventDetailPage() {
   const invite = useInvitedEventsStore((state) =>
     eventId ? (state.byEventId[eventId] ?? null) : null,
   );
+  // The organizer opening their own share link/QR records an invite for their own ride (the
+  // by-code lookup can't tell). Once the event says they own it, clear it so it never shows
+  // on the home screen.
+  const ownsEvent = event?.isOwner === true;
+  useEffect(() => {
+    if (ownsEvent && eventId) useInvitedEventsStore.getState().removeInvite(eventId);
+  }, [ownsEvent, eventId, invite]);
   const [connectOpen, setConnectOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1117,6 +1125,17 @@ export function EventDetailPage() {
    *  against. Orthogonal to `level` above: that one is who the ride is pitched at. */
   const terrainGrade = terrainApplies(activityType) ? asTerrainGrade(event.terrainGrade) : null;
 
+  /** How hard the TRACK is, when it is pleasant to ride, and how shaded it is (sql/041) — mtb /
+   *  gravel only, and each tile appears only when the value exists, so a road ride (or an mtb
+   *  ride that never stated them) shows no empty tiles. Not `level`, not terrain. */
+  const trailMeta = trailMetadataApplies(activityType)
+    ? {
+        routeDifficulty: asRouteDifficulty(event.routeDifficulty),
+        season: asTrailSeason(event.season),
+        shade: asTrailShade(event.shade),
+      }
+    : null;
+
   /** The organizer's own figure first, the app's estimate only to fill a blank, "soon" if even
    *  that is impossible. formatEstimatedDuration is what marks a derived time as derived. */
   const statedDuration = formatDuration(event.durationMin);
@@ -1421,6 +1440,27 @@ export function EventDetailPage() {
                 {terrainLabelFor(terrainGrade, activityType)}
               </span>
               <span className={styles.statTileLabel}>Terrain</span>
+            </div>
+          )}
+          {/* ROUTE DIFFICULTY / SEASON / SHADE — mtb and gravel, only where stated (sql/041). */}
+          {trailMeta?.routeDifficulty && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>
+                {ROUTE_DIFFICULTY_LABEL[trailMeta.routeDifficulty]}
+              </span>
+              <span className={styles.statTileLabel}>Route difficulty</span>
+            </div>
+          )}
+          {trailMeta?.season && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>{TRAIL_SEASON_LABEL[trailMeta.season]}</span>
+              <span className={styles.statTileLabel}>Season</span>
+            </div>
+          )}
+          {trailMeta?.shade && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>{TRAIL_SHADE_LABEL[trailMeta.shade]}</span>
+              <span className={styles.statTileLabel}>Shade</span>
             </div>
           )}
           <div
@@ -1743,10 +1783,18 @@ export function EventDetailPage() {
                     type="button"
                     className={styles.routeDownloadBtn}
                     onClick={() => {
-                      if (!results.route) return;
-                      downloadGpxFile(
-                        gpxFilenameFor(event.name),
-                        buildGpxFile(results.route, event.name),
+                      const route = results.route;
+                      if (!route) return;
+                      const rebuilt = () =>
+                        downloadGpxFile(gpxFilenameFor(event.name), buildGpxFile(route, event.name));
+                      // A track that was imported keeps its ORIGINAL file (sql/042): hand out
+                      // those exact bytes. Anything without one — every ordinary ride — falls
+                      // back to the GPX rebuilt from the line on screen, as it always has.
+                      if (event.routeId == null) return rebuilt();
+                      void downloadOriginalGpx(event.routeId, gpxFilenameFor(event.name)).then(
+                        (saved) => {
+                          if (!saved) rebuilt();
+                        },
                       );
                     }}
                   >
@@ -1974,7 +2022,7 @@ export function EventDetailPage() {
                             ? approvalStatus(rider.registrationStatus)
                             : null;
                           const arrival = showOrganizerUi
-                            ? arrivalStatus(rider.attendanceStatus)
+                            ? arrivalLabel(rider.attendanceStatus, rider.attendanceSource)
                             : null;
                           // Undefined for a rider who joined after the pencil was opened —
                           // that row simply stays read-only until the next Save/Cancel reseeds.
@@ -2028,6 +2076,11 @@ export function EventDetailPage() {
                                         <Circle width={16} height={16} aria-hidden="true" />
                                       )}
                                       Arrived
+                                      {riderDraft.arrived &&
+                                        isAutoArrival(
+                                          rider.attendanceStatus,
+                                          rider.attendanceSource,
+                                        ) && <span> · Auto</span>}
                                     </button>
                                   </span>
                                 ) : (

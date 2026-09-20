@@ -1,8 +1,11 @@
 /**
  * Find Tracks — the public track library.
  *
- * Route:  /routes
- * Open to everyone, signed in or not, like every other browse surface in this app.
+ * Route:  /findtracks[/<country>[/<type>]]   e.g. /findtracks/il/mtb   (was /routes — see App.tsx)
+ * Open to everyone, signed in or not, like every other browse surface in this app. The address
+ * is the shareable link: it names the country and discipline, opening it applies them, and
+ * changing either filter rewrites it (lib/find-tracks-url.ts). Facebook's card for each link is
+ * a static file the build writes (vite-plugin-findtracks-og.ts).
  *
  * WHAT CHANGED AND WHY. This page used to be a route PLANNER: a big overview map, mock hazard /
  * POI / air-quality layers, and a results list fed by GET /routes/public — the standalone
@@ -23,12 +26,42 @@
  * app read this page.
  */
 
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { TrackGalleryBrowser } from "../app/TrackGalleryBrowser";
+import {
+  buildFindTracksPath,
+  type FindTracksFacets,
+  findTracksTitle,
+  parseFindTracksPath,
+} from "../lib/find-tracks-url";
 import type { EventSummary } from "../lib/local-db";
 
 export function TracksPage() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const splat = useParams()["*"];
+  const parsed = useMemo(() => parseFindTracksPath(splat), [splat]);
+
+  // The tab title follows the link, so a bookmark or a browser history entry reads
+  // "MTB tracks in Israel" rather than the site name.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = findTracksTitle(parsed.facets);
+    return () => {
+      document.title = previous;
+    };
+  }, [parsed.facets]);
+
+  // An unknown segment, upper case or a trailing slash all land on the one canonical spelling,
+  // so there is exactly one URL per view (and one preview file for it).
+  const isCanonical = parsed.valid && pathname.replace(/\/+$/, "") === parsed.canonicalPath;
+  if (!isCanonical) return <Navigate to={parsed.canonicalPath} replace />;
+
+  function changeFacets(facets: FindTracksFacets) {
+    const next = buildFindTracksPath(facets);
+    if (next !== parsed.canonicalPath) navigate(next, { replace: true });
+  }
 
   /**
    * The page's cards hand over through a <Link> of their own (TrackGalleryCard's "page"
@@ -52,7 +85,11 @@ export function TracksPage() {
 
   return (
     <section className="stack">
-      <TrackGalleryBrowser variant="page" onPick={openCreateWithTrack} />
+      <TrackGalleryBrowser
+        variant="page"
+        onPick={openCreateWithTrack}
+        urlSync={{ facets: parsed.facets, onChange: changeFacets }}
+      />
     </section>
   );
 }

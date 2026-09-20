@@ -108,6 +108,7 @@ import {
   Accessibility,
   AlertTriangle,
   Bike,
+  CalendarDays,
   Check,
   Clock,
   Coffee,
@@ -117,12 +118,14 @@ import {
   Gauge,
   ImagePlus,
   LifeBuoy,
+  LocateFixed,
   Lock,
   MapPin,
   Mountain,
   Radio,
   Ruler,
   ShieldCheck,
+  Sun,
   Target,
   Timer,
   Trash2,
@@ -149,6 +152,7 @@ import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { config } from "../lib/config";
 import { flagEmoji, orderedCountries } from "../lib/countries";
 import { defaultRideCountry } from "../lib/default-ride-country";
 import { effectiveLimits } from "../lib/entitlements";
@@ -184,6 +188,21 @@ import {
   terrainOptionsFor,
   terrainScaleNameFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTIES,
+  ROUTE_DIFFICULTY_LABEL,
+  type RouteDifficulty,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASONS,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADES,
+  type TrailSeason,
+  type TrailShade,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
 import { useMediaQuery } from "../lib/use-media-query";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
@@ -220,6 +239,11 @@ interface ExistingEvent {
   /** How technical the ground is, 1-5 (sql/038-event-terrain-grade.sql). Absent on an older
    *  server or a ride created before this existed; edit mode then starts the picker unset. */
   terrainGrade?: number | null;
+  /** How hard the track is, when it is pleasant, how shaded (sql/041). Absent on an older server
+   *  or a road ride; edit mode then starts the three pickers unset. */
+  routeDifficulty?: string | null;
+  season?: string | null;
+  shade?: string | null;
   /** EFFECTIVE elevation gain (m) the server persists — the organizer's manual/imported value,
    *  else the attached route's climb. Prefills the Climb field in edit mode. See
    *  sql/021-events-elevation-gain.sql. */
@@ -230,6 +254,9 @@ interface ExistingEvent {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
+  /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
+   *  which is the default a new ride gets. */
+  autoCheckIn?: boolean;
   /** The organizer's expected head-count (sql/028), or null when they left it blank. Prefills
    *  the "Expected riders" field in edit mode. */
   expectedParticipants?: number | null;
@@ -420,6 +447,11 @@ export function EventCreatePage() {
    * yesterday's gravel road says nothing about today's trail.
    */
   const [terrainGrade, setTerrainGrade] = useState<TerrainGrade | null>(null);
+  // Route difficulty / season / shade (sql/041) — mtb and gravel only, like terrain. Server-only
+  // state for the same reason: this device cannot know them for a ride it did not create.
+  const [routeDifficulty, setRouteDifficulty] = useState<RouteDifficulty | null>(null);
+  const [season, setSeason] = useState<TrailSeason | null>(null);
+  const [shade, setShade] = useState<TrailShade | null>(null);
   // Distance/climb — near the difficulty picker below, same "no server column, persisted via
   // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
   // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
@@ -455,6 +487,12 @@ export function EventCreatePage() {
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false,
   );
+  // Auto check-in at the start (sql/040): a rider who opens the app near the start, around the
+  // start time, is marked arrived automatically — shown to the organizer as "Auto", in its own
+  // colour, next to the arrivals they tick by hand. ON by default and deliberately NOT remembered
+  // from the last ride the way the switches above are: it is the safe, useful default, and an
+  // organizer who wants it off says so per ride. The radius and time window are server config.
+  const [autoCheckIn, setAutoCheckIn] = useState(true);
   // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
   // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
   // the real cap is this account's plan limit, which the server enforces and which the plan
@@ -678,6 +716,9 @@ export function EventCreatePage() {
         // Server-only: a terrain grade is not something this device can know about a ride it
         // did not create, so there is no local-extras fallback for it.
         setTerrainGrade(asTerrainGrade(found.terrainGrade));
+        setRouteDifficulty(asRouteDifficulty(found.routeDifficulty));
+        setSeason(asTrailSeason(found.season));
+        setShade(asTrailShade(found.shade));
         // Server-persisted effective elevation wins — it survives logout/login and is the
         // same on every device, and `serverHasElevation` keeps the stale local extras below
         // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
@@ -695,6 +736,7 @@ export function EventCreatePage() {
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
+        setAutoCheckIn(found.autoCheckIn ?? true);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
@@ -1291,6 +1333,8 @@ export function EventCreatePage() {
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
             hasSupportVehicle,
+            // Auto check-in (sql/040). Always sent, so switching it off on an edit really does.
+            autoCheckIn,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
             expectedParticipants: expectedParticipantsValue,
@@ -1298,6 +1342,11 @@ export function EventCreatePage() {
             // ride is no longer off-road — switching an MTB ride to road must not leave an S3
             // claim standing on a ride that no longer has a scale to read it against.
             terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+            // Route difficulty / season / shade (sql/041) — same rule as the grade: always sent,
+            // null once the ride is no longer mtb / gravel so no stale claim stays on a road ride.
+            routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+            season: trailMetadataApplies(activityType) ? season : null,
+            shade: trailMetadataApplies(activityType) ? shade : null,
           },
         });
         await saveExtras(eventId);
@@ -1359,10 +1408,17 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
+          // Auto check-in (sql/040) — sent on create too, so an organizer who switched it off
+          // is never silently given the server default (on).
+          autoCheckIn,
           // Expected riders (sql/028) — null when the organizer left the field blank.
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
           terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+          // Route difficulty / season / shade (sql/041) — off-road rides only, null otherwise.
+          routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+          season: trailMetadataApplies(activityType) ? season : null,
+          shade: trailMetadataApplies(activityType) ? shade : null,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -2036,6 +2092,73 @@ export function EventCreatePage() {
                 </div>
               )}
 
+              {/* ROUTE DIFFICULTY / SEASON / SHADE — mtb and gravel only (sql/041). Three plain
+                  selects in the same style as Terrain above, and rendered ONLY for off-road
+                  rides so a road ride carries no empty MTB fields. Route difficulty is how hard
+                  the TRACK is: not the Level above (who the ride is pitched at) and not Terrain
+                  (the ground). Values are kept through a discipline switch, like the grade. */}
+              {trailMetadataApplies(activityType) && (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="routeDifficulty">
+                      <Gauge aria-hidden="true" />
+                      Route difficulty
+                    </label>
+                    <select
+                      id="routeDifficulty"
+                      className={styles.input}
+                      value={routeDifficulty ?? ""}
+                      onChange={(e) => setRouteDifficulty(asRouteDifficulty(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {ROUTE_DIFFICULTIES.map((key) => (
+                        <option key={key} value={key}>
+                          {ROUTE_DIFFICULTY_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailSeason">
+                      <CalendarDays aria-hidden="true" />
+                      Season
+                    </label>
+                    <select
+                      id="trailSeason"
+                      className={styles.input}
+                      value={season ?? ""}
+                      onChange={(e) => setSeason(asTrailSeason(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SEASONS.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SEASON_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailShade">
+                      <Sun aria-hidden="true" />
+                      Shade
+                    </label>
+                    <select
+                      id="trailShade"
+                      className={styles.input}
+                      value={shade ?? ""}
+                      onChange={(e) => setShade(asTrailShade(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SHADES.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SHADE_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               {/* Distance/climb, near the difficulty picker above — auto-filled from whatever
                   route gets picked/uploaded (see applyRouteDistanceClimb), editable by hand at
                   any time — a route doesn't always carry real elevation, and this is the
@@ -2353,6 +2476,37 @@ export function EventCreatePage() {
                     Support vehicle
                   </span>
                 </label>
+                {/* Auto check-in (sql/040) — riders who open the app near the start, around the
+                    start time, are marked "arrived" automatically, in their own colour so the
+                    organizer can tell it from a tick they made themselves. On by default. The hint
+                    quotes the real radius/window from config, and says what it needs: a track
+                    (the start point) and a start time — without either there is nothing to be
+                    near, and the server answers "no start point". */}
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={autoCheckIn}
+                    onChange={(e) => setAutoCheckIn(e.target.checked)}
+                  />
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${autoCheckIn ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {autoCheckIn ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <LocateFixed aria-hidden="true" />
+                    Auto check-in at start
+                  </span>
+                </label>
+                <p className={styles.hint}>
+                  {autoCheckIn
+                    ? `Riders are marked as arrived (Auto) when they open the app within ${config.autoCheckInRadiusM} m of the start point, up to ${config.autoCheckInWindowMin} min before or after the start time. Needs a track and a start time. You can still tick riders by hand.`
+                    : "Off — you tick riders as arrived yourself."}
+                </p>
               </fieldset>
             </div>
           </div>

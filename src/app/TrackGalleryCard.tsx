@@ -9,19 +9,28 @@
  * pan and zoom (TrackMiniMap), windowed so only the cards on screen hold one; see that file
  * for how that stays affordable in a list of thousands.
  *
- * The SVG line survives as the INSTANT UNDERLAY beneath the map: it paints from geometry
- * already in memory before a single tile has been requested, so the card shows the real route
- * immediately instead of a grey hole, and a rider whose tiles never arrive still sees it.
+ * WHERE THE LINE COMES FROM: the row itself. `event.preview` is a 60-point line plus a
+ * whole-metre elevation series, embedded in every row of the paginated list (GET /events/public,
+ * GET /events), so drawing a card costs no request at all — scrolling through fifty pages is
+ * fifty requests, not fifty pages' worth of one-per-card geometry calls, which is what used to
+ * exhaust the API's rate limit. The DETAILED line (a few hundred points) is fetched only when the
+ * rider explores this card's map — a tap on "Tap to explore" or a press on the map — and swapped
+ * in place (track-detail.ts). The original GPX is neither of these and is never loaded here.
+ *
+ * The SVG line is the INSTANT UNDERLAY beneath the map: it paints from the preview before a
+ * single tile has been requested, so the card shows the real route immediately instead of a grey
+ * hole, and a rider whose tiles never arrive still sees it.
  *
  * WHAT THE NUMBERS ARE, AND WHY EACH IS REAL:
  *
- *   distance / climb  the route's own measured figures, falling back to the organizer's typed
- *                     ones until the geometry arrives.
+ *   distance / climb  the list row's own figures: the route's distance and the EFFECTIVE climb
+ *                     (the organizer's value, else the route's — the server resolves it).
  *   ride time         events.duration_min — the organizer's own estimate. NOT derived from
  *                     distance: lib/ride-duration.ts is explicit that inventing one needs an
  *                     assumed speed, which this app does not ship. Shown as "Not stated"
  *                     rather than omitted, so the rows stay aligned down the grid.
- *   downloads         how many rides have been built on this track (server: usedByRides). A
+ *   downloads         how many rides have been built on this track (server: route_copies, on
+ *                     GET /events/public only; other lists show a dash). A
  *                     real reuse count, not a view counter. Reads "soon" until the server
  *                     sends it — never the rider count wearing a downloads label, which would
  *                     be a confident wrong answer to a different question.
@@ -44,7 +53,7 @@ import {
   ThumbsUp,
   User,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { EventRoute } from "../lib/event-route";
 import { haversineDistanceKm } from "../lib/geo";
@@ -64,6 +73,7 @@ import { type DistanceIcon, distanceIconFor } from "./ActivityIcons";
 import { ElevationProfile } from "./ElevationProfile";
 import { placeholderCoverGradient } from "./event-visuals";
 import styles from "./TrackGalleryCard.module.css";
+import { cachedTrackDetail, loadTrackDetail } from "./track-detail";
 import { projectTrack } from "./track-thumbnail";
 
 // Leaflet must never reach the main bundle — it takes it from 65 kB to 559 kB. Every consumer
@@ -118,11 +128,12 @@ const LOOP_TOLERANCE_KM = 0.4;
 
 interface TrackGalleryCardProps {
   event: EventSummary;
-  route: EventRoute | null | undefined;
-  /** How many rides were built on this track. Undefined when the server does not report it. */
-  usedByRides?: number;
-  /** Fired once the card is near the viewport, so its route can be fetched then and not before. */
-  onVisible: (eventId: string) => void;
+  /**
+   * Whether the detailed line may be fetched without a token — true for the public list, whose
+   * rides' routes are served anonymously. False for My Rides, which can hold a PRIVATE ride only
+   * its owner may read.
+   */
+  anonymousDetail: boolean;
   /**
    * How this card hands its track over.
    *
@@ -134,11 +145,9 @@ interface TrackGalleryCardProps {
   onPick: (event: EventSummary) => void;
 }
 
-export function TrackGalleryCard({
+export const TrackGalleryCard = memo(function TrackGalleryCard({
   event,
-  route,
-  usedByRides,
-  onVisible,
+  anonymousDetail,
   onPick,
   variant = "modal",
 }: TrackGalleryCardProps) {
@@ -146,29 +155,45 @@ export function TrackGalleryCard({
   /** Whether this card currently holds a live Leaflet map. Drives the windowing. */
   const [mapLive, setMapLive] = useState(false);
 
-  // One observer does both jobs: ask for the geometry, and mount/unmount the map. They share a
-  // trigger because they answer the same question — is this card worth spending on right now.
+  // Only the map window depends on visibility now. The line itself is already on the row, so
+  // there is nothing to fetch as a card nears the screen — this observer mounts and unmounts the
+  // Leaflet map and does nothing else.
   useEffect(() => {
     const node = cardRef.current;
     if (!node) return;
     const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries[0]?.isIntersecting ?? false;
-        setMapLive(visible);
-        // requestRoute ignores a repeat for geometry it holds or is fetching, so re-entering
-        // costs nothing — but after a FAILED fetch nothing was cached, and this is what lets
-        // scrolling back to the card try again rather than leaving it blank for good.
-        if (visible) onVisible(event.id);
-      },
+      (entries) => setMapLive(entries[0]?.isIntersecting ?? false),
       { rootMargin: MAP_ROOT_MARGIN },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [event.id, onVisible]);
+  }, []);
+
+  // The card is drawn from the row's 60-point preview...
+  const preview = event.preview ?? null;
+  // ...and from the detailed line once the rider has explored the map (or did earlier: the cache
+  // outlives the card, so scrolling away and back does not lose it or refetch it).
+  const [detail, setDetail] = useState<EventRoute | undefined>(() => cachedTrackDetail(event.id));
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const eventId = event.id;
+  const handleExplore = useCallback(() => {
+    void loadTrackDetail(eventId, { anonymous: anonymousDetail }).then((route) => {
+      if (route && mounted.current) setDetail(route);
+    });
+  }, [eventId, anonymousDetail]);
+
+  const previewPoints = preview?.points ?? null;
+  const mapPoints = detail?.points ?? previewPoints;
 
   const projected = useMemo(
-    () => (route ? projectTrack(route.points, THUMB_W, THUMB_H, THUMB_PAD) : null),
-    [route],
+    () => (previewPoints ? projectTrack(previewPoints, THUMB_W, THUMB_H, THUMB_PAD) : null),
+    [previewPoints],
   );
 
   const isOrganizer = useIsOrganizer();
@@ -181,12 +206,12 @@ export function TrackGalleryCard({
   const toggleFavorite = useTrackLikesStore((s) => s.toggleFavorite);
   const { likes, likedByMe, favoritedByMe } = resolveTrackLikes(override, event);
 
-  const distanceKm = route?.distanceKm ?? event.distanceKm;
-  const climbM = route?.elevationM ?? event.elevationGain;
+  const distanceKm = event.distanceKm;
+  const climbM = event.elevationGain;
   const duration = formatDuration(event.durationMin);
   const place = regionLabel(event.region) || event.location || event.area;
-  // The list carries the reuse count on GET /events/public; the per-card fetch is the fallback.
-  const downloads = event.downloads ?? usedByRides;
+  // Only GET /events/public carries the reuse count; elsewhere the card shows a dash.
+  const downloads = event.downloads;
 
   // Difficulty is a property of the RIDE, not the track — which is why the gallery has never
   // filtered on it. Shown here anyway, and ONLY for mountain biking, because off-road is the
@@ -213,13 +238,13 @@ export function TrackGalleryCard({
   // the two places would need reverse geocoding the app does not have — printing coordinates
   // would be noise.
   const shape = useMemo(() => {
-    const points = route?.points;
+    const points = previewPoints;
     if (!points || points.length < 2) return null;
     const start = points[0];
     const end = points[points.length - 1];
     if (!start || !end) return null;
     return haversineDistanceKm(start, end) <= LOOP_TOLERANCE_KM ? "loop" : "point-to-point";
-  }, [route]);
+  }, [previewPoints]);
 
   function handleLike() {
     if (routeId == null || likedByMe || busy) return;
@@ -251,13 +276,12 @@ export function TrackGalleryCard({
               <polyline className={styles.trackLine} points={projected.points} />
             </svg>
           )}
-          {route === undefined && <span className="spinner" />}
         </div>
 
-        {mapLive && route && route.points.length > 1 && (
+        {mapLive && mapPoints && mapPoints.length > 1 && (
           <div className={styles.mapLayer}>
             <Suspense fallback={null}>
-              <TrackMiniMap points={route.points} label={event.name} />
+              <TrackMiniMap points={mapPoints} label={event.name} onExplore={handleExplore} />
             </Suspense>
           </div>
         )}
@@ -271,9 +295,13 @@ export function TrackGalleryCard({
           Renders nothing at all when the route carries no elevation series (every track saved
           before the server kept one, and any GPX with no <ele> tags) — an empty axis would
           imply a flat ride, which is a different claim from "unknown". */}
-      {route && route.points.length > 1 && route.elevations && (
+      {preview && preview.points.length > 1 && preview.elevations && (
         <div className={styles.profile}>
-          <ElevationProfile points={route.points} elevations={route.elevations} heightPx={44} />
+          <ElevationProfile
+            points={preview.points}
+            elevations={preview.elevations}
+            heightPx={44}
+          />
         </div>
       )}
 
@@ -440,4 +468,4 @@ export function TrackGalleryCard({
       </div>
     </div>
   );
-}
+});

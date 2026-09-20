@@ -188,3 +188,45 @@ describe("applyTrackGalleryCriteria (My rides)", () => {
     expect(out.map((e) => e.name)).toEqual(["Alps", "Beach", "Carmel"]);
   });
 });
+
+describe("route difficulty / season / shade filters (sql/041)", () => {
+  it("are omitted from the query until chosen, then sent as CSV", () => {
+    const none = buildTrackGalleryQuery(crit(), "newest", "");
+    expect(none.has("routeDifficulty")).toBe(false);
+    expect(none.has("season")).toBe(false);
+    expect(none.has("shade")).toBe(false);
+
+    const p = buildTrackGalleryQuery(
+      crit({ routeDifficulty: ["easy", "moderate"], season: ["winter_spring"], shade: ["shaded"] }),
+      "newest",
+      "",
+    );
+    expect(p.get("routeDifficulty")).toBe("easy,moderate");
+    expect(p.get("season")).toBe("winter_spring");
+    expect(p.get("shade")).toBe("shaded");
+  });
+
+  it("each chosen value counts toward the Filter badge", () => {
+    expect(
+      trackGalleryActiveFilterCount(
+        crit({ routeDifficulty: ["hard"], season: ["all_year", "spring_autumn"], shade: ["exposed"] }),
+      ),
+    ).toBe(4);
+  });
+
+  it("filters My rides in memory, and a ride that never stated a value does not match", () => {
+    const rows = [
+      ev({ id: "a", routeDifficulty: "easy", season: "all_year", shade: "shaded" }),
+      ev({ id: "b", routeDifficulty: "hard", season: "all_year", shade: "exposed" }),
+      ev({ id: "c" }), // a road ride / unstated
+    ];
+    const ids = (c: TrackGalleryCriteria) =>
+      applyTrackGalleryCriteria(rows, c, "name_asc", "").map((r) => r.id);
+
+    expect(ids(crit({ routeDifficulty: ["easy"] }))).toEqual(["a"]);
+    expect(ids(crit({ shade: ["exposed"] }))).toEqual(["b"]);
+    expect(ids(crit({ season: ["all_year"] })).sort()).toEqual(["a", "b"]);
+    expect(ids(crit({ routeDifficulty: ["easy", "hard"], shade: ["shaded"] }))).toEqual(["a"]);
+    expect(ids(crit())).toHaveLength(3);
+  });
+});

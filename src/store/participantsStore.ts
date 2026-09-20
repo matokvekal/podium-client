@@ -25,6 +25,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ApiError, apiRequest } from "../lib/api-client";
 import type {
+  AttendanceSource,
   AttendanceStatus,
   Participant,
   RegistrationStatus,
@@ -52,6 +53,7 @@ interface ServerParticipant {
   category: string | null;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  attendanceSource?: AttendanceSource | null;
   resultStatus: ResultStatus;
   joinedAt: string;
 }
@@ -101,6 +103,7 @@ function toParticipant(server: ServerParticipant, overlay: LocalOverlay | undefi
     category: server.category,
     registrationStatus: server.registrationStatus,
     attendanceStatus: server.attendanceStatus,
+    attendanceSource: server.attendanceSource ?? null,
     resultStatus: overlay?.resultStatus ?? server.resultStatus,
     joinedAt: server.joinedAt,
     groupId: overlay?.groupId ?? null,

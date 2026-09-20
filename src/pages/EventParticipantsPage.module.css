@@ -49,6 +49,14 @@
   color: #fff;
 }
 
+/* Arrived by the app itself (auto check-in), not by an organizer's tick: the accent colour
+   instead of the green above. Same shape, so the row does not shift. */
+.checkBtnAuto {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
 .avatar {
   flex-shrink: 0;
   display: flex;

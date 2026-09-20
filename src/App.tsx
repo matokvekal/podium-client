@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { FastResume } from "./app/FastResume";
+import { RequireStatisticsPreview } from "./app/statisticsPreview";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
 import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
@@ -216,12 +217,16 @@ export function App() {
         />
         {/* Rider Statistics — lifetime/yearly totals, achievements, leaderboard. Signed-in riders
             only (like Teams): this is the rider's own participation history, not a browse
-            surface. See pages/StatisticsPage.tsx's own header for its current mock-data status. */}
+            surface. See pages/StatisticsPage.tsx's own header for its current mock-data status.
+            PREVIEW: only Achievements is open to every signed-in rider; /stats and
+            /stats/leaderboard stay behind RequireStatisticsPreview (app/statisticsPreview.tsx). */}
         <Route
           path="/stats"
           element={
             <RequireAuth>
-              <StatisticsPage />
+              <RequireStatisticsPreview>
+                <StatisticsPage />
+              </RequireStatisticsPreview>
             </RequireAuth>
           }
         />
@@ -237,7 +242,9 @@ export function App() {
           path="/stats/leaderboard"
           element={
             <RequireAuth>
-              <StatisticsLeaderboardPage />
+              <RequireStatisticsPreview>
+                <StatisticsLeaderboardPage />
+              </RequireStatisticsPreview>
             </RequireAuth>
           }
         />
@@ -264,18 +271,22 @@ export function App() {
             </RequireAuth>
           }
         />
-        {/* Find Tracks — the public track library. OpenHome, NOT RequireOrganizer: browsing
+        {/* Find Tracks — the public track library, at /findtracks[/<country>[/<type>]]. OpenHome, NOT RequireOrganizer: browsing
             tracks is the app's front door, and gating it behind organizer mode is what kept it
             invisible to the riders it is for. Only the "Ride it" button inside is organizer-only
             (TrackGalleryCard), the same way TrackCard has always gated "Plan a ride". */}
+        {/* A splat, so a new URL facet (state, area) is a lib/find-tracks-url.ts change only.
+            TracksPage redirects any non-canonical spelling. */}
         <Route
-          path="/routes"
+          path="/findtracks/*"
           element={
             <OpenHome>
               <TracksPage />
             </OpenHome>
           }
         />
+        {/* The address this page had before it became shareable — old bookmarks keep working. */}
+        <Route path="/routes" element={<Navigate to="/findtracks" replace />} />
         <Route
           path="/account"
           element={

@@ -33,6 +33,7 @@ import type { ColorTheme } from "../lib/color-theme";
 import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
 import { Avatar } from "./Avatar";
+import { useCanSeeStatisticsPreview } from "./statisticsPreview";
 import { useMyIdentity } from "./useMyIdentity";
 
 // The drawer is on every screen, so its own weight matters. Most sessions never open the
@@ -53,6 +54,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
   const isOrganizer = useIsOrganizer();
   const setUserMode = useUserModeStore((state) => state.setMode);
   const navigate = useNavigate();
+  const canSeeStatistics = useCanSeeStatisticsPreview();
 
   // The server decides whether this account may create rides at all. Until it has been enabled
   // (a manual user_entitlements.can_organize flag — GET /users/me → canOrganize), nothing
@@ -120,26 +122,31 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               directly as a nested pair under one "Statistics" heading rather than two
               unrelated-looking top-level items.
 
-              PREVIEW GATE: Statistics isn't ready for every rider yet, so the menu entry is
-              hidden for everyone except the account(s) in the server's
-              STATISTICS_PREVIEW_EMAILS list (user.controller.ts) — menu visibility only, the
-              API itself is unaffected. Delete `&& profile?.canSeeStatistics === true` (keep
-              just the signed-in check) once Statistics is ready for every rider. */}
-          {status === "signed-in" && profile?.canSeeStatistics === true && (
+              PREVIEW GATE: Achievements is open to every signed-in rider. The rest of Statistics
+              (My Statistics, Leaderboard) isn't ready yet, so those two entries are shown only
+              to the account(s) in the server's STATISTICS_PREVIEW_EMAILS list
+              (user.controller.ts) — see app/statisticsPreview.tsx, which also guards their
+              routes. Delete the `canSeeStatistics` conditions once Statistics is ready for
+              every rider. */}
+          {status === "signed-in" && (
             <div className="drawer__nav-group">
               <div className="drawer__nav-heading">
                 <BarChart3 aria-hidden="true" />
                 Statistics
               </div>
-              <NavLink to="/stats" end className="drawer__nav-subaction" onClick={onClose}>
-                My Statistics
-              </NavLink>
+              {canSeeStatistics && (
+                <NavLink to="/stats" end className="drawer__nav-subaction" onClick={onClose}>
+                  My Statistics
+                </NavLink>
+              )}
               <NavLink to="/stats/achievements" className="drawer__nav-subaction" onClick={onClose}>
                 Achievements
               </NavLink>
-              <NavLink to="/stats/leaderboard" className="drawer__nav-subaction" onClick={onClose}>
-                Leaderboard
-              </NavLink>
+              {canSeeStatistics && (
+                <NavLink to="/stats/leaderboard" className="drawer__nav-subaction" onClick={onClose}>
+                  Leaderboard
+                </NavLink>
+              )}
             </div>
           )}
           {/* Ungated, like Find Rides and Join: browsing the track library is a rider activity,
@@ -147,7 +154,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               effectively invisible — the page itself was behind RequireOrganizer too (App.tsx),
               so a rider could neither see the link nor reach the URL. Only the "Ride it" button
               on a card stays organizer-only. */}
-          <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
+          <NavLink to="/findtracks" className="drawer__nav-item" onClick={onClose}>
             <MapIcon aria-hidden="true" />
             Find Tracks
           </NavLink>

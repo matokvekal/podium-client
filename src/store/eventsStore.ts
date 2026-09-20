@@ -58,6 +58,11 @@ interface EventsState {
    *  cold start, where only the merged `myRides` survives in cache). */
   joinedRideIds: string[];
   myRidesLoading: boolean;
+  /** True once we know which rides this rider owns — the cached list has painted or the
+   *  request has finished, whichever comes first. False on a fresh page load until then, so
+   *  anything that must exclude "rides I organize" (the Invited list) can wait instead of
+   *  guessing from an empty list and flashing rows that are then taken away. */
+  myRidesSettled: boolean;
   otherRides: EventSummary[];
   otherLoading: boolean;
   otherError: string | null;
@@ -84,20 +89,21 @@ export const useEventsStore = create<EventsState>((set, get) => ({
   myRides: [],
   joinedRideIds: [],
   myRidesLoading: false,
+  myRidesSettled: false,
   otherRides: [],
   otherLoading: true,
   otherError: null,
 
   async loadMyRides(authed) {
     if (!authed) {
-      set({ myRides: [], joinedRideIds: [] });
+      set({ myRides: [], joinedRideIds: [], myRidesSettled: false });
       return;
     }
     const requestId = ++myRidesRequestId;
 
     const cached = await getCachedEvents("mine");
     if (requestId === myRidesRequestId && cached.length > 0) {
-      set({ myRides: cached });
+      set({ myRides: cached, myRidesSettled: true });
     }
 
     set({ myRidesLoading: true });
@@ -116,7 +122,9 @@ export const useEventsStore = create<EventsState>((set, get) => ({
       // only ever reached on the success path, so a failure cannot erase a synced list. The
       // global OFFLINE banner is what tells the rider this is last-synced data.
     } finally {
-      if (requestId === myRidesRequestId) set({ myRidesLoading: false });
+      // Settled even when the request failed: with nothing cached and no network there is
+      // nothing more to learn, and holding the Invited list back forever would be worse.
+      if (requestId === myRidesRequestId) set({ myRidesLoading: false, myRidesSettled: true });
     }
   },
 
@@ -194,7 +202,7 @@ export const useEventsStore = create<EventsState>((set, get) => ({
   },
 
   clearMyRides() {
-    set({ myRides: [], joinedRideIds: [] });
+    set({ myRides: [], joinedRideIds: [], myRidesSettled: false });
     void clearCachedEvents("mine");
     // The v2 per-ride caches (detail, route, participants, live) go too — they are the ones
     // holding a rider's private ride content, not just its name in a list.

@@ -3,7 +3,7 @@
  *
  * WHY THIS FILE EXISTS SEPARATELY FROM TrackGallerySheet. This same browser is now two things:
  *
- *   "page"   /routes — Find Tracks, open to every rider, the app's front door to the library.
+ *   "page"   /findtracks — Find Tracks, open to every rider, the app's front door to the library.
  *   "modal"  the create form's picker, opened from "See other rides".
  *
  * They are the same product. A rider who learns the filters on Find Tracks must find exactly
@@ -17,18 +17,28 @@
  * state, query building, paging, cards — is shared.
  *
  * SCALE IS STILL THE CONSTRAINT (see useTrackGallery and TrackMiniMap): the list pages against
- * the server's own limit/offset, geometry is fetched per card only as it nears the viewport,
- * and only on-screen cards hold a live map.
+ * the server's own limit/offset, every row carries its own tiny route preview so scrolling makes
+ * one request per page and none per card, the detailed line is fetched only when a rider
+ * explores a card's map, and only on-screen cards hold a live map.
  */
 
 import { ArrowUp, ArrowUpDown, Heart, Search, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
+import { type FindTracksFacets, facetsFromCriteria, sameFacets } from "../lib/find-tracks-url";
 import type { EventSummary } from "../lib/local-db";
 import { IL_REGIONS, regionLabel } from "../lib/regions";
 import { DURATION_BUCKETS } from "../lib/ride-duration";
+import {
+  ROUTE_DIFFICULTIES,
+  ROUTE_DIFFICULTY_LABEL,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASONS,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADES,
+} from "../lib/trail-metadata";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import {
   TRACK_SORT_LABEL,
@@ -40,6 +50,7 @@ import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-t
 import { useTrackGalleryFiltersStore } from "../store/trackGalleryFiltersStore";
 import { type DistanceIcon, GravelBikeIcon, MtbBikeIcon, RoadBikeIcon } from "./ActivityIcons";
 import { RangeSlider } from "./RangeSlider";
+import { ShareTracksButton } from "./ShareTracksButton";
 import styles from "./TrackGalleryBrowser.module.css";
 import { TrackGalleryCard } from "./TrackGalleryCard";
 import sheet from "./TrackGallerySheet.module.css";
@@ -50,6 +61,12 @@ export interface TrackGalleryBrowserProps {
   onPick: (event: EventSummary) => void;
   /** Modal only — renders the close button and answers Escape. */
   onClose?: () => void;
+  /**
+   * Page only — ties country + discipline to the address bar (/findtracks/il/mtb).
+   * `facets` is what the URL currently says; `onChange` is called with what it should say after
+   * the rider changes one of those filters. See lib/find-tracks-url.ts.
+   */
+  urlSync?: { facets: FindTracksFacets; onChange: (facets: FindTracksFacets) => void };
 }
 
 /**
@@ -74,7 +91,12 @@ function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBrowserProps) {
+export function TrackGalleryBrowser({
+  variant,
+  onPick,
+  onClose,
+  urlSync,
+}: TrackGalleryBrowserProps) {
   const isModal = variant === "modal";
   const [source, setSource] = useState<GallerySource>("all");
   const [search, setSearch] = useState("");
@@ -95,15 +117,37 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
   const setSort = useTrackGalleryFiltersStore((s) => s.setSort);
   const seedCountry = useTrackGalleryFiltersStore((s) => s.seedCountry);
   const clearFiltersAction = useTrackGalleryFiltersStore((s) => s.clearFilters);
-  const clearFilters = () => clearFiltersAction(defaultCountry);
+  const clearFilters = () => {
+    clearFiltersAction(defaultCountry);
+    urlSync?.onChange(facetsFromCriteria({ country: defaultCountry, surface: [] }));
+  };
   const activeCount = trackGalleryActiveFilterCount(criteria, defaultCountry);
 
   // Seed the country filter from the rider's country once — an Israeli opens Find Tracks scoped
   // to Israel without touching anything. seedCountry is a no-op after the first call / a
   // persisted choice.
+  //
+  // Not when the address names a country: a shared /findtracks/il/mtb link must show what its
+  // sender saw, whoever opens it. The effect below applies the URL instead.
+  const urlCountry = urlSync?.facets.country;
+  const urlType = urlSync?.facets.type;
   useEffect(() => {
-    seedCountry(defaultCountry);
-  }, [seedCountry, defaultCountry]);
+    if (urlCountry === undefined) seedCountry(defaultCountry);
+  }, [seedCountry, defaultCountry, urlCountry]);
+
+  // Address bar -> filters. Runs when the URL's country or discipline changes (opening a link,
+  // back/forward). It skips when the filters already imply this URL — that is what stops the
+  // reverse sync (patch, below) from being undone here: a rider who ticks two disciplines gets a
+  // URL naming only the country, and this must not answer by clearing the second one.
+  // A bare /findtracks names nothing and leaves the rider's own filters alone.
+  useEffect(() => {
+    if (urlCountry === undefined) return;
+    const current = useTrackGalleryFiltersStore.getState().criteria;
+    if (sameFacets(facetsFromCriteria(current), { country: urlCountry, type: urlType })) return;
+    // seedCountry first so the "first visit" seed can never overwrite a country the URL chose.
+    seedCountry(urlCountry);
+    setCriteria({ country: urlCountry, surface: urlType ? [urlType] : [] });
+  }, [urlCountry, urlType, seedCountry, setCriteria]);
 
   // A signed-out rider has no favourites, and the server ignores the filter for them. If a
   // stored preference still has it on — they filtered, then signed out — clear it rather than
@@ -112,8 +156,19 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
     if (!signedIn && criteria.favoritesOnly) setCriteria({ favoritesOnly: false });
   }, [signedIn, criteria.favoritesOnly, setCriteria]);
 
-  const { rides, total, loading, loadingMore, error, hasMore, loadMore, requestRoute, routes } =
-    useTrackGallery(source, search, criteria, sort);
+  const { rides, total, loading, loadingMore, error, hasMore, loadMore } = useTrackGallery(
+    source,
+    search,
+    criteria,
+    sort,
+  );
+
+  // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
+  // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the
+  // search box or opening a filter panel does not re-render every card in a long list.
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const pickTrack = useCallback((event: EventSummary) => onPickRef.current(event), []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -186,6 +241,11 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
 
   function patch(next: Partial<TrackGalleryCriteria>) {
     setCriteria(next);
+    // Country and discipline live in the address bar too, so a link copied from here reopens
+    // this exact view. Every other filter stays out of it.
+    if (urlSync && ("country" in next || "surface" in next)) {
+      urlSync.onChange(facetsFromCriteria({ ...criteria, ...next }));
+    }
   }
 
   const showCount = loading ? "…" : String(total);
@@ -214,10 +274,8 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
             <TrackGalleryCard
               key={event.id}
               event={event}
-              route={routes.get(event.id)}
-              usedByRides={routes.get(event.id)?.usedByRides}
-              onVisible={requestRoute}
-              onPick={onPick}
+              anonymousDetail={source === "all"}
+              onPick={pickTrack}
               variant={variant}
             />
           ))}
@@ -272,6 +330,8 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
             );
           })}
         </div>
+
+        {urlSync && <ShareTracksButton facets={facetsFromCriteria(criteria)} />}
 
         {isModal && (
           <button
@@ -514,6 +574,47 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
             />
           </div>
 
+          {/* ROUTE DIFFICULTY / SEASON / SHADE (sql/041) — describe an off-road TRACK, so they are
+              offered only while the ride-type filter includes MTB or Gravel. Elsewhere they would
+              be three groups that can only ever match nothing. */}
+          {(criteria.surface.includes("mtb") || criteria.surface.includes("gravel")) && (
+            <>
+              <FilterGroup label="Route difficulty">
+                {ROUTE_DIFFICULTIES.map((key) => (
+                  <ChipButton
+                    key={key}
+                    on={criteria.routeDifficulty.includes(key)}
+                    onClick={() => patch({ routeDifficulty: toggle(criteria.routeDifficulty, key) })}
+                  >
+                    {ROUTE_DIFFICULTY_LABEL[key]}
+                  </ChipButton>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Season">
+                {TRAIL_SEASONS.map((key) => (
+                  <ChipButton
+                    key={key}
+                    on={criteria.season.includes(key)}
+                    onClick={() => patch({ season: toggle(criteria.season, key) })}
+                  >
+                    {TRAIL_SEASON_LABEL[key]}
+                  </ChipButton>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Shade">
+                {TRAIL_SHADES.map((key) => (
+                  <ChipButton
+                    key={key}
+                    on={criteria.shade.includes(key)}
+                    onClick={() => patch({ shade: toggle(criteria.shade, key) })}
+                  >
+                    {TRAIL_SHADE_LABEL[key]}
+                  </ChipButton>
+                ))}
+              </FilterGroup>
+            </>
+          )}
+
           <FilterGroup label="Ride duration">
             {DURATION_BUCKETS.map((b) => (
               <ChipButton
@@ -680,6 +781,27 @@ function buildActiveChips(
       key: `duration:${key}`,
       label: meta?.label ?? key,
       clear: () => patch({ durationBuckets: c.durationBuckets.filter((v) => v !== key) }),
+    });
+  }
+  for (const key of c.routeDifficulty) {
+    chips.push({
+      key: `difficulty:${key}`,
+      label: ROUTE_DIFFICULTY_LABEL[key],
+      clear: () => patch({ routeDifficulty: c.routeDifficulty.filter((v) => v !== key) }),
+    });
+  }
+  for (const key of c.season) {
+    chips.push({
+      key: `season:${key}`,
+      label: TRAIL_SEASON_LABEL[key],
+      clear: () => patch({ season: c.season.filter((v) => v !== key) }),
+    });
+  }
+  for (const key of c.shade) {
+    chips.push({
+      key: `shade:${key}`,
+      label: TRAIL_SHADE_LABEL[key],
+      clear: () => patch({ shade: c.shade.filter((v) => v !== key) }),
     });
   }
   if (c.distanceKm[0] > DISTANCE_MIN || c.distanceKm[1] < DISTANCE_MAX) {

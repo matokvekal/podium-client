@@ -46,6 +46,14 @@ export type EventStatus =
   | "finished"
   | "cancelled";
 
+/** The tiny route preview a list row carries — see EventSummary.preview. */
+export interface EventPreview {
+  /** [lat, lng] pairs, at most 60. */
+  points: [number, number][];
+  /** Whole metres, one per point, null where a point had no reading. Absent = no elevation. */
+  elevations?: (number | null)[];
+}
+
 export interface EventSummary {
   id: string;
   code: string;
@@ -144,10 +152,22 @@ export interface EventSummary {
   region?: string | null;
   /**
    * How many rides have been built on this ride's attached route (route_copies count). ONLY
-   * GET /events/public fills this in; absent elsewhere, and the track card then falls back to
-   * its own per-card `?preview=1` fetch. Optional / nullable for the same reasons.
+   * GET /events/public fills this in; absent elsewhere, and the track card then shows a dash.
+   * Optional / nullable for the same reasons.
    */
   downloads?: number | null;
+  /**
+   * The attached route's tiny card preview (server: routes.thumb_points, sql/046) — at most 60
+   * points plus a parallel whole-metre elevation series. Sent inside every row of GET
+   * /events/public, so a Find Tracks card draws its map and climb profile with NO request of its
+   * own. Display only: the detailed line is GET /events/:id/route (fetched when a rider explores a
+   * card's map) and the original file is never loaded by the gallery.
+   *
+   * `null` = the ride has no drawable route (or the server has no preview yet); absent = a row
+   * from any other list (GET /events carries none), a cached row, or an older server. Either way
+   * the card simply draws no line — never a fabricated one.
+   */
+  preview?: EventPreview | null;
   /**
    * The ATTACHED TRACK's id (routes.id), from toEventSummary. Likes and hearts belong to the
    * track, not the ride — one `routes` row is shared by every ride built on it — so this is

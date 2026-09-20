@@ -17,13 +17,14 @@
  * state, query building, paging, cards — is shared.
  *
  * SCALE IS STILL THE CONSTRAINT (see useTrackGallery and TrackMiniMap): the list pages against
- * the server's own limit/offset, geometry is fetched per card only as it nears the viewport,
- * and only on-screen cards hold a live map.
+ * the server's own limit/offset, every row carries its own tiny route preview so scrolling makes
+ * one request per page and none per card, the detailed line is fetched only when a rider
+ * explores a card's map, and only on-screen cards hold a live map.
  */
 
 import { ArrowUp, ArrowUpDown, Heart, Search, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { detectDefaultCountryCode, flagEmoji, orderedCountries } from "../lib/countries";
 import type { EventSummary } from "../lib/local-db";
@@ -112,8 +113,19 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
     if (!signedIn && criteria.favoritesOnly) setCriteria({ favoritesOnly: false });
   }, [signedIn, criteria.favoritesOnly, setCriteria]);
 
-  const { rides, total, loading, loadingMore, error, hasMore, loadMore, requestRoute, routes } =
-    useTrackGallery(source, search, criteria, sort);
+  const { rides, total, loading, loadingMore, error, hasMore, loadMore } = useTrackGallery(
+    source,
+    search,
+    criteria,
+    sort,
+  );
+
+  // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
+  // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the
+  // search box or opening a filter panel does not re-render every card in a long list.
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const pickTrack = useCallback((event: EventSummary) => onPickRef.current(event), []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -214,10 +226,8 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
             <TrackGalleryCard
               key={event.id}
               event={event}
-              route={routes.get(event.id)}
-              usedByRides={routes.get(event.id)?.usedByRides}
-              onVisible={requestRoute}
-              onPick={onPick}
+              anonymousDetail={source === "all"}
+              onPick={pickTrack}
               variant={variant}
             />
           ))}

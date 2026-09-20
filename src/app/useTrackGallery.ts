@@ -1,36 +1,40 @@
 /**
- * The data behind the track gallery: a paged list of rides, and each one's route geometry
- * fetched only when its card is actually on screen.
+ * The data behind the track gallery: a paged list of rides.
  *
  * TWO SEPARATE CONCERNS, deliberately not merged:
  *
  *   1. PAGING THE LIST. GET /events/public has taken limit/offset and returned a real `total`
- *      all along; nothing in the app has ever used it, because apiRequest unwraps the envelope
- *      and drops `total` (hence apiRequestPaged in lib/api-client.ts, added for this).
- *      eventsStore asks for limit=100 once and treats that as "all rides" — fine for a home
- *      screen, useless for a gallery meant to scroll through thousands.
+ *      all along; nothing in the app had used it, because apiRequest unwraps the envelope and
+ *      drops `total` (hence apiRequestPaged in lib/api-client.ts, added for this). eventsStore
+ *      asks for limit=100 once and treats that as "all rides" — fine for a home screen, useless
+ *      for a gallery meant to scroll through thousands.
  *
- *   2. GEOMETRY PER CARD. The list payload carries no route: distance and climb on an event
- *      are the organizer's own typed numbers, not the track's. The line itself is one call per
- *      ride (GET /events/:id/route), so it is fetched lazily as cards come into view and
- *      cached in a module-level Map that outlives the modal. Open the gallery, scroll, close
- *      it, open it again — the routes already looked at are still there.
+ *   2. GEOMETRY. There is none to fetch here. Every row carries `preview` — a 60-point line and
+ *      its elevations (server: routes.thumb_points, sql/046) — so a card draws itself from the
+ *      row. This hook used to make one GET /events/:id/route per card as it scrolled into view;
+ *      the API rate-limits at 300 requests per 15 minutes, so about twelve pages of scrolling
+ *      used it all up, after which every map spun and the list itself failed with "Could not
+ *      load tracks right now". Scrolling is now one request per page. The detailed line is
+ *      fetched only when a rider explores a card's map (track-detail.ts), and the original GPX
+ *      only on an explicit download.
  *
  * "MY RIDES" IS NOT A FILTER on the public endpoint. It is GET /events?filter=mine merged with
  * ?filter=joined, which eventsStore already loads, dedupes and caches to IndexedDB. This hook
  * reads that store rather than growing a second, worse copy of it; the search box filters it
- * in memory, since it is one page by definition.
+ * in memory, since it is one page by definition. GET /events rows carry no `preview`, so those
+ * cards draw no route line for now (and make no per-card fetch either).
  *
  * RIDES WITHOUT A TRACK. The list endpoint cannot filter on "has a route", so some rides come
- * back with nothing to draw. They are dropped from the grid once their fetch resolves null,
- * and the caller keeps loading pages so the grid still fills. Never a fabricated line, never a
- * card that pretends — the rule stated in CopyTrackSheet and EventCreatePage.
+ * back with nothing to draw. They are dropped from the grid and the caller keeps loading pages
+ * so the grid still fills. Never a fabricated line, never a card that pretends — the rule stated
+ * in CopyTrackSheet and EventCreatePage. "No track" is decided by `routeId`, not by the preview:
+ * a ride whose route exists but whose preview the server could not build (a database that has
+ * not run sql/046 yet) still shows, just without a line.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiRequest, apiRequestPaged } from "../lib/api-client";
-import type { EventRoute } from "../lib/event-route";
+import { apiRequestPaged } from "../lib/api-client";
 import type { EventSummary } from "../lib/local-db";
 import {
   applyTrackGalleryCriteria,
@@ -39,41 +43,17 @@ import {
   type TrackGallerySort,
 } from "../lib/track-gallery-filter";
 import { useEventsStore } from "../store/eventsStore";
-import { thinPoints } from "./track-thumbnail";
 
 /** One network page. Smaller than the server's max of 100 — this fills about two screens of
- * grid, and every row costs a follow-up geometry call, so a huge page just queues work the
- * rider may never scroll to. */
+ * grid, and every row carries its preview line, so a huge page is bytes the rider may never
+ * scroll to. */
 const PAGE_SIZE = 24;
 
 export type GallerySource = "all" | "mine";
 
-/**
- * Geometry cache, keyed by event id, shared by every gallery instance for the life of the tab.
- * `null` is a real cached answer meaning "this ride has no route" — distinct from a missing
- * key, which means "not asked yet". Storing the negative is what stops a routeless ride being
- * re-requested every time it scrolls past.
- */
-const routeCache = new Map<string, GalleryRoute | null>();
-
-/** Points kept per cached route. Comfortably above what either consumer can resolve — the card
- * map thins again to 400, the thumbnail to 80 — and ~8x smaller than what the server sends. */
-const CACHED_POINT_TARGET = 600;
-const inFlight = new Set<string>();
-
-/**
- * The geometry response, plus the reuse count when the server reports one.
- *
- * `usedByRides` is how many rides have been built on this track — the honest version of a
- * "downloads" number, since nothing in this product downloads a track file. It rides along on
- * the `?preview=1` response the gallery already makes rather than costing a second call per
- * card. A server that has not shipped it yet simply omits it, and the card drops the stat.
- */
-export type GalleryRoute = EventRoute & { usedByRides?: number };
-
-/** A ride whose route came back missing or too short to draw. */
-function isRouteless(route: GalleryRoute | null | undefined): boolean {
-  return route === null || (route != null && route.points.length < 2);
+/** A ride with no track at all. Decided by `routeId`, which the list has always carried. */
+function hasNoTrack(ride: EventSummary): boolean {
+  return ride.routeId === null;
 }
 
 interface UseTrackGalleryResult {
@@ -84,10 +64,6 @@ interface UseTrackGalleryResult {
   error: string | null;
   hasMore: boolean;
   loadMore: () => void;
-  /** Called by a card when it scrolls into view; resolves and caches that ride's route. */
-  requestRoute: (eventId: string) => void;
-  /** Resolved geometry by event id. `undefined` = not asked yet, `null` = asked, none exists. */
-  routes: ReadonlyMap<string, GalleryRoute | null>;
 }
 
 export function useTrackGallery(
@@ -119,34 +95,18 @@ export function useTrackGallery(
   const [publicLoading, setPublicLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /**
-   * Resolved geometry, mirrored out of the module cache into state so React actually re-renders
-   * when an answer lands — the cache alone is a mutable Map and nothing would notice it change.
-   * Seeded FROM the cache, so reopening the gallery paints the routes already known instead of
-   * re-fetching them and flashing placeholders.
-   */
-  const [routes, setRoutes] = useState<ReadonlyMap<string, GalleryRoute | null>>(
-    () => new Map(routeCache),
-  );
-
   // Guards every async write: a filter change while a page is in flight must not append that
   // page to the new list. Same one-request-wins pattern as tracksStore and eventsStore.
   const requestIdRef = useRef(0);
   const offsetRef = useRef(0);
-  // Read inside requestRoute so that callback can stay identity-stable — the cards' observers
-  // depend on it, and a new identity every time the toggle moves would rebuild all of them.
-  const sourceRef = useRef(source);
-  sourceRef.current = source;
-
   // Loaded ONLY when the rider actually asks for their own rides, not on open.
   //
-  // This is authenticated, and the gallery is the one screen that fires a burst of requests the
-  // moment it opens — two here plus one per visible card. If the 15-minute access token has
-  // expired while the organizer was filling in the form, that burst is a wall of 401s, and a
-  // refused refresh ends in SESSION_EXPIRED, which AuthContext handles with a hard
-  // window.location.replace("/login"). The document blanks mid-navigation: the gallery paints,
-  // then the screen goes white. Nothing needs My Rides until the toggle is pressed, so it is
-  // not fetched until then.
+  // This is authenticated. If the 15-minute access token has expired while the organizer was
+  // filling in the form, a refused refresh ends in SESSION_EXPIRED, which AuthContext handles
+  // with a hard window.location.replace("/login") — the document blanks mid-navigation. The
+  // gallery used to open with a burst of authenticated calls, one per visible card, which made
+  // that likely; it is now two requests. Nothing needs My Rides until the toggle is pressed, so
+  // it is still not fetched until then.
   useEffect(() => {
     if (source !== "mine") return;
     loadMyRides(status === "signed-in");
@@ -175,9 +135,9 @@ export function useTrackGallery(
       // have I liked this track, have I saved it — and so `favoritesOnly` has someone to scope
       // to. Without it every heart renders empty however many the rider has saved.
       //
-      // This is ONE request per page, not one per card, so it does not reopen the 401-burst
-      // problem described below: apiRequest refreshes and retries a single expired token
-      // quietly, which is exactly what it is for.
+      // This is ONE request per page, not one per card, so it cannot produce a burst of 401s:
+      // apiRequest refreshes and retries a single expired token quietly, which is exactly what
+      // it is for.
       const page = await apiRequestPaged<EventSummary>(`/events/public?${params.toString()}`, {
         anonymous: !signedInRef.current,
       });
@@ -234,60 +194,14 @@ export function useTrackGallery(
     })();
   }, [fetchPage, source, publicLoading, loadingMore, publicTotal]);
 
-  const requestRoute = useCallback((eventId: string) => {
-    if (routeCache.has(eventId) || inFlight.has(eventId)) return;
-    inFlight.add(eventId);
-    (async () => {
-      try {
-        // `preview=1` asks for the gallery's shape: a thinned line plus the reuse count. A
-        // server that does not know the parameter ignores it and answers with the ordinary
-        // full-geometry body, which is a perfectly good answer — the thumbnail thins whatever
-        // it is given and the card drops the count. So this is safe to ship ahead of the
-        // server, and gets better the moment the server catches up.
-        // ANONYMOUS FOR THE PUBLIC LIST. The server serves a public ride's route without a
-        // token — verified against production — so sending the bearer token bought nothing and
-        // made every card one more 401 in the burst described above, which is what could take
-        // the whole session down. My Rides is the exception: it can contain a PRIVATE ride,
-        // whose route is only readable as its owner, so those stay authenticated.
-        const route = await apiRequest<GalleryRoute | null>(`/events/${eventId}/route?preview=1`, {
-          anonymous: sourceRef.current === "all",
-        });
-        // THINNED BEFORE IT IS CACHED, and this is the one that matters for memory. A saved
-        // route is ~3,000 points and about 116 KB of JSON; the cache is module-level and holds
-        // every ride the rider has scrolled past for the life of the tab, so at 300 rides the
-        // untrimmed version is tens of megabytes of JSON parsed into hundreds of thousands of
-        // tiny arrays. Nothing here needs that precision: the only consumers are a card-sized
-        // map and an 80-point SVG thumbnail.
-        //
-        // Safe because this copy is DISPLAY ONLY — picking a track re-fetches the full,
-        // untouched geometry in EventCreatePage.pickEventToCopy, so what gets saved onto a new
-        // ride is never the thinned line.
-        const stored: GalleryRoute | null = route
-          ? { ...route, points: thinPoints(route.points, CACHED_POINT_TARGET) }
-          : null;
-        routeCache.set(eventId, stored);
-        setRoutes((prev) => new Map(prev).set(eventId, stored));
-      } catch {
-        // A failed fetch is NOT "this ride has no track" — leaving it uncached lets it retry
-        // the next time the card scrolls into view, rather than hiding a ride over one blip.
-      } finally {
-        inFlight.delete(eventId);
-      }
-    })();
-  }, []);
-
   const rides = useMemo(() => {
     // "All rides" is already filtered AND sorted by the server (buildTrackGalleryQuery). "My
     // rides" is one fully-loaded page from the store, so the identical criteria + sort are
     // applied here in memory instead — same helper, so the two sources behave the same.
     const base =
       source === "mine" ? applyTrackGalleryCriteria(myRides, criteria, sort, search) : publicRides;
-    // Hidden only once the answer is known. A ride still being fetched stays in the grid
-    // showing its placeholder, so cards do not flicker in and out while scrolling. A ride
-    // already proven routeless in an earlier opening of the modal is filtered on first paint,
-    // because `routes` is seeded from the cache that outlives this component.
-    return base.filter((e) => !isRouteless(routes.get(e.id)));
-  }, [source, myRides, publicRides, criteria, sort, search, routes]);
+    return base.filter((e) => !hasNoTrack(e));
+  }, [source, myRides, publicRides, criteria, sort, search]);
 
   const loading = source === "mine" ? myRidesLoading && myRides.length === 0 : publicLoading;
   const total = source === "mine" ? rides.length : publicTotal;
@@ -301,7 +215,5 @@ export function useTrackGallery(
     error,
     hasMore,
     loadMore,
-    requestRoute,
-    routes,
   };
 }

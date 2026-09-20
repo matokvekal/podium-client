@@ -2,17 +2,14 @@
  * @vitest-environment jsdom
  */
 
-// The pilot's promises, end to end through the component: an ineligible viewer sees nothing and
-// causes NO network request and NO storage write; an eligible one gets the strip, drawn from ONE
-// request for one place, cached under the event's own key.
+// End to end through the component: any viewer of a ride with a route and a start time gets the
+// strip, drawn from ONE request for one place and cached under the event's own key; a ride with
+// no start time, or a provider that is down, gets nothing and never an error.
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCountryStore } from "../store/countryStore";
 import { WindStrip } from "./WindStrip";
-
-let profile: { canSeeWindForecast?: boolean } | null = null;
-vi.mock("../auth/AuthContext", () => ({ useAuth: () => ({ profile }) }));
 
 const POINTS: [number, number][] = [
   [32.0, 34.8],
@@ -66,7 +63,7 @@ function strip(overrides: Partial<Parameters<typeof WindStrip>[0]["event"]> = {}
   const { iso } = startsInTwoDays();
   return (
     <WindStrip
-      event={{ id: "evt-1", startsAt: iso, isOwner: true, myParticipant: null, ...overrides }}
+      event={{ id: "evt-1", startsAt: iso, ...overrides }}
       points={POINTS}
       durationMin={90}
       routeDistanceKm={19}
@@ -74,43 +71,18 @@ function strip(overrides: Partial<Parameters<typeof WindStrip>[0]["event"]> = {}
   );
 }
 
-describe("WindStrip gating", () => {
-  it("not enabled for this account: renders nothing, no request, nothing stored", async () => {
+describe("WindStrip availability", () => {
+  it("any viewer gets the strip — no account flag, no ownership, no registration needed", async () => {
     const fetchMock = mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: false };
-    const { container } = render(strip());
-    await new Promise((r) => setTimeout(r, 30));
-    expect(container.innerHTML).toBe("");
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(localStorage.length).toBe(0);
-  });
-
-  it("enabled account but a stranger to the ride: renders nothing, no request, nothing stored", async () => {
-    const fetchMock = mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: true };
-    const { container } = render(strip({ isOwner: false, myParticipant: null }));
-    await new Promise((r) => setTimeout(r, 30));
-    expect(container.innerHTML).toBe("");
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(localStorage.length).toBe(0);
-  });
-
-  it("enabled account and a rider still awaiting approval: nothing", async () => {
-    const fetchMock = mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: true };
-    const { container } = render(
-      strip({ isOwner: false, myParticipant: { registrationStatus: "waiting_approval" } }),
-    );
-    await new Promise((r) => setTimeout(r, 30));
-    expect(container.innerHTML).toBe("");
-    expect(fetchMock).not.toHaveBeenCalled();
+    render(strip());
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(4));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("WindStrip for an eligible owner", () => {
+describe("WindStrip forecast", () => {
   it("draws one column per hour of the ride window from ONE request, and caches under the event key", async () => {
     const fetchMock = mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: true };
     render(strip());
 
     // 90 min ride → window is start−1h … end+1h (3.5 h) → hourly columns at −1, 0, +1, +2 h.
@@ -141,7 +113,6 @@ describe("WindStrip for an eligible owner", () => {
 
   it("a second mount inside the TTL reads the cache and makes no second request", async () => {
     const fetchMock = mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: true };
     const first = render(strip());
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(4));
     first.unmount();
@@ -153,7 +124,6 @@ describe("WindStrip for an eligible owner", () => {
 
   it("uses the Hebrew labels for an Israeli rider", async () => {
     mockFetch(startsInTwoDays().ms);
-    profile = { canSeeWindForecast: true };
     useCountryStore.setState({ code: "IL" });
     render(strip());
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(4));
@@ -168,7 +138,6 @@ describe("WindStrip for an eligible owner", () => {
       "fetch",
       vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })),
     );
-    profile = { canSeeWindForecast: true };
     const { container } = render(strip());
     await new Promise((r) => setTimeout(r, 30));
     expect(container.innerHTML).toBe("");
@@ -176,7 +145,6 @@ describe("WindStrip for an eligible owner", () => {
 
   it("a ride with no start time gets no strip and no request", async () => {
     const fetchMock = mockFetch(Date.now());
-    profile = { canSeeWindForecast: true };
     const { container } = render(strip({ startsAt: null }));
     await new Promise((r) => setTimeout(r, 30));
     expect(container.innerHTML).toBe("");

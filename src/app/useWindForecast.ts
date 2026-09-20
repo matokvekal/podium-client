@@ -1,15 +1,13 @@
 // React binding for the wind pilot: turns "this ride, this viewer" into a forecast or null.
 //
-// When `eligible` is false this does NOTHING — no plan, no cache read, no request — which is the
-// pilot's guarantee for everyone outside it. Eligibility is decided by the caller through
-// lib/wind-eligibility.ts; this hook does not look at who the user is.
+// With no route, start time or duration there is nothing to plan, and it does NOTHING — no cache
+// read, no request. Any failure on the way just leaves the forecast null.
 
 import { useEffect, useMemo, useState } from "react";
 import { loadWindForecast, type WindForecast } from "../lib/wind-forecast";
 import { planWindWindow } from "../lib/wind-model";
 
 interface UseWindForecastInput {
-  eligible: boolean;
   eventId: string | null | undefined;
   points: readonly [number, number][] | null | undefined;
   /** ISO start instant of the ride. */
@@ -19,7 +17,6 @@ interface UseWindForecastInput {
 }
 
 export function useWindForecast({
-  eligible,
   eventId,
   points,
   startsAt,
@@ -28,10 +25,10 @@ export function useWindForecast({
   const [forecast, setForecast] = useState<WindForecast | null>(null);
 
   const plan = useMemo(() => {
-    if (!eligible || !points || !startsAt || durationMin == null) return null;
+    if (!points || !startsAt || durationMin == null) return null;
     const startMs = Date.parse(startsAt);
     return planWindWindow({ points, startMs, durationMin });
-  }, [eligible, points, startsAt, durationMin]);
+  }, [points, startsAt, durationMin]);
 
   // Keyed on the plan's signature rather than its identity: a route reload that hands back the
   // same points must not re-run this (it would only be a cache hit, but there is no reason to).
@@ -39,7 +36,7 @@ export function useWindForecast({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `plan` is read through `signature`, which fully identifies it.
   useEffect(() => {
-    if (!eligible || !eventId || !plan) {
+    if (!eventId || !plan) {
       setForecast(null);
       return;
     }
@@ -52,7 +49,7 @@ export function useWindForecast({
         // Aborted, or nothing to show: the strip just stays absent.
       });
     return () => controller.abort();
-  }, [eligible, eventId, signature]);
+  }, [eventId, signature]);
 
   return forecast;
 }

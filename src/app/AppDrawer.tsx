@@ -154,7 +154,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               effectively invisible — the page itself was behind RequireOrganizer too (App.tsx),
               so a rider could neither see the link nor reach the URL. Only the "Ride it" button
               on a card stays organizer-only. */}
-          <NavLink to="/routes" className="drawer__nav-item" onClick={onClose}>
+          <NavLink to="/findtracks" className="drawer__nav-item" onClick={onClose}>
             <MapIcon aria-hidden="true" />
             Find Tracks
           </NavLink>

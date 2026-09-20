@@ -5,9 +5,10 @@ import { defineConfig } from "vite";
 // can always say which build it is. Imported rather than read with node:fs so the config
 // still typechecks without @types/node.
 import pkg from "./package.json";
+import { findTracksOgPlugin } from "./vite-plugin-findtracks-og";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), findTracksOgPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },

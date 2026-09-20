@@ -123,7 +123,7 @@ export function riderSquareIcon(
  * The viewer's own device position — a distinct blue "you are here" marker, never confused
  * with a rider square or the red SOS marker. Shown while this rider is sharing location; that
  * sharing now also transmits to the server (app/useLocationBroadcast.ts) — see
- * ELNINO_CLIENT_AGENT_SOURCE_OF_TRUTH.md §14.
+ * gilad/agents/client-source-of-truth.md §14.
  *
  * With a known heading it is a Google-/Waze-style navigation arrow (a chevron pointing the way
  * the rider is moving) sitting in a soft accuracy halo; with no heading yet — first fix, or

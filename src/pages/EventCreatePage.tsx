@@ -108,6 +108,7 @@ import {
   Accessibility,
   AlertTriangle,
   Bike,
+  CalendarDays,
   Check,
   Clock,
   Coffee,
@@ -124,6 +125,7 @@ import {
   Radio,
   Ruler,
   ShieldCheck,
+  Sun,
   Target,
   Timer,
   Trash2,
@@ -186,6 +188,21 @@ import {
   terrainOptionsFor,
   terrainScaleNameFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTIES,
+  ROUTE_DIFFICULTY_LABEL,
+  type RouteDifficulty,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASONS,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADES,
+  type TrailSeason,
+  type TrailShade,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
 import { useMediaQuery } from "../lib/use-media-query";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
@@ -222,6 +239,11 @@ interface ExistingEvent {
   /** How technical the ground is, 1-5 (sql/038-event-terrain-grade.sql). Absent on an older
    *  server or a ride created before this existed; edit mode then starts the picker unset. */
   terrainGrade?: number | null;
+  /** How hard the track is, when it is pleasant, how shaded (sql/041). Absent on an older server
+   *  or a road ride; edit mode then starts the three pickers unset. */
+  routeDifficulty?: string | null;
+  season?: string | null;
+  shade?: string | null;
   /** EFFECTIVE elevation gain (m) the server persists — the organizer's manual/imported value,
    *  else the attached route's climb. Prefills the Climb field in edit mode. See
    *  sql/021-events-elevation-gain.sql. */
@@ -425,6 +447,11 @@ export function EventCreatePage() {
    * yesterday's gravel road says nothing about today's trail.
    */
   const [terrainGrade, setTerrainGrade] = useState<TerrainGrade | null>(null);
+  // Route difficulty / season / shade (sql/041) — mtb and gravel only, like terrain. Server-only
+  // state for the same reason: this device cannot know them for a ride it did not create.
+  const [routeDifficulty, setRouteDifficulty] = useState<RouteDifficulty | null>(null);
+  const [season, setSeason] = useState<TrailSeason | null>(null);
+  const [shade, setShade] = useState<TrailShade | null>(null);
   // Distance/climb — near the difficulty picker below, same "no server column, persisted via
   // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
   // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
@@ -689,6 +716,9 @@ export function EventCreatePage() {
         // Server-only: a terrain grade is not something this device can know about a ride it
         // did not create, so there is no local-extras fallback for it.
         setTerrainGrade(asTerrainGrade(found.terrainGrade));
+        setRouteDifficulty(asRouteDifficulty(found.routeDifficulty));
+        setSeason(asTrailSeason(found.season));
+        setShade(asTrailShade(found.shade));
         // Server-persisted effective elevation wins — it survives logout/login and is the
         // same on every device, and `serverHasElevation` keeps the stale local extras below
         // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
@@ -1312,6 +1342,11 @@ export function EventCreatePage() {
             // ride is no longer off-road — switching an MTB ride to road must not leave an S3
             // claim standing on a ride that no longer has a scale to read it against.
             terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+            // Route difficulty / season / shade (sql/041) — same rule as the grade: always sent,
+            // null once the ride is no longer mtb / gravel so no stale claim stays on a road ride.
+            routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+            season: trailMetadataApplies(activityType) ? season : null,
+            shade: trailMetadataApplies(activityType) ? shade : null,
           },
         });
         await saveExtras(eventId);
@@ -1380,6 +1415,10 @@ export function EventCreatePage() {
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
           terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+          // Route difficulty / season / shade (sql/041) — off-road rides only, null otherwise.
+          routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+          season: trailMetadataApplies(activityType) ? season : null,
+          shade: trailMetadataApplies(activityType) ? shade : null,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -2051,6 +2090,73 @@ export function EventCreatePage() {
                     tyres.
                   </p>
                 </div>
+              )}
+
+              {/* ROUTE DIFFICULTY / SEASON / SHADE — mtb and gravel only (sql/041). Three plain
+                  selects in the same style as Terrain above, and rendered ONLY for off-road
+                  rides so a road ride carries no empty MTB fields. Route difficulty is how hard
+                  the TRACK is: not the Level above (who the ride is pitched at) and not Terrain
+                  (the ground). Values are kept through a discipline switch, like the grade. */}
+              {trailMetadataApplies(activityType) && (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="routeDifficulty">
+                      <Gauge aria-hidden="true" />
+                      Route difficulty
+                    </label>
+                    <select
+                      id="routeDifficulty"
+                      className={styles.input}
+                      value={routeDifficulty ?? ""}
+                      onChange={(e) => setRouteDifficulty(asRouteDifficulty(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {ROUTE_DIFFICULTIES.map((key) => (
+                        <option key={key} value={key}>
+                          {ROUTE_DIFFICULTY_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailSeason">
+                      <CalendarDays aria-hidden="true" />
+                      Season
+                    </label>
+                    <select
+                      id="trailSeason"
+                      className={styles.input}
+                      value={season ?? ""}
+                      onChange={(e) => setSeason(asTrailSeason(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SEASONS.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SEASON_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailShade">
+                      <Sun aria-hidden="true" />
+                      Shade
+                    </label>
+                    <select
+                      id="trailShade"
+                      className={styles.input}
+                      value={shade ?? ""}
+                      onChange={(e) => setShade(asTrailShade(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SHADES.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SHADE_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
 
               {/* Distance/climb, near the difficulty picker above — auto-filled from whatever

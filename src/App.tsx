@@ -271,18 +271,22 @@ export function App() {
             </RequireAuth>
           }
         />
-        {/* Find Tracks — the public track library. OpenHome, NOT RequireOrganizer: browsing
+        {/* Find Tracks — the public track library, at /findtracks[/<country>[/<type>]]. OpenHome, NOT RequireOrganizer: browsing
             tracks is the app's front door, and gating it behind organizer mode is what kept it
             invisible to the riders it is for. Only the "Ride it" button inside is organizer-only
             (TrackGalleryCard), the same way TrackCard has always gated "Plan a ride". */}
+        {/* A splat, so a new URL facet (state, area) is a lib/find-tracks-url.ts change only.
+            TracksPage redirects any non-canonical spelling. */}
         <Route
-          path="/routes"
+          path="/findtracks/*"
           element={
             <OpenHome>
               <TracksPage />
             </OpenHome>
           }
         />
+        {/* The address this page had before it became shareable — old bookmarks keep working. */}
+        <Route path="/routes" element={<Navigate to="/findtracks" replace />} />
         <Route
           path="/account"
           element={

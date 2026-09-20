@@ -21,18 +21,26 @@ import {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /**
+   * How long the server asked the caller to wait before trying again, in whole seconds — from
+   * the `Retry-After` header (or the rate limiter's `RateLimit-Reset`) of a 429. Null when the
+   * response carried neither, and on every error that is not a rate-limit refusal.
+   */
+  readonly retryAfterSeconds: number | null;
 
   constructor(
     status: number,
     message: string,
     code: string | null = null,
     offline = false,
+    retryAfterSeconds: number | null = null,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.offline = offline;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   /**
@@ -114,6 +122,20 @@ function ensureRefresh(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/** `Retry-After` is either a number of seconds or an HTTP date; the rate limiter also sends
+ *  `RateLimit-Reset` (seconds until the window ends). Null when neither is usable. */
+function readRetryAfterSeconds(response: Response): number | null {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+    const at = Date.parse(retryAfter);
+    if (!Number.isNaN(at)) return Math.max(0, Math.ceil((at - Date.now()) / 1000));
+  }
+  const reset = Number(response.headers.get("ratelimit-reset"));
+  return Number.isFinite(reset) && reset > 0 ? Math.ceil(reset) : null;
+}
+
 async function readError(response: Response): Promise<ApiError> {
   let code: string | null = null;
   let message = response.statusText || "Request failed";
@@ -124,7 +146,8 @@ async function readError(response: Response): Promise<ApiError> {
   } catch {
     // Not JSON — keep the status text.
   }
-  return new ApiError(response.status, message, code);
+  const retryAfter = response.status === 429 ? readRetryAfterSeconds(response) : null;
+  return new ApiError(response.status, message, code, false, retryAfter);
 }
 
 async function send(path: string, options: RequestOptions, retryOn401: boolean): Promise<Response> {

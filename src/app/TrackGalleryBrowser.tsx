@@ -44,7 +44,7 @@ import { RangeSlider } from "./RangeSlider";
 import styles from "./TrackGalleryBrowser.module.css";
 import { TrackGalleryCard } from "./TrackGalleryCard";
 import sheet from "./TrackGallerySheet.module.css";
-import { type GallerySource, useTrackGallery } from "./useTrackGallery";
+import { type GallerySource, type LoadMoreProblem, useTrackGallery } from "./useTrackGallery";
 
 export interface TrackGalleryBrowserProps {
   variant: "page" | "modal";
@@ -113,12 +113,8 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
     if (!signedIn && criteria.favoritesOnly) setCriteria({ favoritesOnly: false });
   }, [signedIn, criteria.favoritesOnly, setCriteria]);
 
-  const { rides, total, loading, loadingMore, error, hasMore, loadMore } = useTrackGallery(
-    source,
-    search,
-    criteria,
-    sort,
-  );
+  const { rides, total, loading, loadingMore, error, hasMore, loadMore, loadMoreProblem, retry } =
+    useTrackGallery(source, search, criteria, sort);
 
   // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
   // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the
@@ -207,7 +203,12 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
     <>
       {error && (
         <p className="banner banner--error" role="alert">
-          {error}
+          {error}{" "}
+          {source === "all" && (
+            <button type="button" className="button button--quiet" onClick={retry}>
+              Try again
+            </button>
+          )}
         </p>
       )}
 
@@ -240,6 +241,18 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
         <div className={sheet.centered}>
           <span className="spinner" aria-hidden="true" />
           <span className="muted">Loading more…</span>
+        </div>
+      )}
+
+      {/* A page failed. The cards already loaded stay exactly as they are; nothing here retries by
+          itself (the sentinel above is not mounted while this shows) — the hook makes at most one
+          timed retry after a 429's Retry-After, and after that only this button asks again. */}
+      {loadMoreProblem && (
+        <div className={sheet.centered} role="status">
+          <span className="muted">{loadMoreProblemText(loadMoreProblem)}</span>
+          <button type="button" className="button button--quiet" onClick={retry}>
+            Try again
+          </button>
         </div>
       )}
     </>
@@ -589,6 +602,19 @@ export function TrackGalleryBrowser({ variant, onPick, onClose }: TrackGalleryBr
       </div>
     </>
   );
+}
+
+/** "45s" for a short wait, "12 min" for a long one — 707s is not a number anyone reads. */
+function formatWait(seconds: number): string {
+  return seconds < 90 ? `${seconds}s` : `${Math.round(seconds / 60)} min`;
+}
+
+/** What to tell the rider when a page of more tracks would not load. */
+function loadMoreProblemText(problem: LoadMoreProblem): string {
+  if (problem.kind === "failed") return "Could not load more tracks.";
+  return problem.retryInSeconds === null
+    ? "Still too many requests right now. Give it a minute, then try again."
+    : `Too many requests right now — trying again in about ${formatWait(problem.retryInSeconds)}.`;
 }
 
 /**

@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiRequestPaged } from "../lib/api-client";
+import { ApiError, apiRequestPaged } from "../lib/api-client";
 import type { EventSummary } from "../lib/local-db";
 import {
   applyTrackGalleryCriteria,
@@ -51,6 +51,25 @@ const PAGE_SIZE = 24;
 
 export type GallerySource = "all" | "mine";
 
+/** Cooldown when a 429 names no wait of its own. */
+const DEFAULT_RATE_LIMIT_WAIT_S = 60;
+/** The API's rate-limit window is 15 minutes; a longer wait than that is a bad header. */
+const MAX_RATE_LIMIT_WAIT_S = 15 * 60;
+
+/**
+ * Why the next page is not being fetched on its own. While this is set the list is NOT asking for
+ * more — the scroll sentinel is not even mounted — so a failed page cannot re-arm itself.
+ *
+ *   "rate-limited"  the API answered 429. `retryInSeconds` is the wait it asked for; one automatic
+ *                   retry follows after it, and nothing further without the rider's say-so.
+ *   "failed"        any other failure. Never retried automatically: only the rider's "Try again".
+ */
+export interface LoadMoreProblem {
+  kind: "rate-limited" | "failed";
+  /** Seconds until the one automatic retry, or null when none is pending. */
+  retryInSeconds: number | null;
+}
+
 /** A ride with no track at all. Decided by `routeId`, which the list has always carried. */
 function hasNoTrack(ride: EventSummary): boolean {
   return ride.routeId === null;
@@ -64,6 +83,10 @@ interface UseTrackGalleryResult {
   error: string | null;
   hasMore: boolean;
   loadMore: () => void;
+  /** Set after a failed page; see LoadMoreProblem. Loaded cards stay usable while it is. */
+  loadMoreProblem: LoadMoreProblem | null;
+  /** The rider's explicit "Try again": refetches the page that failed, once. */
+  retry: () => void;
 }
 
 export function useTrackGallery(
@@ -99,6 +122,31 @@ export function useTrackGallery(
   // page to the new list. Same one-request-wins pattern as tracksStore and eventsStore.
   const requestIdRef = useRef(0);
   const offsetRef = useRef(0);
+
+  // WHY A FAILED PAGE MUST NOT RETRY ITSELF. The scroll sentinel re-arms whenever loadMore changes
+  // identity, and loadMore changes identity when loadingMore flips back to false — which is
+  // exactly what a failed request does. The sentinel is still on screen, so its fresh observer
+  // fires at once, asks for the same page, fails, flips again: one 429 became 114 requests in
+  // 5 seconds, all refused, all counted against the rate limit that caused the first one.
+  //
+  // So failure is a STATE, not a blip. `blockedRef` is what loadMore checks (a ref, so the check
+  // is immediate rather than a render behind); `loadMoreProblem` is the same fact for the UI,
+  // and while it is set `hasMore` is false, so the sentinel is not mounted to fire at all.
+  // `inFlightRef` makes "one page request at a time" true by construction.
+  const [loadMoreProblem, setLoadMoreProblem] = useState<LoadMoreProblem | null>(null);
+  const blockedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  // One automatic retry per stretch of failures, restored by any page that succeeds. Beyond it
+  // only a person can ask again, so the worst case is bounded by how fast someone can click.
+  const autoRetriesLeftRef = useRef(1);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCooldown = useCallback(() => {
+    if (cooldownTimerRef.current !== null) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = null;
+  }, []);
+  // A timer must not outlive the gallery.
+  useEffect(() => clearCooldown, [clearCooldown]);
   // Loaded ONLY when the rider actually asks for their own rides, not on open.
   //
   // This is authenticated. If the 15-minute access token has expired while the organizer was
@@ -162,6 +210,13 @@ export function useTrackGallery(
     if (source !== "all") return;
     const thisRequest = ++requestIdRef.current;
     offsetRef.current = 0;
+    // A new list (search, filter, sort) starts with a clean slate: no stale failure, no stale
+    // timer aimed at the previous list.
+    clearCooldown();
+    blockedRef.current = false;
+    inFlightRef.current = false;
+    autoRetriesLeftRef.current = 1;
+    setLoadMoreProblem(null);
     setPublicLoading(true);
     setError(null);
     (async () => {
@@ -175,24 +230,85 @@ export function useTrackGallery(
         if (thisRequest === requestIdRef.current) setPublicLoading(false);
       }
     })();
-  }, [fetchPage, source]);
+  }, [fetchPage, source, clearCooldown]);
 
+  // Deliberately not the sentinel's business: a failure blocks further automatic loading (see
+  // the note on blockedRef), and the only ways past the block are the one timed retry below and
+  // the rider's explicit retry().
+  const loadMoreRef = useRef<() => void>(() => {});
   const loadMore = useCallback(() => {
-    if (source !== "all" || publicLoading || loadingMore) return;
+    if (source !== "all" || publicLoading) return;
+    if (blockedRef.current || inFlightRef.current) return;
     if (offsetRef.current >= publicTotal) return;
     const thisRequest = requestIdRef.current;
+    inFlightRef.current = true;
     setLoadingMore(true);
     (async () => {
       try {
         await fetchPage(offsetRef.current, thisRequest);
-      } catch {
         if (thisRequest !== requestIdRef.current) return;
-        setError("Could not load more tracks right now.");
+        // A page landed: the API is answering, so the next failure earns its retry again.
+        autoRetriesLeftRef.current = 1;
+      } catch (err) {
+        if (thisRequest !== requestIdRef.current) return;
+        blockedRef.current = true;
+        const limited = err instanceof ApiError && err.status === 429;
+        if (limited && autoRetriesLeftRef.current > 0) {
+          autoRetriesLeftRef.current -= 1;
+          // Honour what the server asked for (Retry-After / the limiter's reset), plus a second
+          // so the retry does not land on the very tick the window ends.
+          const asked = err.retryAfterSeconds ?? DEFAULT_RATE_LIMIT_WAIT_S;
+          const waitS = Math.min(Math.max(asked, 1), MAX_RATE_LIMIT_WAIT_S) + 1;
+          setLoadMoreProblem({ kind: "rate-limited", retryInSeconds: waitS });
+          clearCooldown();
+          cooldownTimerRef.current = setTimeout(() => {
+            cooldownTimerRef.current = null;
+            if (thisRequest !== requestIdRef.current) return;
+            // The one controlled retry: unblock and go straight through loadMore (not via the
+            // sentinel). If it fails, autoRetriesLeft is 0 and it stays blocked.
+            blockedRef.current = false;
+            setLoadMoreProblem(null);
+            loadMoreRef.current();
+          }, waitS * 1000);
+        } else {
+          setLoadMoreProblem({ kind: limited ? "rate-limited" : "failed", retryInSeconds: null });
+        }
       } finally {
-        if (thisRequest === requestIdRef.current) setLoadingMore(false);
+        if (thisRequest === requestIdRef.current) {
+          inFlightRef.current = false;
+          setLoadingMore(false);
+        }
       }
     })();
-  }, [fetchPage, source, publicLoading, loadingMore, publicTotal]);
+  }, [fetchPage, source, publicLoading, publicTotal, clearCooldown]);
+  loadMoreRef.current = loadMore;
+
+  // The rider's explicit "Try again". Whatever failed is what gets asked again — once.
+  const retry = useCallback(() => {
+    clearCooldown();
+    blockedRef.current = false;
+    setLoadMoreProblem(null);
+    if (offsetRef.current === 0) {
+      // The FIRST page never landed (there is nothing on screen to scroll from). Refetch it the
+      // way the list's own effect does.
+      const thisRequest = ++requestIdRef.current;
+      inFlightRef.current = false;
+      setPublicLoading(true);
+      setError(null);
+      (async () => {
+        try {
+          await fetchPage(0, thisRequest);
+        } catch {
+          if (thisRequest !== requestIdRef.current) return;
+          setError("Could not load tracks right now.");
+        } finally {
+          if (thisRequest === requestIdRef.current) setPublicLoading(false);
+        }
+      })();
+      return;
+    }
+    loadMoreRef.current();
+  }, [clearCooldown, fetchPage]);
 
   const rides = useMemo(() => {
     // "All rides" is already filtered AND sorted by the server (buildTrackGalleryQuery). "My
@@ -205,7 +321,9 @@ export function useTrackGallery(
 
   const loading = source === "mine" ? myRidesLoading && myRides.length === 0 : publicLoading;
   const total = source === "mine" ? rides.length : publicTotal;
-  const hasMore = source === "all" && offsetRef.current < publicTotal;
+  // False while a failure is being held: the sentinel is only mounted when there is more AND
+  // nothing has gone wrong, so it cannot re-arm a failed page.
+  const hasMore = source === "all" && offsetRef.current < publicTotal && loadMoreProblem === null;
 
   return {
     rides,
@@ -215,5 +333,7 @@ export function useTrackGallery(
     error,
     hasMore,
     loadMore,
+    loadMoreProblem,
+    retry,
   };
 }

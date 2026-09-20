@@ -21,7 +21,8 @@
  * "MY RIDES" IS NOT A FILTER on the public endpoint. It is GET /events?filter=mine merged with
  * ?filter=joined, which eventsStore already loads, dedupes and caches to IndexedDB. This hook
  * reads that store rather than growing a second, worse copy of it; the search box filters it
- * in memory, since it is one page by definition. Those rows carry `preview` too.
+ * in memory, since it is one page by definition. GET /events rows carry no `preview`, so those
+ * cards draw no route line for now (and make no per-card fetch either).
  *
  * RIDES WITHOUT A TRACK. The list endpoint cannot filter on "has a route", so some rides come
  * back with nothing to draw. They are dropped from the grid and the caller keeps loading pages
@@ -33,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiRequestPaged } from "../lib/api-client";
+import { ApiError, apiRequestPaged } from "../lib/api-client";
 import type { EventSummary } from "../lib/local-db";
 import {
   applyTrackGalleryCriteria,
@@ -50,6 +51,25 @@ const PAGE_SIZE = 24;
 
 export type GallerySource = "all" | "mine";
 
+/** Cooldown when a 429 names no wait of its own. */
+const DEFAULT_RATE_LIMIT_WAIT_S = 60;
+/** The API's rate-limit window is 15 minutes; a longer wait than that is a bad header. */
+const MAX_RATE_LIMIT_WAIT_S = 15 * 60;
+
+/**
+ * Why the next page is not being fetched on its own. While this is set the list is NOT asking for
+ * more — the scroll sentinel is not even mounted — so a failed page cannot re-arm itself.
+ *
+ *   "rate-limited"  the API answered 429. `retryInSeconds` is the wait it asked for; one automatic
+ *                   retry follows after it, and nothing further without the rider's say-so.
+ *   "failed"        any other failure. Never retried automatically: only the rider's "Try again".
+ */
+export interface LoadMoreProblem {
+  kind: "rate-limited" | "failed";
+  /** Seconds until the one automatic retry, or null when none is pending. */
+  retryInSeconds: number | null;
+}
+
 /** A ride with no track at all. Decided by `routeId`, which the list has always carried. */
 function hasNoTrack(ride: EventSummary): boolean {
   return ride.routeId === null;
@@ -63,6 +83,10 @@ interface UseTrackGalleryResult {
   error: string | null;
   hasMore: boolean;
   loadMore: () => void;
+  /** Set after a failed page; see LoadMoreProblem. Loaded cards stay usable while it is. */
+  loadMoreProblem: LoadMoreProblem | null;
+  /** The rider's explicit "Try again": refetches the page that failed, once. */
+  retry: () => void;
 }
 
 export function useTrackGallery(
@@ -98,6 +122,31 @@ export function useTrackGallery(
   // page to the new list. Same one-request-wins pattern as tracksStore and eventsStore.
   const requestIdRef = useRef(0);
   const offsetRef = useRef(0);
+
+  // WHY A FAILED PAGE MUST NOT RETRY ITSELF. The scroll sentinel re-arms whenever loadMore changes
+  // identity, and loadMore changes identity when loadingMore flips back to false — which is
+  // exactly what a failed request does. The sentinel is still on screen, so its fresh observer
+  // fires at once, asks for the same page, fails, flips again: one 429 became 114 requests in
+  // 5 seconds, all refused, all counted against the rate limit that caused the first one.
+  //
+  // So failure is a STATE, not a blip. `blockedRef` is what loadMore checks (a ref, so the check
+  // is immediate rather than a render behind); `loadMoreProblem` is the same fact for the UI,
+  // and while it is set `hasMore` is false, so the sentinel is not mounted to fire at all.
+  // `inFlightRef` makes "one page request at a time" true by construction.
+  const [loadMoreProblem, setLoadMoreProblem] = useState<LoadMoreProblem | null>(null);
+  const blockedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  // One automatic retry per stretch of failures, restored by any page that succeeds. Beyond it
+  // only a person can ask again, so the worst case is bounded by how fast someone can click.
+  const autoRetriesLeftRef = useRef(1);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCooldown = useCallback(() => {
+    if (cooldownTimerRef.current !== null) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = null;
+  }, []);
+  // A timer must not outlive the gallery.
+  useEffect(() => clearCooldown, [clearCooldown]);
   // Loaded ONLY when the rider actually asks for their own rides, not on open.
   //
   // This is authenticated. If the 15-minute access token has expired while the organizer was
@@ -234,6 +283,33 @@ export function useTrackGallery(
   }, [fetchPage, source, publicLoading, publicTotal, clearCooldown]);
   loadMoreRef.current = loadMore;
 
+  // The rider's explicit "Try again". Whatever failed is what gets asked again — once.
+  const retry = useCallback(() => {
+    clearCooldown();
+    blockedRef.current = false;
+    setLoadMoreProblem(null);
+    if (offsetRef.current === 0) {
+      // The FIRST page never landed (there is nothing on screen to scroll from). Refetch it the
+      // way the list's own effect does.
+      const thisRequest = ++requestIdRef.current;
+      inFlightRef.current = false;
+      setPublicLoading(true);
+      setError(null);
+      (async () => {
+        try {
+          await fetchPage(0, thisRequest);
+        } catch {
+          if (thisRequest !== requestIdRef.current) return;
+          setError("Could not load tracks right now.");
+        } finally {
+          if (thisRequest === requestIdRef.current) setPublicLoading(false);
+        }
+      })();
+      return;
+    }
+    loadMoreRef.current();
+  }, [clearCooldown, fetchPage]);
+
   const rides = useMemo(() => {
     // "All rides" is already filtered AND sorted by the server (buildTrackGalleryQuery). "My
     // rides" is one fully-loaded page from the store, so the identical criteria + sort are
@@ -257,5 +333,7 @@ export function useTrackGallery(
     error,
     hasMore,
     loadMore,
+    loadMoreProblem,
+    retry,
   };
 }

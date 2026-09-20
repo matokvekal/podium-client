@@ -156,19 +156,8 @@ export function TrackGalleryBrowser({
     if (!signedIn && criteria.favoritesOnly) setCriteria({ favoritesOnly: false });
   }, [signedIn, criteria.favoritesOnly, setCriteria]);
 
-  const { rides, total, loading, loadingMore, error, hasMore, loadMore } = useTrackGallery(
-    source,
-    search,
-    criteria,
-    sort,
-  );
-
-  // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
-  // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the
-  // search box or opening a filter panel does not re-render every card in a long list.
-  const onPickRef = useRef(onPick);
-  onPickRef.current = onPick;
-  const pickTrack = useCallback((event: EventSummary) => onPickRef.current(event), []);
+  const { rides, total, loading, loadingMore, error, hasMore, loadMore, loadMoreProblem, retry } =
+    useTrackGallery(source, search, criteria, sort);
 
   // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
   // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the

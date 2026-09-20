@@ -11,6 +11,14 @@
 import { create } from "zustand";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { getCachedStatistics, putCachedStatistics } from "../lib/local-db";
+import {
+  type CachedTimeline,
+  fromParamFor,
+  mergePeriods,
+  needsRefresh,
+  type PeriodTimelinePayload,
+  type PeriodType,
+} from "../lib/statistics-periods";
 
 export interface StatYearTotals {
   year: number;
@@ -84,11 +92,22 @@ interface LeaderboardSlot {
   stale: boolean;
 }
 
+interface TimelineSlot {
+  data: CachedTimeline | null;
+  loading: boolean;
+  /** The request failed AND there is nothing cached to show instead. */
+  failed: boolean;
+}
+
 interface StatisticsState {
   me: RiderStatsPayload | null;
   meLoading: boolean;
   meStale: boolean;
   leaderboards: Record<string, LeaderboardSlot>;
+  /** Month / year results for the Achievements page — see lib/statistics-periods.ts. */
+  timelines: Record<PeriodType, TimelineSlot>;
+
+  loadTimeline(userId: number, type: PeriodType): Promise<void>;
 
   loadMyStatistics(userId: number): Promise<void>;
   loadLeaderboard(
@@ -101,6 +120,8 @@ interface StatisticsState {
 }
 
 let meRequestId = 0;
+const timelineRequestIds: Record<PeriodType, number> = { month: 0, year: 0 };
+const EMPTY_TIMELINE: TimelineSlot = { data: null, loading: true, failed: false };
 const leaderboardRequestIds = new Map<string, number>();
 
 export const useStatisticsStore = create<StatisticsState>((set, get) => ({
@@ -108,6 +129,56 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   meLoading: true,
   meStale: false,
   leaderboards: {},
+  timelines: { month: EMPTY_TIMELINE, year: EMPTY_TIMELINE },
+
+  /**
+   * Device-first, then the server only when the rules in lib/statistics-periods.ts say so:
+   *   - paint whatever this device already holds, instantly (works offline)
+   *   - closed months/years are kept with no expiry (until sign-out clears the cache), so they
+   *     are never fetched twice; the CURRENT month/year is trusted for 24h
+   *   - when a fetch is due it asks only for the tail (`from`), and merges the answer in
+   */
+  async loadTimeline(userId, type) {
+    const thisRequest = ++timelineRequestIds[type];
+    const scope = `periods:${type}`;
+    const put = (slot: TimelineSlot) =>
+      set((state) => ({ timelines: { ...state.timelines, [type]: slot } }));
+
+    put({ ...get().timelines[type], loading: true, failed: false });
+
+    const cached = await getCachedStatistics<CachedTimeline>(scope, userId);
+    if (thisRequest !== timelineRequestIds[type]) return;
+    if (cached) put({ data: cached.value, loading: true, failed: false });
+
+    const heldForRule = cached
+      ? { periods: cached.value.periods, lastSyncedAt: cached.lastSyncedAt }
+      : null;
+    if (!needsRefresh(heldForRule, type)) {
+      put({ data: cached?.value ?? null, loading: false, failed: false });
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({ type });
+      const from = fromParamFor(cached?.value.periods);
+      if (from) params.set("from", from);
+      const payload = await apiRequest<PeriodTimelinePayload>(`/statistics/periods?${params}`);
+      if (thisRequest !== timelineRequestIds[type]) return;
+      const next: CachedTimeline = {
+        periods: mergePeriods(cached?.value.periods ?? [], payload.periods),
+        weightKg: payload.weightKg,
+      };
+      await putCachedStatistics(scope, userId, next);
+      if (thisRequest !== timelineRequestIds[type]) return;
+      put({ data: next, loading: false, failed: false });
+    } catch {
+      if (thisRequest !== timelineRequestIds[type]) return;
+      // What is already on screen from the device stays — a failed request is not evidence the
+      // numbers are wrong. Only an empty screen is reported as a failure.
+      const data = get().timelines[type].data;
+      put({ data, loading: false, failed: data == null });
+    }
+  },
 
   async loadMyStatistics(userId) {
     const thisRequest = ++meRequestId;

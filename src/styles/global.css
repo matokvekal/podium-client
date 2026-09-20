@@ -555,6 +555,19 @@ textarea {
   color: var(--text);
 }
 
+/* An arrival the app recorded by itself (auto check-in). The accent colour, not the success
+   green, on purpose: green is "a person ticked this", accent is "the app did" — the same split
+   the organizer's start list uses (data-tone="auto" in EventDetailPage.module.css). */
+.banner--auto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
 /* --- layout helpers --------------------------------------------------------- */
 
 .row {

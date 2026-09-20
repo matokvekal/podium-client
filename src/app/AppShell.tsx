@@ -15,7 +15,7 @@
 import { ArrowLeft, Menu, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiRequest } from "../lib/api-client";
 import { appTagline } from "../lib/app-tagline";
@@ -30,6 +30,7 @@ import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useCountryStore } from "../store/countryStore";
 import { AppDrawer } from "./AppDrawer";
 import { Avatar } from "./Avatar";
+import { useAutoCheckIn } from "./useAutoCheckIn";
 import { useEnforceOrganizerEligibility } from "./useEnforceOrganizerEligibility";
 import { useMyIdentity } from "./useMyIdentity";
 
@@ -69,6 +70,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   // Drop a stale "organizer" preference if the server says this account can't create rides.
   useEnforceOrganizerEligibility();
+  // "Opens the app at the start line" is not a page, so this lives here: it takes one GPS fix when
+  // a ride the rider is on is inside its check-in window, and the server decides if it counts.
+  const autoCheckIn = useAutoCheckIn();
   const me = useMyIdentity();
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,6 +194,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       {!connected && (
         <div className="banner banner--offline" role="status">
           OFFLINE — showing last synced data
+        </div>
+      )}
+
+      {/* Confirmation of an automatic check-in. Says "Auto" and uses the accent colour, matching
+          how the organizer's start list marks the same arrival, so nobody mistakes it for a tick
+          an organizer made. Clears itself after config.autoCheckInToastMs. */}
+      {autoCheckIn.arrived && (
+        <div className="banner banner--auto" role="status">
+          <span>
+            ✓ Auto check-in — you are marked as arrived at{" "}
+            <Link to={`/events/${autoCheckIn.arrived.id}`}>{autoCheckIn.arrived.name}</Link>
+          </span>
+          <button
+            type="button"
+            className="button button--quiet"
+            onClick={autoCheckIn.dismiss}
+            aria-label="Dismiss"
+          >
+            OK
+          </button>
         </div>
       )}
 

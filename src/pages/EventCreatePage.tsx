@@ -117,6 +117,7 @@ import {
   Gauge,
   ImagePlus,
   LifeBuoy,
+  LocateFixed,
   Lock,
   MapPin,
   Mountain,
@@ -149,6 +150,7 @@ import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { config } from "../lib/config";
 import { flagEmoji, orderedCountries } from "../lib/countries";
 import { defaultRideCountry } from "../lib/default-ride-country";
 import { effectiveLimits } from "../lib/entitlements";
@@ -230,6 +232,9 @@ interface ExistingEvent {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
+  /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
+   *  which is the default a new ride gets. */
+  autoCheckIn?: boolean;
   /** The organizer's expected head-count (sql/028), or null when they left it blank. Prefills
    *  the "Expected riders" field in edit mode. */
   expectedParticipants?: number | null;
@@ -455,6 +460,12 @@ export function EventCreatePage() {
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false,
   );
+  // Auto check-in at the start (sql/040): a rider who opens the app near the start, around the
+  // start time, is marked arrived automatically — shown to the organizer as "Auto", in its own
+  // colour, next to the arrivals they tick by hand. ON by default and deliberately NOT remembered
+  // from the last ride the way the switches above are: it is the safe, useful default, and an
+  // organizer who wants it off says so per ride. The radius and time window are server config.
+  const [autoCheckIn, setAutoCheckIn] = useState(true);
   // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
   // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
   // the real cap is this account's plan limit, which the server enforces and which the plan
@@ -695,6 +706,7 @@ export function EventCreatePage() {
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
+        setAutoCheckIn(found.autoCheckIn ?? true);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
@@ -1291,6 +1303,8 @@ export function EventCreatePage() {
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
             hasSupportVehicle,
+            // Auto check-in (sql/040). Always sent, so switching it off on an edit really does.
+            autoCheckIn,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
             expectedParticipants: expectedParticipantsValue,
@@ -1359,6 +1373,9 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
+          // Auto check-in (sql/040) — sent on create too, so an organizer who switched it off
+          // is never silently given the server default (on).
+          autoCheckIn,
           // Expected riders (sql/028) — null when the organizer left the field blank.
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
@@ -2353,6 +2370,37 @@ export function EventCreatePage() {
                     Support vehicle
                   </span>
                 </label>
+                {/* Auto check-in (sql/040) — riders who open the app near the start, around the
+                    start time, are marked "arrived" automatically, in their own colour so the
+                    organizer can tell it from a tick they made themselves. On by default. The hint
+                    quotes the real radius/window from config, and says what it needs: a track
+                    (the start point) and a start time — without either there is nothing to be
+                    near, and the server answers "no start point". */}
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={autoCheckIn}
+                    onChange={(e) => setAutoCheckIn(e.target.checked)}
+                  />
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${autoCheckIn ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {autoCheckIn ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <LocateFixed aria-hidden="true" />
+                    Auto check-in at start
+                  </span>
+                </label>
+                <p className={styles.hint}>
+                  {autoCheckIn
+                    ? `Riders are marked as arrived (Auto) when they open the app within ${config.autoCheckInRadiusM} m of the start point, up to ${config.autoCheckInWindowMin} min before or after the start time. Needs a track and a start time. You can still tick riders by hand.`
+                    : "Off — you tick riders as arrived yourself."}
+                </p>
               </fieldset>
             </div>
           </div>

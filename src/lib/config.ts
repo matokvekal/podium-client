@@ -78,4 +78,28 @@ export const config = {
    * batching cadence the Android transmitter is documented to use.
    */
   locationBatchIntervalMs: 30_000,
+
+  // ── Auto check-in at the start (server sql/040-auto-check-in.sql) ─────────────────────────
+  //
+  // The SERVER decides whether a rider is close enough and early/late enough — it checks the
+  // fix against its own AUTO_CHECK_IN_RADIUS_M / AUTO_CHECK_IN_WINDOW_MIN. These two mirror those
+  // numbers for exactly two client jobs and no more:
+  //   - autoCheckInWindowMin: when to bother asking for a GPS fix at all, so the app never
+  //     prompts for location a week before a ride. Keep it equal to the server's window; if the
+  //     server's is wider this only means the app stops asking a little early, never that a
+  //     wrong check-in is accepted.
+  //   - autoCheckInRadiusM: the number quoted in the create form's hint text.
+  autoCheckInWindowMin: 60,
+  autoCheckInRadiusM: 100,
+
+  /**
+   * While a ride is inside its check-in window and this rider is not yet marked, how often to
+   * try again — a rider who opened the app in the car park and then walked to the start line
+   * should be checked in on arrival, not only if they reopen the app. Only runs while the app is
+   * visible and there is a candidate ride, so it costs nothing the rest of the time.
+   */
+  autoCheckInRetryMs: 60_000,
+
+  /** How long the "you were checked in automatically" confirmation stays on screen. */
+  autoCheckInToastMs: 10_000,
 } as const;

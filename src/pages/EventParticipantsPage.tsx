@@ -44,6 +44,7 @@ import { Avatar } from "../app/Avatar";
 import { ParticipantFormSheet, type ParticipantFormValues } from "../app/ParticipantFormSheet";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { isAutoArrival } from "../lib/arrival";
 import { type EventStatus, getCachedEvent } from "../lib/local-db";
 import type { Participant } from "../lib/participant-types";
 import { useEventGroupsStore } from "../store/eventGroupsStore";
@@ -208,6 +209,11 @@ export function EventParticipantsPage() {
   }, [participants, search]);
 
   const presentCount = participants.filter((p) => p.attendanceStatus === "present").length;
+  // Of those, the ones the app checked in from the rider's own GPS (sql/040) — shown separately
+  // so the organizer sees how much of the start list they no longer have to tick by hand.
+  const autoCount = participants.filter(
+    (p) => p.attendanceStatus === "present" && isAutoArrival(p.attendanceStatus, p.attendanceSource),
+  ).length;
 
   if (loading) {
     return (
@@ -294,7 +300,9 @@ export function EventParticipantsPage() {
 
       <div className="row" style={{ justifyContent: "space-between" }}>
         <span className="badge">{participants.length} total</span>
-        <span className="badge badge--live">{presentCount} arrived</span>
+        <span className="badge badge--live">
+          {presentCount} arrived{autoCount > 0 ? ` (${autoCount} auto)` : ""}
+        </span>
       </div>
 
       <div className="row" style={{ flexWrap: "wrap" }}>
@@ -332,7 +340,14 @@ export function EventParticipantsPage() {
                 type="button"
                 className={
                   p.attendanceStatus === "present"
-                    ? `${styles.checkBtn} ${styles.checkBtnActive}`
+                    ? // Accent for an arrival the app recorded, green for one an organizer ticked.
+                      // Un-ticking either is the same PATCH, which stamps the source "manual" so
+                      // the app never ticks that rider straight back.
+                      `${styles.checkBtn} ${
+                        isAutoArrival(p.attendanceStatus, p.attendanceSource)
+                          ? styles.checkBtnAuto
+                          : styles.checkBtnActive
+                      }`
                     : styles.checkBtn
                 }
                 onClick={() => {
@@ -346,7 +361,11 @@ export function EventParticipantsPage() {
                 }}
                 aria-pressed={p.attendanceStatus === "present"}
                 aria-label={p.attendanceStatus === "present" ? "Mark not arrived" : "Mark arrived"}
-                title="Check in"
+                title={
+                  isAutoArrival(p.attendanceStatus, p.attendanceSource)
+                    ? "Checked in automatically from the rider's GPS — tap to undo"
+                    : "Check in"
+                }
               >
                 <Check width={16} height={16} aria-hidden="true" />
               </button>

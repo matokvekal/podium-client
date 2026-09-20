@@ -45,6 +45,7 @@ import {
   Accessibility,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Circle,
   Coffee,
   Download,
@@ -69,6 +70,7 @@ import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
 import { ElevationProfile } from "../app/ElevationProfile";
+import { WindStrip } from "../app/WindStrip";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
@@ -137,6 +139,29 @@ const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
+
+/**
+ * A low, smooth-roofed sedan in the same 24px outline style as the lucide icons around it (lucide's
+ * own Car is a boxy hatchback). A generic body shape drawn here — deliberately not any brand's
+ * logo, and not the Waze logo either, which is a brand asset we do not have a licence for.
+ */
+function SedanIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 15.5v-2c0-.8.5-1.3 1.3-1.5L6.2 11.3C7.4 9.4 9.5 8.2 12 8.2h1.4c2 0 3.5.8 4.9 2.2l2.4 1.2c.8.3 1.3.9 1.3 1.7v2.2M2 15.5h2.1M8.5 15.5h7.1M19.9 15.5H22" />
+      <circle cx="6.3" cy="16" r="2.2" />
+      <circle cx="17.7" cy="16" r="2.2" />
+    </svg>
+  );
+}
 
 /**
  * "Track copied from <ride>" — the credit line under the route preview, shown when this ride's
@@ -1299,11 +1324,15 @@ export function EventDetailPage() {
                 href={wazeHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${styles.heroIconBtn} ${styles.heroWazeBtn}`}
-                aria-label="Navigate to the meeting point with Waze"
-                title="Drive to the meeting point — Waze"
+                className={styles.heroWazeBtn}
+                aria-label="Navigate with Waze"
+                title="Navigate with Waze"
               >
-                <Navigation aria-hidden="true" />
+                {/* A generic car glyph and the word "Waze" — deliberately not the Waze logo,
+                    which is a brand asset we do not have a licence for. */}
+                <SedanIcon />
+                <span>Waze</span>
+                <ChevronRight className={styles.heroWazeChevron} aria-hidden="true" />
               </a>
             )}
             {/* Share is gone once the ride is over. A share link exists to get someone TO a
@@ -1805,9 +1834,20 @@ export function EventDetailPage() {
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={results.route.points} />
                 </Suspense>
+                {/* showEmpty: a route with no elevation series keeps this slot (a neutral placeholder,
+                    no invented values) so the wind strip below never moves up into it. */}
                 <ElevationProfile
                   points={results.route.points}
                   elevations={results.route.elevations}
+                  showEmpty
+                />
+                {/* Wind pilot: renders nothing (and asks nobody for anything) unless this viewer
+                    is eligible — see lib/wind-eligibility.ts. */}
+                <WindStrip
+                  event={event}
+                  points={results.route.points}
+                  durationMin={event.durationMin ?? estimatedMin}
+                  routeDistanceKm={results.route.distanceKm}
                 />
                 {event.copiedFromEventId && (
                   <CopiedFromCredit sourceEventId={event.copiedFromEventId} />

@@ -181,20 +181,45 @@
 }
 
 /* Waze is the one button here that is not an app action but a hand-off to another app, so it
-   wears that app's colour instead of the hero's smoked glass — Waze cyan, with the navigation
-   arrow filled solid so it reads as a mark at 16px rather than as a thin outline. */
+   wears a Waze-blue pill instead of the hero's smoked glass, and says who it hands off to:
+   generic car glyph, the word "Waze", then a thin separator and a chevron for "goes
+   elsewhere". Same 32px height as .heroIconBtn so the row stays level. The blue is a shade
+   darker than Waze's own cyan so the white content holds contrast. */
 .heroWazeBtn {
-  color: #04222c;
-  background: #33ccff;
-  backdrop-filter: none;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  background: #0a8fc4;
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .heroWazeBtn svg {
-  fill: currentColor;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* The separator is the chevron's own left border, so it stays attached to it if the row wraps. */
+.heroWazeBtn .heroWazeChevron {
+  box-sizing: content-box;
+  width: 12px;
+  height: 12px;
+  padding-left: 6px;
+  margin-left: 1px;
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
 }
 
 .heroWazeBtn:hover {
-  background: #05c8f7;
+  background: #0879a8;
 }
 
 .heroBottom {

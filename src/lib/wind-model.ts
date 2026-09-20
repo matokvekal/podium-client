@@ -1,6 +1,6 @@
 // Wind around a ride — the pure part: which hours to show, where to ask, and how strong is strong.
 //
-// PILOT (see lib/wind-eligibility.ts for who gets it). No DOM, no network, no storage here, so
+// No DOM, no network, no storage here, so
 // all of it is unit-tested in the repo's node-environment Vitest.
 //
 // THIS IS A WEATHER FORECAST FOR THE RIDE WINDOW, NOT A PREDICTION OF THE RIDER. We do not know

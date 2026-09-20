@@ -1,7 +1,6 @@
 // Orchestrates one event's wind forecast: cache → provider → cache. No React, no DOM.
 //
-// The order, for an eligible viewer (eligibility itself is decided BEFORE this is called — see
-// lib/wind-eligibility.ts; nothing here checks who is asking):
+// The order (nothing here checks who is asking — the strip is open to every viewer):
 //   1. a cached forecast made for this exact ride and younger than the TTL is used as is;
 //   2. otherwise ONE batched request goes to the provider and the cache is replaced;
 //   3. if that request fails, an older cached forecast for the same ride is shown rather than

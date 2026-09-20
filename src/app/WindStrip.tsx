@@ -14,18 +14,15 @@
 // deliberately do not convert time to distance (no ETA, no rider position): the hourly columns are
 // spread evenly across that plot width, in time order.
 //
-// PILOT. It renders nothing unless lib/wind-eligibility.ts says this viewer may have it, and
-// while it is not eligible the hook under it plans nothing and asks nobody for anything. Any
-// failure on the way (no route, no start time, provider down, storage blocked) also renders
-// nothing: a weather problem must never take the ride page with it.
+// Open to every viewer of a ride that has a route and a start time. Any failure on the way (no
+// route, no start time, forecast out of range, provider down, storage blocked) renders nothing
+// and asks for nothing more: a weather problem must never take the ride page with it.
 //
 // The arrow is north-up like a weather map — a wind from the west (270°) points east.
 
 import { useMemo } from "react";
-import { useAuth } from "../auth/AuthContext";
 import { estimateDurationMin } from "../lib/ride-duration";
 import { formatLocalClockParts } from "../lib/time";
-import { canSeeWindForecast } from "../lib/wind-eligibility";
 import { type WindLabels, windLabels, windLanguage } from "../lib/wind-labels";
 import { showGust, type WindSample, windCellColors, windStrength } from "../lib/wind-model";
 import { useCountryStore } from "../store/countryStore";
@@ -33,12 +30,7 @@ import { useWindForecast } from "./useWindForecast";
 import styles from "./WindStrip.module.css";
 
 interface WindStripProps {
-  event: {
-    id: string;
-    startsAt: string | null;
-    isOwner?: boolean;
-    myParticipant?: { registrationStatus: string } | null;
-  };
+  event: { id: string; startsAt: string | null };
   /** [lat, lng] pairs — the route the elevation profile above is drawing. */
   points: readonly [number, number][] | null | undefined;
   /** The ride's duration as the page resolved it: the organizer's figure, else the estimate. */
@@ -114,10 +106,7 @@ function WindColumn({
 }
 
 export function WindStrip({ event, points, durationMin, routeDistanceKm }: WindStripProps) {
-  const { profile } = useAuth();
   const country = useCountryStore((s) => s.code);
-
-  const eligible = canSeeWindForecast(profile, event);
 
   // The smallest sensible fallback when the ride has neither a stated nor an estimated duration:
   // the app's own estimate from the route's length alone (a generic 20 km/h bike ride).
@@ -136,7 +125,6 @@ export function WindStrip({ event, points, durationMin, routeDistanceKm }: WindS
   );
 
   const forecast = useWindForecast({
-    eligible,
     eventId: event.id,
     points,
     startsAt: event.startsAt,
@@ -146,7 +134,7 @@ export function WindStrip({ event, points, durationMin, routeDistanceKm }: WindS
   const language = windLanguage(country);
   const labels = windLabels(language);
 
-  if (!eligible || !forecast) return null;
+  if (!forecast) return null;
 
   // The gust row exists only if at least one hour has a gust worth showing; otherwise it would
   // be a row of blanks.

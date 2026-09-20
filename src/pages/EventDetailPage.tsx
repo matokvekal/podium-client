@@ -1841,8 +1841,8 @@ export function EventDetailPage() {
                   elevations={results.route.elevations}
                   showEmpty
                 />
-                {/* Wind pilot: renders nothing (and asks nobody for anything) unless this viewer
-                    is eligible — see lib/wind-eligibility.ts. */}
+                {/* Hourly wind + temperature for the ride window. Renders nothing (and never breaks
+                    the page) when there is no start time or the forecast is unavailable. */}
                 <WindStrip
                   event={event}
                   points={results.route.points}

@@ -327,3 +327,32 @@
   width: 20px;
   height: 20px;
 }
+
+/* --- loading / empty / error / weight notes --- */
+
+.note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.note a {
+  color: var(--accent-strong);
+  font-weight: var(--weight-bold);
+}
+
+.noteButton {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-strong);
+  font-weight: var(--weight-bold);
+  text-decoration: underline;
+  cursor: pointer;
+}

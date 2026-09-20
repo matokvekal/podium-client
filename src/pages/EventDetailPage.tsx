@@ -78,6 +78,7 @@ import { useOwnerCover } from "../app/useOwnerCover";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
+import { arrivalLabel, isAutoArrival } from "../lib/arrival";
 import { config } from "../lib/config";
 
 import { useConnectivityStore } from "../lib/connectivity";
@@ -236,7 +237,9 @@ function draftFromServer(rider: CachedParticipant): RiderDraft {
   };
 }
 
-type StatusTone = "ok" | "warn" | "bad";
+// "auto" is an arrival the rider's own GPS produced (attendanceSource "auto") — the accent colour,
+// so it is told apart from the green "ok" of an arrival an organizer ticked. See lib/arrival.ts.
+type StatusTone = "ok" | "auto" | "warn" | "bad";
 interface RiderStatus {
   text: string;
   tone: StatusTone;
@@ -263,22 +266,6 @@ function approvalStatus(registrationStatus: string): RiderStatus {
       return { text: "Rejected", tone: "bad" };
     default:
       return { text: registrationStatus, tone: "warn" };
-  }
-}
-
-function arrivalStatus(attendanceStatus: string): RiderStatus {
-  switch (attendanceStatus) {
-    case "present":
-      return { text: "✓ Arrived", tone: "ok" };
-    // Already out on the road — arrived, and then some.
-    case "started":
-      return { text: "✓ Arrived · started", tone: "ok" };
-    case "dns":
-      return { text: "Did not start", tone: "bad" };
-    case "unknown":
-      return { text: "Not arrived", tone: "warn" };
-    default:
-      return { text: attendanceStatus, tone: "warn" };
   }
 }
 
@@ -1974,7 +1961,7 @@ export function EventDetailPage() {
                             ? approvalStatus(rider.registrationStatus)
                             : null;
                           const arrival = showOrganizerUi
-                            ? arrivalStatus(rider.attendanceStatus)
+                            ? arrivalLabel(rider.attendanceStatus, rider.attendanceSource)
                             : null;
                           // Undefined for a rider who joined after the pencil was opened —
                           // that row simply stays read-only until the next Save/Cancel reseeds.
@@ -2028,6 +2015,11 @@ export function EventDetailPage() {
                                         <Circle width={16} height={16} aria-hidden="true" />
                                       )}
                                       Arrived
+                                      {riderDraft.arrived &&
+                                        isAutoArrival(
+                                          rider.attendanceStatus,
+                                          rider.attendanceSource,
+                                        ) && <span> · Auto</span>}
                                     </button>
                                   </span>
                                 ) : (

@@ -8,6 +8,13 @@ import type { UserVisualAsset } from "./user-identity";
 
 export type RegistrationStatus = "registered" | "waiting_approval" | "approved" | "rejected";
 export type AttendanceStatus = "unknown" | "present" | "dns" | "started";
+/**
+ * How attendanceStatus was last written (server sql/040-auto-check-in.sql): "auto" = the rider's
+ * own GPS was verified at the start, "manual" = an organizer ticked (or un-ticked) them, null /
+ * absent = never written since the column existed, which reads as manual. Only "auto" is shown
+ * differently — see lib/arrival.ts.
+ */
+export type AttendanceSource = "manual" | "auto";
 export type ResultStatus = "none" | "finished" | "dnf" | "stopped" | "unknown";
 
 export interface Participant {
@@ -26,6 +33,8 @@ export interface Participant {
   category: string | null;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  /** Optional: an older server or a cached row omits it, which reads as not-automatic. */
+  attendanceSource?: AttendanceSource | null;
   resultStatus: ResultStatus;
   joinedAt: string;
   /** Which of the event's groups (store/eventGroupsStore.ts) this rider rides in — null until

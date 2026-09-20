@@ -32,7 +32,7 @@
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
 import type { EventRoute } from "./event-route";
 import type { LiveRider } from "./live-types";
-import type { AttendanceStatus, RegistrationStatus } from "./participant-types";
+import type { AttendanceSource, AttendanceStatus, RegistrationStatus } from "./participant-types";
 import type { RiderLevel } from "./rider-level";
 import type { SurfaceType } from "./surface-types";
 import type { UserVisualAsset } from "./user-identity";
@@ -185,6 +185,15 @@ export interface EventSummary {
    */
   hasSupportVehicle?: boolean;
   /**
+   * The organizer switched auto check-in on for this ride (server sql/040-auto-check-in.sql):
+   * riders on the start list are marked arrived automatically when they open the app near the
+   * start, around the start time. On the SUMMARY because lib/auto-check-in.ts decides from My
+   * Rides — before any detail page is opened — whether a ride is worth asking for a GPS fix.
+   * Optional: a cached row or an older server omits it, and absent means off. The radius and
+   * time window are NOT here; the server owns them (see config.autoCheckInWindowMin).
+   */
+  autoCheckIn?: boolean;
+  /**
    * How many riders the organizer expects (sql/028), or null/absent when they left it blank.
    * The event page shows "12 / 40" only when this is set; otherwise just the count. It is NOT
    * a capacity — the real cap is the organizer's plan limit and never comes down to the client.
@@ -209,6 +218,8 @@ export interface MyParticipant {
   id: number;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  /** How that attendance was recorded; absent on an older server or cached detail. */
+  attendanceSource?: AttendanceSource | null;
 }
 
 /**
@@ -316,6 +327,7 @@ export interface CachedParticipant {
   bib: string | null;
   registrationStatus: RegistrationStatus;
   attendanceStatus: AttendanceStatus;
+  attendanceSource?: AttendanceSource | null;
 }
 
 /** What a cache read hands back: the payload plus when the server last confirmed it. */

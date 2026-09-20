@@ -1,24 +1,28 @@
 /**
  * Rider Statistics — the personal performance timeline. Route: /stats/achievements.
  *
- * REPLACES the earlier tabs + 5-gem-progression-rail Achievements design entirely, per explicit
- * product correction: "the old Achievements design/progression screen is no longer the product
- * direction." There is no goal, no target, no "next gem", no progress bar anywhere on this page
- * — the gem is a reward for a period already lived, not something to chase. See
- * lib/statistics-timeline-mock.ts's header for the exact shape this mirrors.
+ * REAL DATA. One block per calendar month (or year), newest first, each with the five results and
+ * the gem that period earned. There is no goal, no target, no "next gem", no progress bar
+ * anywhere on this page — the gem is a reward for a period already lived, not something to chase.
  *
- * THE CLIENT NEVER COMPUTES A GEM. Every gem shown here is a mock stand-in for a value a future
- * server endpoint returns (thresholds differ per metric AND per month-vs-year, and live in
- * server config) — this page only ever renders `stat.gem`, never derives one.
+ * THE CLIENT NEVER COMPUTES A GEM. Every gem shown is `gems[stat]` exactly as the server sent it
+ * (server/src/statistics/statistics.gems.ts owns the thresholds); this page never derives one.
  *
- * Concept: MY ACTUAL PERFORMANCE + MY GEM FOR IT + MY HISTORY (this page) + MY RANKING (a later
- * phase — "ME vs OTHER RIDERS", explicitly deferred). Each period block below has a "Rankings"
- * affordance reserved for that later phase; it does nothing yet.
+ * WHAT COUNTS as a ride is decided on the server: every approved/registered participant of a ride
+ * that has finished (by its organizer, or automatically a day after it ended). An operator can
+ * tighten that to riders recorded as having turned up — auto check-in at the start, or ticked by the organizer (app_flags
+ * stats_require_live_checkin) — nothing here changes when they do.
+ *
+ * CACHING (lib/statistics-periods.ts has the rules, store/statisticsStore.ts applies them):
+ * the current month/year is a live query trusted for 24h; every closed month/year is kept on this
+ * device with no expiry until sign-out, so scrolling back through history costs no requests.
  *
  * Route:   /stats/achievements
- * Loads:   lib/statistics-timeline-mock.ts (temporary — a real endpoint returns this same shape
- *          per period), public/images/statistics/achievements/*.jpg (the 5 gem renders)
- * Actions: Month/Year switch (resets the timeline); infinite scroll loads older periods
+ * Loads:   GET /statistics/periods via store/statisticsStore.ts (device cache first),
+ *          public/images/statistics/achievements/*.jpg (the 5 gem renders)
+ * Actions: Month/Year switch (resets the timeline); infinite scroll reveals older periods
+ *
+ * "Rankings" per period (ME vs OTHER RIDERS) is a later phase — the button below holds its place.
  */
 
 import {
@@ -38,18 +42,19 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useMyIdentity } from "../app/useMyIdentity";
 import {
   formatStatValue,
   GEM_ASSET,
-  getMonthlyPeriods,
-  getYearlyPeriods,
-  type PeriodStats,
   type PeriodType,
+  percentChange,
+  periodLabel,
   STAT_LABEL,
   STAT_ORDER,
   type StatKey,
-} from "../lib/statistics-timeline-mock";
-import { MockDataNotice } from "./MockDataBadge";
+  statValue,
+} from "../lib/statistics-periods";
+import { useStatisticsStore } from "../store/statisticsStore";
 import styles from "./StatisticsAchievementsPage.module.css";
 
 const STAT_ICON: Record<StatKey, ReactNode> = {
@@ -62,15 +67,11 @@ const STAT_ICON: Record<StatKey, ReactNode> = {
 
 const PAGE_SIZE = 6;
 
-/** Signed whole-percent change vs the prior period. `null` when the prior period had no
- *  baseline to compare against (0), so a rider's very first ride ever doesn't read as "+∞%". */
-function percentChange(current: number, previous: number): number | null {
-  if (previous === 0) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
 export function StatisticsAchievementsPage() {
+  const me = useMyIdentity();
   const [periodType, setPeriodType] = useState<PeriodType>("month");
+  const slot = useStatisticsStore((s) => s.timelines[periodType]);
+  const loadTimeline = useStatisticsStore((s) => s.loadTimeline);
   const [count, setCount] = useState(PAGE_SIZE);
   const [legendOpen, setLegendOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -86,24 +87,31 @@ export function StatisticsAchievementsPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // +1 so the OLDEST visible period can still show a trend against the one just before it —
-  // that extra period is fetched but never rendered.
-  const periodsWithLookback: PeriodStats[] =
-    periodType === "month" ? getMonthlyPeriods(count + 1) : getYearlyPeriods(count + 1);
-  const periods = periodsWithLookback.slice(0, count);
+  // The device cache paints first, so switching Month/Year is instant when it has been visited.
+  useEffect(() => {
+    if (me.userId != null) void loadTimeline(me.userId, periodType);
+  }, [me.userId, periodType, loadTimeline]);
+
+  // Every period the store holds (newest first); `count` only limits how many are drawn at once.
+  const allPeriods = slot.data?.periods ?? [];
+  const periods = allPeriods.slice(0, count);
+  const hasMore = periods.length < allPeriods.length;
+  const noRidesYet = allPeriods.length > 0 && allPeriods.every((p) => p.rides === 0);
+  const needsWeight =
+    slot.data != null && slot.data.weightKg == null && allPeriods.some((p) => p.calories == null);
 
   function switchPeriodType(next: PeriodType) {
     setPeriodType(next);
     setCount(PAGE_SIZE);
   }
 
-  // Infinite scroll: load the next batch of older periods as the sentinel comes into view —
+  // Infinite scroll: reveal the next batch of older periods as the sentinel comes into view —
   // same IntersectionObserver-over-a-sentinel pattern already used elsewhere in this app
-  // (TrackGallerySheet). Mock data is generated on demand, so "loading more" is just asking for
-  // a longer slice; a real endpoint would page here instead.
+  // (TrackGallerySheet). All the periods are already on the device, so this only widens the slice
+  // that is drawn; it never makes a request.
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    if (!sentinel || !hasMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) setCount((c) => c + PAGE_SIZE);
@@ -112,7 +120,7 @@ export function StatisticsAchievementsPage() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, []);
+  }, [hasMore]);
 
   return (
     <div className={styles.page}>
@@ -156,34 +164,58 @@ export function StatisticsAchievementsPage() {
         </button>
       </div>
 
-      <MockDataNotice>
-        Sample timeline — this whole page is placeholder data until period-by-period gems have a
-        real source.
-      </MockDataNotice>
-
       <p className={styles.sectionEyebrow}>MY RESULTS</p>
+
+      {me.userId == null || (slot.loading && slot.data == null) ? (
+        <p className={styles.note} role="status">
+          Loading your results…
+        </p>
+      ) : slot.failed ? (
+        <p className={styles.note} role="alert">
+          Could not load your results right now.{" "}
+          <button
+            type="button"
+            className={styles.noteButton}
+            onClick={() => me.userId != null && void loadTimeline(me.userId, periodType)}
+          >
+            Try again
+          </button>
+        </p>
+      ) : (
+        <>
+          {noRidesYet && (
+            <p className={styles.note}>
+              No rides counted yet. A ride counts once you have joined it and it has finished.
+            </p>
+          )}
+          {needsWeight && (
+            <p className={styles.note}>
+              Calories need your weight — <Link to="/account">add it in Account</Link> and they will
+              show here.
+            </p>
+          )}
+        </>
+      )}
 
       <div className={styles.timeline}>
         {periods.map((period, i) => {
-          // The period right before this one, chronologically — one older, i.e. the NEXT entry
-          // in this newest-first list. Always present: periodsWithLookback fetched one extra.
-          const previousPeriod = periodsWithLookback[i + 1];
           return (
             <section className={styles.periodBlock} key={period.period}>
               <div className={styles.periodHeaderRow}>
-                <h2 className={styles.periodLabel}>{period.label}</h2>
+                <h2 className={styles.periodLabel}>{periodLabel(periodType, period.period)}</h2>
                 {i === 0 && <span className={styles.currentBadge}>Current</span>}
               </div>
 
               <div className={styles.statList}>
-                {STAT_ORDER.map((key) => {
-                  const stat = period.stats[key];
-                  const trend = percentChange(stat.value, previousPeriod.stats[key].value);
+                {STAT_ORDER.map((key: StatKey) => {
+                  const value = statValue(period, key);
+                  const gem = period.gems[key];
+                  const trend = percentChange(value, statValue(period.previous, key));
                   return (
                     <div className={styles.statRow} key={key}>
                       <span className={styles.statIcon}>{STAT_ICON[key]}</span>
                       <span className={styles.statLabel}>{STAT_LABEL[key]}</span>
-                      <span className={styles.statValue}>{formatStatValue(stat)}</span>
+                      <span className={styles.statValue}>{formatStatValue(key, value)}</span>
                       {trend != null && (
                         <span
                           className={trend >= 0 ? styles.trendUp : styles.trendDown}
@@ -201,10 +233,10 @@ export function StatisticsAchievementsPage() {
                       )}
                       <span className={styles.statGemFrame}>
                         <img
-                          src={GEM_ASSET(stat.gem)}
-                          alt={stat.gem}
+                          src={GEM_ASSET(gem)}
+                          alt={gem}
                           className={styles.statGem}
-                          title={stat.gem}
+                          title={gem}
                         />
                       </span>
                     </div>
@@ -217,7 +249,7 @@ export function StatisticsAchievementsPage() {
                   layout, per instruction to design for it now and build it later. */}
               <button type="button" className={styles.rankingsButton} disabled title="Coming soon">
                 <Trophy aria-hidden="true" />
-                Rankings for {period.label}
+                Rankings for {periodLabel(periodType, period.period)}
               </button>
             </section>
           );

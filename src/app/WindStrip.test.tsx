@@ -75,17 +75,15 @@ function strip(overrides: Partial<Parameters<typeof WindStrip>[0]["event"]> = {}
 }
 
 describe("WindStrip gating", () => {
-  it("not enabled for this account: renders nothing, no request, nothing stored", async () => {
+  it("open to everyone: an owner whose account has no pilot flag still gets the strip", async () => {
     const fetchMock = mockFetch(startsInTwoDays().ms);
     profile = { canSeeWindForecast: false };
-    const { container } = render(strip());
-    await new Promise((r) => setTimeout(r, 30));
-    expect(container.innerHTML).toBe("");
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(localStorage.length).toBe(0);
+    render(strip());
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(4));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("enabled account but a stranger to the ride: renders nothing, no request, nothing stored", async () => {
+  it("a stranger to the ride: renders nothing, no request, nothing stored", async () => {
     const fetchMock = mockFetch(startsInTwoDays().ms);
     profile = { canSeeWindForecast: true };
     const { container } = render(strip({ isOwner: false, myParticipant: null }));

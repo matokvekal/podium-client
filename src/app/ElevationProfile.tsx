@@ -29,6 +29,13 @@ interface ElevationProfileProps {
   elevations: readonly (number | null)[] | null | undefined;
   /** Overrides the responsive default (96px on a phone, 120px on a wide screen). */
   heightPx?: number;
+  /**
+   * When there is nothing honest to draw, keep the chart's place (same height) and say so instead
+   * of rendering nothing. Opt-in: Find Tracks and every other caller still collapse, so only the
+   * ride page — where the wind strip sits directly under this — holds the slot. No values are
+   * ever invented: the empty state has no line, no axis and no numbers.
+   */
+  showEmpty?: boolean;
 }
 
 /** Room for the "1200 m" gutter, the km labels underneath, and a little air top and right. */
@@ -60,7 +67,12 @@ function sampleNearest(samples: readonly ElevationSample[], km: number): Elevati
   return Math.abs(before.distanceKm - km) <= Math.abs(after.distanceKm - km) ? before : after;
 }
 
-export function ElevationProfile({ points, elevations, heightPx }: ElevationProfileProps) {
+export function ElevationProfile({
+  points,
+  elevations,
+  heightPx,
+  showEmpty = false,
+}: ElevationProfileProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
   const [hover, setHover] = useState<ElevationSample | null>(null);
@@ -120,8 +132,21 @@ export function ElevationProfile({ points, elevations, heightPx }: ElevationProf
     [profile, plotWidth],
   );
 
-  // Nothing usable to draw: the page carries on with just its map.
-  if (!profile || !axis || !geometry) return null;
+  // Nothing usable to draw: the page carries on with just its map — unless the caller asked to
+  // keep the slot, in which case a neutral, value-free placeholder of the same height stands in.
+  if (!profile || !axis || !geometry) {
+    if (!showEmpty) return null;
+    return (
+      <div
+        className={styles.empty}
+        style={{ height }}
+        role="img"
+        aria-label="No elevation profile is available for this route."
+      >
+        <span className={styles.emptyText}>No elevation data for this route</span>
+      </div>
+    );
+  }
 
   const climbLabel = `${Math.round(profile.maxM - profile.minM)} m between the lowest and highest point`;
 

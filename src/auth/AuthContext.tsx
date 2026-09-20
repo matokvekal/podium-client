@@ -109,6 +109,12 @@ export interface Profile {
    * that file) once Statistics is ready for every rider.
    */
   canSeeStatistics?: boolean;
+  /**
+   * Wind-along-the-route pilot gate (lib/wind-eligibility.ts). Server-computed from one switch in
+   * user.controller.ts, so the client carries no email list. Only an explicit `true` counts.
+   * Remove this field (and that file) once the wind strip opens up for everyone.
+   */
+  canSeeWindForecast?: boolean;
 }
 
 interface AuthResponse {

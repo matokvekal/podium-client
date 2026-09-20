@@ -66,3 +66,20 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+/* The value-free stand-in for a route with no elevation series (ElevationProfile showEmpty): the
+   chart's own height, a dashed baseline and one quiet line of text. No line, axis or numbers —
+   nothing here can be mistaken for terrain. */
+.empty {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-bottom: 1px dashed var(--border);
+}
+
+.emptyText {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

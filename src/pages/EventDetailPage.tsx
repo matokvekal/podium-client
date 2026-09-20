@@ -69,6 +69,7 @@ import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
 import { ElevationProfile } from "../app/ElevationProfile";
+import { WindStrip } from "../app/WindStrip";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
@@ -1744,9 +1745,20 @@ export function EventDetailPage() {
                 <Suspense fallback={<div className="row muted">Loading the map…</div>}>
                   <RouteMap points={results.route.points} />
                 </Suspense>
+                {/* showEmpty: a route with no elevation series keeps this slot (a neutral placeholder,
+                    no invented values) so the wind strip below never moves up into it. */}
                 <ElevationProfile
                   points={results.route.points}
                   elevations={results.route.elevations}
+                  showEmpty
+                />
+                {/* Wind pilot: renders nothing (and asks nobody for anything) unless this viewer
+                    is eligible — see lib/wind-eligibility.ts. */}
+                <WindStrip
+                  event={event}
+                  points={results.route.points}
+                  durationMin={event.durationMin ?? estimatedMin}
+                  routeDistanceKm={results.route.distanceKm}
                 />
                 {event.copiedFromEventId && (
                   <CopiedFromCredit sourceEventId={event.copiedFromEventId} />

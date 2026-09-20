@@ -1,0 +1,140 @@
+/* The wind strip: the next row under the elevation profile, not a card of its own.
+
+   It occupies the same horizontal band as the chart's plot area. The two paddings below MIRROR
+   PAD_LEFT (42) and PAD_RIGHT (14) in app/ElevationProfile.tsx — that file is deliberately left
+   untouched, so if it ever changes its gutters, change these to match.
+
+   Cell fills come from the continuous ramp in lib/wind-model.ts (set inline); everything else uses
+   tokens.css so it follows light/dark with the rest of the page. */
+
+.wrap {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 2px 14px 0 42px;
+}
+
+/* Row labels, in the chart's left gutter. Same row heights and 1px gap as every column, so each
+   label stays level with its row however far the columns scroll. */
+.labels {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.strip {
+  display: flex;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Columns share the plot width equally; only if they would get narrower than the minimum
+     (a very long ride) does it scroll sideways instead of squeezing the numbers. */
+  overflow-x: auto;
+}
+
+.col {
+  flex: 1 1 0;
+  min-width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+}
+
+/* One height per row, shared by the label column and every hour column. */
+.time,
+.text,
+.rowLabelText {
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.5625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time {
+  height: 11px;
+  line-height: 11px;
+  color: var(--text-muted);
+}
+
+.text {
+  height: 12px;
+  line-height: 12px;
+  color: var(--text-muted);
+}
+
+.rowLabelText {
+  height: 12px;
+  line-height: 12px;
+  color: var(--text-muted);
+}
+
+/* The gust is a warning worth a glance, so it is a touch stronger than the temperature under it —
+   but still plain text, never a coloured box. */
+.gust {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Temperature is the secondary reading: plain text, a little quieter than the wind and gusts. */
+.temp {
+  height: 14px;
+  line-height: 14px;
+  font-size: 0.6875rem;
+  opacity: 0.9;
+}
+
+.rowLabelCell {
+  display: block;
+  height: 20px;
+  line-height: 20px;
+  color: var(--text-muted);
+  font-size: 0.5625rem;
+  white-space: nowrap;
+}
+
+/* A data cell, not a button: small, rectangular, barely rounded, close to its neighbours. Capped
+   so a short ride on a wide screen does not blow the cells up. */
+.cell {
+  display: block;
+  box-sizing: border-box;
+  width: min(100%, 34px);
+  height: 20px;
+  margin: 0 auto;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.arrowRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 13px;
+  color: var(--text-muted);
+}
+
+.arrow {
+  display: block;
+}
+
+.credit {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 0.5rem;
+  line-height: 1;
+  text-align: right;
+  text-decoration: underline;
+  opacity: 0.7;
+}

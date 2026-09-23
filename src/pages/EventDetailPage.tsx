@@ -1317,7 +1317,7 @@ export function EventDetailPage() {
                 from My Rides, and anyone else from the Past filter — neither needs a link. */}
             {/* Ride chat — the riders on this ride and its organizers (server: "event:chat").
                 Kept after the ride finishes, so History still opens it. */}
-            {canChat && <RideChatButton rideId={event.id} className={styles.heroIconBtn} />}
+            {canChat && <RideChatButton rideId={event.id} variant="page" />}
             {canShare && (
               <button
                 type="button"

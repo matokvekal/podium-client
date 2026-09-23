@@ -28,6 +28,8 @@ import { StatisticsPage } from "./pages/StatisticsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
+import { RideChatPage } from "./pages/RideChatPage";
+import { SharedTrackPage } from "./pages/SharedTrackPage";
 import { TracksPage } from "./pages/TracksPage";
 import { useUserModeStore } from "./store/userModeStore";
 
@@ -192,6 +194,17 @@ export function App() {
             </RequireAuth>
           }
         />
+        {/* Ride chat — the riders on this ride and its organizers (server: "event:chat", checked
+            on every read and send). Signed-in only; also reachable for a finished ride from
+            History. See pages/RideChatPage.tsx. */}
+        <Route
+          path="/events/:eventId/chat"
+          element={
+            <RequireAuth>
+              <RideChatPage />
+            </RequireAuth>
+          }
+        />
         {/* The live map — fully separate from the event detail page on purpose (asked for
             directly: "event page and live are 2 different pages... not same page with 2 maps").
             Open, same as the detail page: a public event's live locations (if show_live_locations
@@ -285,6 +298,20 @@ export function App() {
             </OpenHome>
           }
         />
+        {/* ONE shared track — /mtb/<trackId>, /gravel/<trackId>, /road/<trackId> (a card's Share
+            button; lib/track-share-url.ts). Open like Find Tracks: the link must show the track to
+            whoever opens it. Signing in from the menu returns here (AppDrawer's goToLogin). */}
+        {(["mtb", "gravel", "road"] as const).map((terrain) => (
+          <Route
+            key={terrain}
+            path={`/${terrain}/:trackId`}
+            element={
+              <OpenHome>
+                <SharedTrackPage />
+              </OpenHome>
+            }
+          />
+        ))}
         {/* The address this page had before it became shareable — old bookmarks keep working. */}
         <Route path="/routes" element={<Navigate to="/findtracks" replace />} />
         <Route

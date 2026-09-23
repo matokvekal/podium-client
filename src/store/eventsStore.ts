@@ -109,8 +109,11 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     set({ myRidesLoading: true });
     try {
       const [mine, joined] = await Promise.all([
-        apiRequest<EventSummary[]>("/events?filter=mine"),
-        apiRequest<EventSummary[]>("/events?filter=joined"),
+        // includePreview: each row carries its 60-point route preview, so the Find Tracks "My"
+        // grid and the ride cards draw maps with no request per card. The server made it
+        // opt-in (this list is unpaginated); asked for here so the payload stays what it was.
+        apiRequest<EventSummary[]>("/events?filter=mine&includePreview=true"),
+        apiRequest<EventSummary[]>("/events?filter=joined&includePreview=true"),
       ]);
       if (requestId !== myRidesRequestId) return;
       const merged = dedupeById([...mine, ...joined]);

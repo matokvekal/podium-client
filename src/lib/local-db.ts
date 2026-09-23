@@ -287,6 +287,11 @@ export interface EventDetail extends EventSummary {
   showLiveLocations: boolean;
   myParticipant: MyParticipant | null;
   /**
+   * What THIS viewer may do with the ride, decided by the server (server authz/capabilities.ts)
+   * — e.g. "event:chat". Optional: a cached detail or an older server omits it.
+   */
+  capabilities?: string[];
+  /**
    * Start-list capacity. `participantCount` (approved + pending) and `isFull` are sent to every
    * viewer; the server 409s (EVENT_FULL) when a join hits the cap, so client checks are UX only.
    *

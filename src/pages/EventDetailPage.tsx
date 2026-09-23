@@ -130,6 +130,8 @@ import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
+import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
+import { canOpenRideChat } from "../lib/ride-chat";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -163,41 +165,6 @@ function SedanIcon() {
   );
 }
 
-/**
- * "Track copied from <ride>" — the credit line under the route preview, shown when this ride's
- * track came from another ride (server: events.copied_from_event_id, sql/025).
- *
- * The server sends the source ride's ID, not its name, so the name is fetched here — best
- * effort, and the whole point of this component is what happens when that fails. A source ride
- * can be cancelled, deleted, or private to someone else, and none of those are errors: the ride
- * and the track are separate entities, and the record of where a track came from deliberately
- * outlives the ride it came from. So a name that will not resolve degrades to plain,
- * unlinked text rather than a dead link or a disappearing credit.
- */
-function CopiedFromCredit({ sourceEventId }: { sourceEventId: string }) {
-  const [name, setName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiRequest<{ name?: string }>(`/events/${sourceEventId}`)
-      .then((source) => {
-        if (!cancelled && source?.name) setName(source.name);
-      })
-      .catch(() => {
-        // Gone, cancelled, or not ours to see. The credit stays, the link does not.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceEventId]);
-
-  return (
-    <p className={styles.routeCredit}>
-      Track copied from{" "}
-      {name ? <Link to={`/events/${sourceEventId}`}>{name}</Link> : "another ride"}
-    </p>
-  );
-}
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
@@ -1023,6 +990,12 @@ export function EventDetailPage() {
     event?.owner?.avatar,
   );
 
+  // Ride chat: drawn only for someone on the ride (lib/ride-chat.ts canOpenRideChat), with its
+  // unread badge refreshed once now and every ~5 min — one request, never per ride. Above the
+  // early returns below so the hook order never changes.
+  const canChat = signedIn && event != null && canOpenRideChat(event);
+  useRideChatUnread(canChat && event ? [event.id] : [], canChat);
+
   if (loading) {
     return (
       <div className="row">
@@ -1342,6 +1315,9 @@ export function EventDetailPage() {
                 could only ever hand out a code that answers "no event has that code": an
                 invitation to something nobody can accept. Riders who were there still reach it
                 from My Rides, and anyone else from the Past filter — neither needs a link. */}
+            {/* Ride chat — the riders on this ride and its organizers (server: "event:chat").
+                Kept after the ride finishes, so History still opens it. */}
+            {canChat && <RideChatButton rideId={event.id} className={styles.heroIconBtn} />}
             {canShare && (
               <button
                 type="button"
@@ -1849,9 +1825,9 @@ export function EventDetailPage() {
                   durationMin={event.durationMin ?? estimatedMin}
                   routeDistanceKm={results.route.distanceKm}
                 />
-                {event.copiedFromEventId && (
-                  <CopiedFromCredit sourceEventId={event.copiedFromEventId} />
-                )}
+                {/* No "Track copied from <ride>" line here any more (asked for directly): where a
+                    track came from is bookkeeping (events.copied_from_event_id still records it for
+                    the reuse count), not something a rider needs on the ride page. */}
               </div>
             )}
 

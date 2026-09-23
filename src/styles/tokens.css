@@ -45,6 +45,11 @@
   --status-danger: #df4b7b;
   --status-finished: #4338ca;
 
+  /* ride chat — its own colour, used by nothing else, so the chat button is recognisable at a
+     glance on any card (app/RideChatButton.module.css). Same in light and dark. */
+  --chat: #7c5cff;
+  --chat-strong: #6a48f0;
+
   /* effort ramp — cool to hot, five stops. The calorie estimator's speed slider walks these as
      the rider asks more of themselves: the bar, its thumb and the flame all heat up together,
      so a faster ride LOOKS like a harder ride before the number is read. Graphics only —

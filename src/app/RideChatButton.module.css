@@ -1,77 +1,98 @@
-/* The ride chat icon. Card variant matches the card's heart button (30px, no chrome) so it
-   adds no height to the card; the page variant is a small labelled pill. */
+/*
+ * The ride chat button — ONE look everywhere (ride card and ride page) so a rider learns it
+ * once: a solid purple circle with a white chat bubble, plus a count badge that is always
+ * there.
+ *
+ * Purple on purpose: no other control in the app is purple (blue is every other action, red
+ * is live / alerts), so the chat reads as its own thing at a glance instead of blending into
+ * the grey icon row the way a bare outline icon did.
+ *
+ * The badge is always drawn, so it is obvious a chat exists even before anyone writes:
+ *   unread > 0   red, with the unread count  — "there is something for you"
+ *   unread = 0   quiet grey 0                — "chat is here, nothing new"
+ */
 
 .btn {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
-  gap: 4px;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
-  margin: -4px 0 0;
+  margin: -4px 4px 0 0;
   padding: 0;
-  font: inherit;
-  color: var(--text-muted);
-  background: none;
+  color: #fff;
+  background: var(--chat);
   border: none;
   border-radius: 50%;
+  box-shadow: 0 2px 6px rgb(124 92 255 / 0.4);
   cursor: pointer;
+  transition:
+    transform var(--beat-1) ease,
+    background var(--beat-1) ease;
 }
 
 .btn:hover {
-  color: var(--accent-strong);
-  background: var(--surface-raised);
+  background: var(--chat-strong);
+  transform: scale(1.06);
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--chat);
+  outline-offset: 2px;
+}
+
+/* The ride page: a little bigger, beside the hero's other round buttons. */
 .btnPage {
-  width: auto;
-  height: var(--tap-target);
-  margin: 0;
-  padding: 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-}
-
-/* With a caller's className the look is theirs; this only anchors the badge. */
-.anchor {
-  position: relative;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px 0 0;
 }
 
 .icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
-.word {
-  line-height: 1;
-}
-
-/* The unread count: small, red, on the icon's top-right corner. */
 .badge {
   position: absolute;
-  inset-block-start: -3px;
-  inset-inline-end: -5px;
-  min-width: 17px;
-  height: 17px;
+  inset-block-start: -5px;
+  inset-inline-end: -7px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   font-size: 10px;
   font-weight: var(--weight-bold);
-  line-height: 17px;
+  line-height: 16px;
   text-align: center;
   color: #fff;
   background: var(--status-danger);
   border: 2px solid var(--surface);
   border-radius: 999px;
   box-sizing: content-box;
+  font-variant-numeric: tabular-nums;
 }
 
-.btnPage .badge {
-  inset-block-start: -6px;
-  inset-inline-end: -6px;
+.badge[data-zero] {
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-color: var(--surface);
+}
+
+/* A new message arriving gives the red badge one small pop, so it is noticed. */
+.badge:not([data-zero]) {
+  animation: chat-badge-pop var(--beat-3) ease-out;
+}
+
+@keyframes chat-badge-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

@@ -183,18 +183,20 @@ describe("RideChatButton", () => {
     );
   }
 
-  it("shows the icon without a badge when nothing is unread", () => {
+  it("always shows the badge — a quiet 0 when nothing is unread", () => {
     useRideChatStore.setState({ summaries: { [RIDE]: { rideId: RIDE, latestId: 5, unread: 0 } } });
     renderButton();
-    expect(screen.getByLabelText("Ride chat")).toBeTruthy();
-    expect(screen.queryByText("0")).toBeNull();
+    expect(screen.getByLabelText("Ride chat, no new messages")).toBeTruthy();
+    const badge = screen.getByText("0");
+    expect(badge.hasAttribute("data-zero")).toBe(true);
   });
 
   it("shows a red count when there are unread messages", () => {
     useRideChatStore.setState({ summaries: { [RIDE]: { rideId: RIDE, latestId: 9, unread: 3 } } });
     renderButton();
     expect(screen.getByLabelText("Ride chat, 3 unread")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+    // Red (not the quiet zero style).
+    expect(screen.getByText("3").hasAttribute("data-zero")).toBe(false);
   });
 
   it("drops the badge the moment the chat is read", () => {
@@ -202,5 +204,6 @@ describe("RideChatButton", () => {
     renderButton();
     act(() => useRideChatStore.getState().markRead(RIDE, 9));
     expect(screen.queryByText("3")).toBeNull();
+    expect(screen.getByText("0")).toBeTruthy();
   });
 });

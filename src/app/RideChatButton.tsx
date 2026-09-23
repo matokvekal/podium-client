@@ -1,6 +1,7 @@
 /**
- * The ride chat icon — on a ride card and on the ride page. 💬 alone, or 💬 with a small red
- * count when there are unread messages. Tapping it opens /events/:eventId/chat.
+ * The ride chat button — on a ride card and on the ride page: a purple circle with a chat
+ * bubble and a count badge (red unread count, or a quiet 0). Tapping it opens
+ * /events/:eventId/chat.
  *
  * It reads its count from store/rideChatStore.ts and fetches NOTHING itself: the list or page
  * that renders it refreshes every ride's badge in one request (useRideChatUnread), so a list of
@@ -21,13 +22,10 @@ import styles from "./RideChatButton.module.css";
 export function RideChatButton({
   rideId,
   variant = "card",
-  className,
 }: {
   rideId: string;
-  /** "card" is icon-sized for the card's title row; "page" carries the word "Chat". */
+  /** "card" matches the card's 30px heart; "page" is the ride page's 32px hero size. */
   variant?: "card" | "page";
-  /** Replaces the button's own look (the ride page passes its hero icon style). */
-  className?: string;
 }) {
   const navigate = useNavigate();
   const unread = useRideChatStore((s) => s.summaries[rideId]?.unread ?? 0);
@@ -38,29 +36,27 @@ export function RideChatButton({
     navigate(`/events/${rideId}/chat`);
   }
 
-  const label = unread > 0 ? `Ride chat, ${unread} unread` : "Ride chat";
+  const label = unread > 0 ? `Ride chat, ${unread} unread` : "Ride chat, no new messages";
 
   return (
     <button
       type="button"
-      className={
-        className
-          ? `${styles.anchor} ${className}`
-          : variant === "page"
-            ? `${styles.btn} ${styles.btnPage}`
-            : styles.btn
-      }
+      className={variant === "page" ? `${styles.btn} ${styles.btnPage}` : styles.btn}
       onClick={open}
       aria-label={label}
       title={label}
     >
-      <MessageCircle className={styles.icon} aria-hidden="true" />
-      {variant === "page" && <span className={styles.word}>Chat</span>}
-      {unread > 0 && (
-        <span className={styles.badge} aria-hidden="true">
-          {unreadBadgeText(unread)}
-        </span>
-      )}
+      <MessageCircle className={styles.icon} fill="currentColor" aria-hidden="true" />
+      {/* Always drawn — red with the count when there is something new, a quiet 0 otherwise
+          (see the stylesheet). key=unread replays the pop when a new message lands. */}
+      <span
+        key={unread}
+        className={styles.badge}
+        data-zero={unread === 0 || undefined}
+        aria-hidden="true"
+      >
+        {unreadBadgeText(unread)}
+      </span>
     </button>
   );
 }

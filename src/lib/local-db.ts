@@ -279,6 +279,9 @@ export interface EventDetail extends EventSummary {
   requiresBib: boolean;
   description: string | null;
   finishedAt: string | null;
+  /** When the ride actually went live (server sql/048); null before it has, or from an older
+   *  server. The live screen's Elapsed clock counts from this — lib/ride-elapsed.ts. */
+  startedAt?: string | null;
   isOwner: boolean;
   requiresApproval: boolean;
   isPaused: boolean;

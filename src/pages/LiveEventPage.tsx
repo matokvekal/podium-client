@@ -77,6 +77,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { isLocationManuallyStopped } from "../lib/location-broadcast";
+import { rideElapsedMs } from "../lib/ride-elapsed";
 import { formatAge } from "../lib/time";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { resolveUserAvatar, type UserVisualAsset } from "../lib/user-identity";
@@ -512,7 +513,9 @@ export function LiveEventPage() {
     ? (ridersById.get(event.myParticipant.id)?.distanceKm ?? null)
     : null;
   const progressKm = myDistance ?? (leaderDistance > 0 ? leaderDistance : null);
-  const elapsedMs = event?.startsAt ? Math.max(0, now - new Date(event.startsAt).getTime()) : null;
+  // From when the ride actually went live (events.started_at), not the planned start — see
+  // lib/ride-elapsed.ts for the fallbacks.
+  const elapsedMs = event ? rideElapsedMs(event, now) : null;
   const remainingKm =
     results?.route?.distanceKm != null && progressKm != null
       ? Math.max(0, results.route.distanceKm - progressKm)

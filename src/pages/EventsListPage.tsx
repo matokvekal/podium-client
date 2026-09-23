@@ -6,7 +6,8 @@
  *           the merged list AND the joined-only id set). Everyone: GET /events/public
  *           (unauthenticated) for "Find Rides". See App.tsx > OpenHome.
  * Actions:  open a ride; create or join one (both require signing in first); My Rides
- *           Past/Current/Upcoming multi-select chips (none selected = all) + See All
+ *           Past/Current/Upcoming multi-select chips (opens on Current + Upcoming; none
+ *           selected = all) + See All
  *           (search/sort/favourites); Find Rides
  *           client-side Filter + Sort (lib/find-rides-filter.ts).
  * State:    the active tab; My Rides chip filter + See-All controls; Find Rides criteria
@@ -54,6 +55,7 @@ import { Link, useLocation } from "react-router-dom";
 import { EmptyRidesState } from "../app/EmptyRidesState";
 import { EventCard } from "../app/EventCard";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
+import { useRideChatUnread } from "../app/RideChatButton";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
 import {
@@ -119,6 +121,9 @@ const MY_RIDES_FILTERS: { value: MyRidesFilter; label: string }[] = [
   { value: "current", label: "Current" },
   { value: "upcoming", label: "Upcoming" },
 ];
+
+/** What My Rides opens on — see the myFilters state. */
+export const DEFAULT_MY_RIDES_FILTERS: MyRidesFilter[] = ["current", "upcoming"];
 
 export function EventsListPage() {
   const { status, profile } = useAuth();
@@ -197,7 +202,14 @@ export function EventsListPage() {
     () => rawMyRides.filter((ride) => profile != null && ride.ownerId === profile.id),
     [rawMyRides, profile],
   );
+  const myRidesSettled = useEventsStore((state) => state.myRidesSettled);
+  // On a fresh load neither the session nor My Rides is known yet, so "rides I organize" is
+  // an empty set and every stored invite — including ones for the rider's own rides — would
+  // paint for a second before the filter below could catch them. Hold the list back until
+  // both are known; a guest owns nothing, so nothing to wait for there.
+  const ownershipKnown = status === "signed-out" || (authed && myRidesSettled);
   const pendingInvites = useMemo(() => {
+    if (!ownershipKnown) return [];
     const owned = new Set(createdRides.map((ride) => ride.id));
     return (
       Object.values(invitesByEventId)
@@ -206,7 +218,17 @@ export function EventsListPage() {
         .filter((invite) => !owned.has(invite.eventId))
         .sort((a, b) => b.invitedAt - a.invitedAt)
     );
-  }, [invitesByEventId, createdRides]);
+  }, [invitesByEventId, createdRides, ownershipKnown]);
+
+  // Drop stored invites for rides this rider owns, not just hide them: the entry would
+  // otherwise sit in localStorage and resurface anywhere else that reads the store.
+  useEffect(() => {
+    if (!ownershipKnown || createdRides.length === 0) return;
+    const { byEventId, removeInvite } = useInvitedEventsStore.getState();
+    for (const ride of createdRides) {
+      if (ride.id in byEventId) removeInvite(ride.id);
+    }
+  }, [ownershipKnown, createdRides]);
   const createdSorted = useMemo(() => {
     const rank = (e: EventSummary) =>
       figmaStatus(e.status) === "live" ? 0 : figmaStatus(e.status) === "upcoming" ? 1 : 2;
@@ -214,6 +236,16 @@ export function EventsListPage() {
       (a, b) => rank(a) - rank(b) || timestamp(a.startsAt) - timestamp(b.startsAt),
     );
   }, [createdRides]);
+  // Ride chat badges for every ride this rider is on or organizes — ONE request for the whole
+  // list, now and every ~5 min (app/RideChatButton.tsx). Never one per card, and it loads no
+  // messages: only counts.
+  useRideChatUnread(
+    useMemo(
+      () => (authed ? [...myRides, ...createdRides].map((ride) => ride.id) : []),
+      [authed, myRides, createdRides],
+    ),
+    authed,
+  );
   const myRidesLoading = useEventsStore((state) => state.myRidesLoading);
   const otherRides = useEventsStore((state) => state.otherRides);
   const otherLoading = useEventsStore((state) => state.otherLoading);
@@ -252,11 +284,15 @@ export function EventsListPage() {
   }, [myRides]);
 
   // The chip row's active buckets. Multi-select, checkbox-style: an EMPTY selection means
-  // "show everything" (the view you land on), and tapping chips narrows to just the picked
-  // buckets — tap Past to see only past, then add Upcoming to see both. Purely a client-side
-  // lens over myRides — every chip shows rides that are already loaded, so toggling one never
-  // triggers a fetch or a spinner.
-  const [myFilters, setMyFilters] = useState<MyRidesFilter[]>([]);
+  // "show everything", and tapping chips narrows to just the picked buckets — tap Past to see
+  // only past, then add Upcoming to see both. Purely a client-side lens over myRides — every
+  // chip shows rides that are already loaded, so toggling one never triggers a fetch or a
+  // spinner.
+  //
+  // The view you land on is UPCOMING (asked for directly — past rides first was noise). Current
+  // rides in too: a live ride is the one a rider most needs to reach fast, and it must never
+  // drop off the home screen mid-ride just because it has started.
+  const [myFilters, setMyFilters] = useState<MyRidesFilter[]>(DEFAULT_MY_RIDES_FILTERS);
   function toggleMyFilter(value: MyRidesFilter) {
     setMyFilters((current) =>
       current.includes(value)
@@ -822,7 +858,7 @@ export function EventsListPage() {
                       ? "No rides happening right now."
                       : myFilters.length === 1 && myFilters[0] === "past"
                         ? "No past rides yet."
-                        : myFilters.length === 1 && myFilters[0] === "upcoming"
+                        : myFilters.every((f) => f === "upcoming" || f === "current")
                           ? "No upcoming rides."
                           : "No rides match the selected filters."}
                 </p>

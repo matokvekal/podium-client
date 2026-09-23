@@ -45,6 +45,7 @@ import {
   Accessibility,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Circle,
   Coffee,
   Download,
@@ -108,13 +109,29 @@ import {
   terrainDescriptionFor,
   terrainLabelFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTY_LABEL,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SHADE_LABEL,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
 import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
-import { buildGpxFile, downloadGpxFile, gpxFilenameFor } from "../lib/track-gpx";
+import {
+  buildGpxFile,
+  downloadGpxFile,
+  downloadOriginalGpx,
+  gpxFilenameFor,
+} from "../lib/track-gpx";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
+import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
+import { canOpenRideChat } from "../lib/ride-chat";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -126,40 +143,28 @@ const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 const RouteMap = lazy(() => import("../app/RouteMap"));
 
 /**
- * "Track copied from <ride>" — the credit line under the route preview, shown when this ride's
- * track came from another ride (server: events.copied_from_event_id, sql/025).
- *
- * The server sends the source ride's ID, not its name, so the name is fetched here — best
- * effort, and the whole point of this component is what happens when that fails. A source ride
- * can be cancelled, deleted, or private to someone else, and none of those are errors: the ride
- * and the track are separate entities, and the record of where a track came from deliberately
- * outlives the ride it came from. So a name that will not resolve degrades to plain,
- * unlinked text rather than a dead link or a disappearing credit.
+ * A low, smooth-roofed sedan in the same 24px outline style as the lucide icons around it (lucide's
+ * own Car is a boxy hatchback). A generic body shape drawn here — deliberately not any brand's
+ * logo, and not the Waze logo either, which is a brand asset we do not have a licence for.
  */
-function CopiedFromCredit({ sourceEventId }: { sourceEventId: string }) {
-  const [name, setName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiRequest<{ name?: string }>(`/events/${sourceEventId}`)
-      .then((source) => {
-        if (!cancelled && source?.name) setName(source.name);
-      })
-      .catch(() => {
-        // Gone, cancelled, or not ours to see. The credit stays, the link does not.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceEventId]);
-
+function SedanIcon() {
   return (
-    <p className={styles.routeCredit}>
-      Track copied from{" "}
-      {name ? <Link to={`/events/${sourceEventId}`}>{name}</Link> : "another ride"}
-    </p>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 15.5v-2c0-.8.5-1.3 1.3-1.5L6.2 11.3C7.4 9.4 9.5 8.2 12 8.2h1.4c2 0 3.5.8 4.9 2.2l2.4 1.2c.8.3 1.3.9 1.3 1.7v2.2M2 15.5h2.1M8.5 15.5h7.1M19.9 15.5H22" />
+      <circle cx="6.3" cy="16" r="2.2" />
+      <circle cx="17.7" cy="16" r="2.2" />
+    </svg>
   );
 }
+
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
@@ -384,6 +389,13 @@ export function EventDetailPage() {
   const invite = useInvitedEventsStore((state) =>
     eventId ? (state.byEventId[eventId] ?? null) : null,
   );
+  // The organizer opening their own share link/QR records an invite for their own ride (the
+  // by-code lookup can't tell). Once the event says they own it, clear it so it never shows
+  // on the home screen.
+  const ownsEvent = event?.isOwner === true;
+  useEffect(() => {
+    if (ownsEvent && eventId) useInvitedEventsStore.getState().removeInvite(eventId);
+  }, [ownsEvent, eventId, invite]);
   const [connectOpen, setConnectOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -978,6 +990,12 @@ export function EventDetailPage() {
     event?.owner?.avatar,
   );
 
+  // Ride chat: drawn only for someone on the ride (lib/ride-chat.ts canOpenRideChat), with its
+  // unread badge refreshed once now and every ~5 min — one request, never per ride. Above the
+  // early returns below so the hook order never changes.
+  const canChat = signedIn && event != null && canOpenRideChat(event);
+  useRideChatUnread(canChat && event ? [event.id] : [], canChat);
+
   if (loading) {
     return (
       <div className="row">
@@ -1104,6 +1122,17 @@ export function EventDetailPage() {
   /** How technical the ground is (sql/038) — mtb/gravel only, where a scale exists to read it
    *  against. Orthogonal to `level` above: that one is who the ride is pitched at. */
   const terrainGrade = terrainApplies(activityType) ? asTerrainGrade(event.terrainGrade) : null;
+
+  /** How hard the TRACK is, when it is pleasant to ride, and how shaded it is (sql/041) — mtb /
+   *  gravel only, and each tile appears only when the value exists, so a road ride (or an mtb
+   *  ride that never stated them) shows no empty tiles. Not `level`, not terrain. */
+  const trailMeta = trailMetadataApplies(activityType)
+    ? {
+        routeDifficulty: asRouteDifficulty(event.routeDifficulty),
+        season: asTrailSeason(event.season),
+        shade: asTrailShade(event.shade),
+      }
+    : null;
 
   /** The organizer's own figure first, the app's estimate only to fill a blank, "soon" if even
    *  that is impossible. formatEstimatedDuration is what marks a derived time as derived. */
@@ -1268,11 +1297,15 @@ export function EventDetailPage() {
                 href={wazeHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${styles.heroIconBtn} ${styles.heroWazeBtn}`}
-                aria-label="Navigate to the meeting point with Waze"
-                title="Drive to the meeting point — Waze"
+                className={styles.heroWazeBtn}
+                aria-label="Navigate with Waze"
+                title="Navigate with Waze"
               >
-                <Navigation aria-hidden="true" />
+                {/* A generic car glyph and the word "Waze" — deliberately not the Waze logo,
+                    which is a brand asset we do not have a licence for. */}
+                <SedanIcon />
+                <span>Waze</span>
+                <ChevronRight className={styles.heroWazeChevron} aria-hidden="true" />
               </a>
             )}
             {/* Share is gone once the ride is over. A share link exists to get someone TO a
@@ -1282,6 +1315,9 @@ export function EventDetailPage() {
                 could only ever hand out a code that answers "no event has that code": an
                 invitation to something nobody can accept. Riders who were there still reach it
                 from My Rides, and anyone else from the Past filter — neither needs a link. */}
+            {/* Ride chat — the riders on this ride and its organizers (server: "event:chat").
+                Kept after the ride finishes, so History still opens it. */}
+            {canChat && <RideChatButton rideId={event.id} className={styles.heroIconBtn} />}
             {canShare && (
               <button
                 type="button"
@@ -1409,6 +1445,27 @@ export function EventDetailPage() {
                 {terrainLabelFor(terrainGrade, activityType)}
               </span>
               <span className={styles.statTileLabel}>Terrain</span>
+            </div>
+          )}
+          {/* ROUTE DIFFICULTY / SEASON / SHADE — mtb and gravel, only where stated (sql/041). */}
+          {trailMeta?.routeDifficulty && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>
+                {ROUTE_DIFFICULTY_LABEL[trailMeta.routeDifficulty]}
+              </span>
+              <span className={styles.statTileLabel}>Route difficulty</span>
+            </div>
+          )}
+          {trailMeta?.season && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>{TRAIL_SEASON_LABEL[trailMeta.season]}</span>
+              <span className={styles.statTileLabel}>Season</span>
+            </div>
+          )}
+          {trailMeta?.shade && (
+            <div className={styles.statTile}>
+              <span className={styles.statTileValue}>{TRAIL_SHADE_LABEL[trailMeta.shade]}</span>
+              <span className={styles.statTileLabel}>Shade</span>
             </div>
           )}
           <div
@@ -1731,10 +1788,18 @@ export function EventDetailPage() {
                     type="button"
                     className={styles.routeDownloadBtn}
                     onClick={() => {
-                      if (!results.route) return;
-                      downloadGpxFile(
-                        gpxFilenameFor(event.name),
-                        buildGpxFile(results.route, event.name),
+                      const route = results.route;
+                      if (!route) return;
+                      const rebuilt = () =>
+                        downloadGpxFile(gpxFilenameFor(event.name), buildGpxFile(route, event.name));
+                      // A track that was imported keeps its ORIGINAL file (sql/042): hand out
+                      // those exact bytes. Anything without one — every ordinary ride — falls
+                      // back to the GPX rebuilt from the line on screen, as it always has.
+                      if (event.routeId == null) return rebuilt();
+                      void downloadOriginalGpx(event.routeId, gpxFilenameFor(event.name)).then(
+                        (saved) => {
+                          if (!saved) rebuilt();
+                        },
                       );
                     }}
                   >
@@ -1760,9 +1825,9 @@ export function EventDetailPage() {
                   durationMin={event.durationMin ?? estimatedMin}
                   routeDistanceKm={results.route.distanceKm}
                 />
-                {event.copiedFromEventId && (
-                  <CopiedFromCredit sourceEventId={event.copiedFromEventId} />
-                )}
+                {/* No "Track copied from <ride>" line here any more (asked for directly): where a
+                    track came from is bookkeeping (events.copied_from_event_id still records it for
+                    the reuse count), not something a rider needs on the ride page. */}
               </div>
             )}
 

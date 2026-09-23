@@ -111,6 +111,15 @@ export interface EventSummary {
    * never a 1.
    */
   terrainGrade?: number | null;
+  /**
+   * How hard the TRACK is, when it is pleasant to ride, and how shaded (server sql/041). Stable
+   * English keys — the Hebrew words live in lib/trail-metadata.ts. Collected and shown for mtb /
+   * gravel only; null / absent on road rides and on a cached row or older server. Not the same
+   * as `level` (who the ride is pitched at) or `terrainGrade` (the ground).
+   */
+  routeDifficulty?: string | null;
+  season?: string | null;
+  shade?: string | null;
   organizerGroup?: string | null;
   teamId?: string | null;
   /**
@@ -158,14 +167,13 @@ export interface EventSummary {
   downloads?: number | null;
   /**
    * The attached route's tiny card preview (server: routes.thumb_points, sql/046) — at most 60
-   * points plus a parallel whole-metre elevation series. Sent inside every row of GET
-   * /events/public, so a Find Tracks card draws its map and climb profile with NO request of its
-   * own. Display only: the detailed line is GET /events/:id/route (fetched when a rider explores a
-   * card's map) and the original file is never loaded by the gallery.
+   * points plus a parallel whole-metre elevation series. Sent inside every row of GET /events and
+   * GET /events/public, so a Find Tracks / My Rides card draws its map and climb profile with NO
+   * request of its own. Display only: the detailed line is GET /events/:id/route (fetched when a
+   * rider explores a card's map) and the original file is GET /routes/:id/gpx.
    *
-   * `null` = the ride has no drawable route (or the server has no preview yet); absent = a row
-   * from any other list (GET /events carries none), a cached row, or an older server. Either way
-   * the card simply draws no line — never a fabricated one.
+   * `null` = the ride has no drawable route (or the server has no preview yet); absent = a cached
+   * row or an older server. Either way the card simply draws no line — never a fabricated one.
    */
   preview?: EventPreview | null;
   /**
@@ -278,6 +286,11 @@ export interface EventDetail extends EventSummary {
   showParticipants: boolean;
   showLiveLocations: boolean;
   myParticipant: MyParticipant | null;
+  /**
+   * What THIS viewer may do with the ride, decided by the server (server authz/capabilities.ts)
+   * — e.g. "event:chat". Optional: a cached detail or an older server omits it.
+   */
+  capabilities?: string[];
   /**
    * Start-list capacity. `participantCount` (approved + pending) and `isFull` are sent to every
    * viewer; the server 409s (EVENT_FULL) when a join hits the cap, so client checks are UX only.

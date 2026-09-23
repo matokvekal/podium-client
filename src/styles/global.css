@@ -393,6 +393,29 @@ textarea {
   color: var(--accent);
 }
 
+/* Find Tracks, featured in the menu: an accent icon, a soft tint and a small tag, so it stands
+   out from the plain rows while staying the same height as every other item. */
+.drawer__nav-item--featured {
+  font-weight: var(--weight-medium);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.drawer__nav-item--featured svg {
+  color: var(--accent);
+}
+
+.drawer__nav-tag {
+  margin-inline-start: auto;
+  padding: 1px 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  line-height: 1.4;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
 /* Day/night switch: the icon glows in its own light. In day mode it shows a moon — pale
    yellow-white moonlight; in dark mode a sun — warm amber. data-theme is the CURRENT theme,
    which is also which icon is showing (moon while in day, sun while in dark). */

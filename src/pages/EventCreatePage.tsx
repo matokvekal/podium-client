@@ -108,6 +108,7 @@ import {
   Accessibility,
   AlertTriangle,
   Bike,
+  CalendarDays,
   Check,
   Clock,
   Coffee,
@@ -124,6 +125,7 @@ import {
   Radio,
   Ruler,
   ShieldCheck,
+  Sun,
   Target,
   Timer,
   Trash2,
@@ -151,7 +153,7 @@ import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton"
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
-import { flagEmoji, orderedCountries } from "../lib/countries";
+import { COUNTRIES, flagEmoji, orderedCountries } from "../lib/countries";
 import { defaultRideCountry } from "../lib/default-ride-country";
 import { effectiveLimits } from "../lib/entitlements";
 import {
@@ -178,7 +180,9 @@ import {
   splitDuration,
 } from "../lib/ride-duration";
 import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
-import { SURFACE_TYPE_ICON, type SurfaceType } from "../lib/surface-types";
+import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
+import type { TrackHandoff } from "../lib/track-handoff";
+import { type TrackSource, trackCountry, trackFieldLocks } from "../lib/track-prefill";
 import {
   asTerrainGrade,
   type TerrainGrade,
@@ -186,6 +190,21 @@ import {
   terrainOptionsFor,
   terrainScaleNameFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTIES,
+  ROUTE_DIFFICULTY_LABEL,
+  type RouteDifficulty,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASONS,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADES,
+  type TrailSeason,
+  type TrailShade,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
 import { useMediaQuery } from "../lib/use-media-query";
 import { useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventRouteStore } from "../store/eventRouteStore";
@@ -222,6 +241,11 @@ interface ExistingEvent {
   /** How technical the ground is, 1-5 (sql/038-event-terrain-grade.sql). Absent on an older
    *  server or a ride created before this existed; edit mode then starts the picker unset. */
   terrainGrade?: number | null;
+  /** How hard the track is, when it is pleasant, how shaded (sql/041). Absent on an older server
+   *  or a road ride; edit mode then starts the three pickers unset. */
+  routeDifficulty?: string | null;
+  season?: string | null;
+  shade?: string | null;
   /** EFFECTIVE elevation gain (m) the server persists — the organizer's manual/imported value,
    *  else the attached route's climb. Prefills the Climb field in edit mode. See
    *  sql/021-events-elevation-gain.sql. */
@@ -337,6 +361,11 @@ const ACTIVITY_TYPES: { value: SurfaceType; label: string }[] = [
  */
 const NARROW_PICKER_QUERY = "(max-width: 349px)";
 
+/** "Israel" for "IL" — the name shown on the track row when Country is not asked. */
+function countryName(code: string): string {
+  return COUNTRIES.find((c) => c.code === code)?.name ?? code;
+}
+
 const NEW_TEAM_OPTION = "__new__";
 
 // The three days group rides most often go out on. JS's own Date#getDay() numbering
@@ -365,14 +394,9 @@ export function EventCreatePage() {
   const setEventRoute = useEventRouteStore((s) => s.setRoute);
   const clearEventRoute = useEventRouteStore((s) => s.clearRoute);
   const routerLocation = useLocation();
-  const pickedTrack = (routerLocation.state ?? null) as {
-    fromRouteId?: number;
-    fromRouteName?: string | null;
-    fromRoutePlace?: string | null;
-    fromRouteDistanceKm?: number | null;
-    fromRouteClimbM?: number | null;
-    fromRouteSurface?: SurfaceType | null;
-  } | null;
+  // Built by lib/track-handoff.ts. Partial because an older link / bookmark may carry fewer
+  // fields — each one missing is simply left for the organizer.
+  const pickedTrack = (routerLocation.state ?? null) as Partial<TrackHandoff> | null;
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
@@ -425,6 +449,11 @@ export function EventCreatePage() {
    * yesterday's gravel road says nothing about today's trail.
    */
   const [terrainGrade, setTerrainGrade] = useState<TerrainGrade | null>(null);
+  // Route difficulty / season / shade (sql/041) — mtb and gravel only, like terrain. Server-only
+  // state for the same reason: this device cannot know them for a ride it did not create.
+  const [routeDifficulty, setRouteDifficulty] = useState<RouteDifficulty | null>(null);
+  const [season, setSeason] = useState<TrailSeason | null>(null);
+  const [shade, setShade] = useState<TrailShade | null>(null);
   // Distance/climb — near the difficulty picker below, same "no server column, persisted via
   // eventExtrasStore" story as Level. Plain strings (not numbers) since these are controlled
   // number inputs that need to hold "" while empty. Auto-filled from whatever route gets
@@ -587,6 +616,14 @@ export function EventCreatePage() {
    * picked track was dropped and the create form opened blank.
    */
   const [fromRouteId, setFromRouteId] = useState<number | null>(null);
+  /**
+   * The KNOWN track this ride is being built from (Find Tracks, the picker, a shared link) —
+   * its name, country and terrain. null for an uploaded file or no track. While set, the form
+   * takes terrain + country from it and hides those two fields (lib/track-prefill.ts); removing
+   * the track clears it and they come back.
+   */
+  const [trackSource, setTrackSource] = useState<TrackSource | null>(null);
+  const trackLocks = trackFieldLocks(trackSource);
   const [copyLoading, setCopyLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedRestStops, setUploadedRestStops] = useState<[number, number][]>([]);
@@ -599,6 +636,9 @@ export function EventCreatePage() {
    */
   const [existingRouteAttached, setExistingRouteAttached] = useState(false);
   const [removeExistingRoute, setRemoveExistingRoute] = useState(false);
+  /** Any track on the form — a known one, an uploaded file, or (edit) the saved one. */
+  const trackAttached =
+    copiedFrom != null || fromRouteId != null || uploadedFileName != null || existingRouteAttached;
   /**
    * Set the moment the organizer uploads / browses / removes a track, so the edit-mode prefill
    * effect below — which is still finishing its fetches after the form goes interactive — can't
@@ -689,6 +729,9 @@ export function EventCreatePage() {
         // Server-only: a terrain grade is not something this device can know about a ride it
         // did not create, so there is no local-extras fallback for it.
         setTerrainGrade(asTerrainGrade(found.terrainGrade));
+        setRouteDifficulty(asRouteDifficulty(found.routeDifficulty));
+        setSeason(asTrailSeason(found.season));
+        setShade(asTrailShade(found.shade));
         // Server-persisted effective elevation wins — it survives logout/login and is the
         // same on every device, and `serverHasElevation` keeps the stale local extras below
         // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
@@ -811,7 +854,7 @@ export function EventCreatePage() {
     area.trim(),
     startsAt,
     description.trim(),
-    copiedFrom || uploadedFileName || existingRouteAttached ? "route" : "",
+    copiedFrom || fromRouteId != null || uploadedFileName || existingRouteAttached ? "route" : "",
   ];
   const readinessCount = readinessFields.filter(Boolean).length;
   const readinessPct = Math.round((readinessCount / readinessFields.length) * 100);
@@ -875,6 +918,51 @@ export function EventCreatePage() {
     }
   }
 
+  /**
+   * Take what a KNOWN track already says (asked for directly: "reuse as much track information
+   * as possible"). Name, terrain and country always follow the track; the rest fills only a
+   * field still empty, so nothing typed by hand is overwritten. A value the track does not carry
+   * is left alone — never guessed. Functional setters: the Find Tracks handoff calls this from a
+   * mount effect, before any of this render's values are current.
+   */
+  function applyTrackFacts(facts: {
+    name: string | null | undefined;
+    country: string | null | undefined;
+    region: string | null | undefined;
+    activityType: SurfaceType | null | undefined;
+    terrainGrade: number | null | undefined;
+    routeDifficulty: string | null | undefined;
+    season: string | null | undefined;
+    shade: string | null | undefined;
+    durationMin: number | null | undefined;
+  }) {
+    const trackName = facts.name?.trim() || null;
+    const code = trackCountry(facts.country);
+    setTrackSource({ name: trackName, country: code, activityType: facts.activityType ?? null });
+    if (trackName) {
+      setName((current) => current || trackName);
+      setInvalidName(false);
+    }
+    if (facts.activityType) setActivityType(facts.activityType);
+    if (code) {
+      setCountry(code);
+      setCountrySettled(true);
+      if (code === "IL" && facts.region && !regionEdited) setRegion(facts.region);
+    }
+    const grade = asTerrainGrade(facts.terrainGrade);
+    if (grade != null) setTerrainGrade((current) => current ?? grade);
+    const difficulty = asRouteDifficulty(facts.routeDifficulty);
+    if (difficulty) setRouteDifficulty((current) => current ?? difficulty);
+    const trackSeason = asTrailSeason(facts.season);
+    if (trackSeason) setSeason((current) => current ?? trackSeason);
+    const trackShade = asTrailShade(facts.shade);
+    if (trackShade) setShade((current) => current ?? trackShade);
+    if (!durationEdited && facts.durationMin != null) {
+      const minutes = facts.durationMin;
+      setDurationMin((current) => current ?? minutes);
+    }
+  }
+
   async function pickEventToCopy(event: EventSummary) {
     trackChoiceTouchedRef.current = true;
     setCopiedFrom(event);
@@ -892,6 +980,17 @@ export function EventCreatePage() {
     setGalleryOpen(false);
     setCopyLoading(true);
     setInvalidRoute(false);
+    applyTrackFacts({
+      name: event.name,
+      country: event.country,
+      region: event.region,
+      activityType: event.activityType,
+      terrainGrade: event.terrainGrade,
+      routeDifficulty: event.routeDifficulty,
+      season: event.season,
+      shade: event.shade,
+      durationMin: event.durationMin,
+    });
 
     // "Copy all elements except the date" — everything about the source event carries over
     // except startsAt, which stays whatever the organizer already set (or leaves blank to set
@@ -926,6 +1025,7 @@ export function EventCreatePage() {
         // mock/fake route). The invalidRoute flag surfaces the missing-route state.
         setCopiedFrom(null);
         setCopiedRoute(null);
+        setTrackSource(null);
         setInvalidRoute(true);
         return;
       }
@@ -948,6 +1048,9 @@ export function EventCreatePage() {
     // Removing the track has to remove ALL of it. Leaving fromRouteId set meant the ride still
     // saved with the Find Tracks route the rider had just cleared off the form.
     setFromRouteId(null);
+    // Terrain + Country come back on screen, with Upload / See other rides, so another track
+    // can be chosen.
+    setTrackSource(null);
     setUploadedFileName(null);
     setUploadedRestStops([]);
     // Only clears values that came from the route being removed — a hand-typed distance/climb
@@ -966,6 +1069,8 @@ export function EventCreatePage() {
     // Same reason as pickEventToCopy: an uploaded file replaces any previously picked track,
     // and a stale fromRouteId would otherwise win in saveExtras and attach that route instead.
     setFromRouteId(null);
+    // A file says nothing about country or terrain — the organizer answers both.
+    setTrackSource(null);
     setCopyLoading(false);
     setGalleryOpen(false);
     setCopiedRoute(uploaded.route);
@@ -1038,6 +1143,17 @@ export function EventCreatePage() {
     const picked = pickedTrack;
     if (!picked?.fromRouteId) return;
     setFromRouteId(picked.fromRouteId);
+    applyTrackFacts({
+      name: picked.fromRouteName,
+      country: picked.fromRouteCountry,
+      region: picked.fromRouteRegion,
+      activityType: picked.fromRouteSurface,
+      terrainGrade: picked.fromRouteTerrainGrade,
+      routeDifficulty: picked.fromRouteDifficulty,
+      season: picked.fromRouteSeason,
+      shade: picked.fromRouteShade,
+      durationMin: picked.fromRouteDurationMin,
+    });
     if (picked.fromRoutePlace?.trim()) {
       setLocation((current: string) => current || picked.fromRoutePlace!);
     }
@@ -1047,7 +1163,6 @@ export function EventCreatePage() {
     if (picked.fromRouteClimbM != null) {
       setClimbMInput((current: string) => current || String(picked.fromRouteClimbM));
     }
-    if (picked.fromRouteSurface) setActivityType(picked.fromRouteSurface);
     // Full geometry for the preview map. Best-effort: the attach below works from the id
     // alone, so a failed preview fetch costs a thumbnail, not the route.
     void apiRequest<{
@@ -1223,7 +1338,9 @@ export function EventCreatePage() {
     const { ok, errors } = validateCreateEventForm({
       name,
       startsAt,
-      hasRoute: copiedRoute != null,
+      // A Find Tracks track is attached by id, so it counts even while (or if) its preview
+      // geometry has not loaded.
+      hasRoute: copiedRoute != null || fromRouteId != null,
       isEditing,
       description,
     });
@@ -1312,6 +1429,11 @@ export function EventCreatePage() {
             // ride is no longer off-road — switching an MTB ride to road must not leave an S3
             // claim standing on a ride that no longer has a scale to read it against.
             terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+            // Route difficulty / season / shade (sql/041) — same rule as the grade: always sent,
+            // null once the ride is no longer mtb / gravel so no stale claim stays on a road ride.
+            routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+            season: trailMetadataApplies(activityType) ? season : null,
+            shade: trailMetadataApplies(activityType) ? shade : null,
           },
         });
         await saveExtras(eventId);
@@ -1380,6 +1502,10 @@ export function EventCreatePage() {
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
           terrainGrade: terrainApplies(activityType) ? terrainGrade : null,
+          // Route difficulty / season / shade (sql/041) — off-road rides only, null otherwise.
+          routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
+          season: trailMetadataApplies(activityType) ? season : null,
+          shade: trailMetadataApplies(activityType) ? shade : null,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1562,44 +1688,48 @@ export function EventCreatePage() {
         )}
 
         <form onSubmit={submit} onKeyDown={blockEnterSubmit}>
-          <fieldset
-            className={styles.panel}
-            style={{ border: "none", marginBottom: "var(--space-4)" }}
-          >
-            <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
-              <Compass aria-hidden="true" />
-              Terrain
-            </legend>
-            {narrowPickers ? (
-              <select
-                className={styles.input}
-                aria-label="Terrain"
-                value={activityType}
-                onChange={(e) => setActivityType(e.target.value as SurfaceType)}
-              >
-                {ACTIVITY_TYPES.map((activity) => (
-                  <option key={activity.value} value={activity.value}>
-                    {activity.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
-                {ACTIVITY_TYPES.map((activity) => (
-                  <label key={activity.value} className={styles.chip}>
-                    <input
-                      type="radio"
-                      name="activityType"
-                      className={styles.chipInput}
-                      checked={activityType === activity.value}
-                      onChange={() => setActivityType(activity.value)}
-                    />
-                    {activity.label}
-                  </label>
-                ))}
-              </div>
-            )}
-          </fieldset>
+          {/* Terrain is the TRACK's when the ride is built from a known one — not asked again
+              (lib/track-prefill.ts). It is named on the track row below instead. */}
+          {!trackLocks.hideTerrain && (
+            <fieldset
+              className={styles.panel}
+              style={{ border: "none", marginBottom: "var(--space-4)" }}
+            >
+              <legend className={styles.fieldLabel} style={{ marginBottom: 4 }}>
+                <Compass aria-hidden="true" />
+                Terrain
+              </legend>
+              {narrowPickers ? (
+                <select
+                  className={styles.input}
+                  aria-label="Terrain"
+                  value={activityType}
+                  onChange={(e) => setActivityType(e.target.value as SurfaceType)}
+                >
+                  {ACTIVITY_TYPES.map((activity) => (
+                    <option key={activity.value} value={activity.value}>
+                      {activity.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className={`${styles.chipGroup} ${styles.chipGroupRow}`}>
+                  {ACTIVITY_TYPES.map((activity) => (
+                    <label key={activity.value} className={styles.chip}>
+                      <input
+                        type="radio"
+                        name="activityType"
+                        className={styles.chipInput}
+                        checked={activityType === activity.value}
+                        onChange={() => setActivityType(activity.value)}
+                      />
+                      {activity.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          )}
 
           <div className={styles.field} style={{ marginBottom: "var(--space-4)" }}>
             <label className={styles.fieldLabel} htmlFor="name">
@@ -1620,16 +1750,32 @@ export function EventCreatePage() {
           </div>
 
           <fieldset className={styles.routeFieldset} data-invalid={invalidRoute}>
-            {copiedFrom || uploadedFileName || existingRouteAttached ? (
+            {trackAttached ? (
               <div className={styles.trackPicked}>
                 <div>
+                  {/* The TRACK's own name — never "Copied from …": where a track came from is
+                      bookkeeping, not something the organizer or a rider needs to read. */}
                   <div className={styles.trackPickedName}>
-                    {copiedFrom
-                      ? `Copied from ${copiedFrom.name}`
+                    {trackSource?.name
+                      ? trackSource.name
                       : uploadedFileName
                         ? `Uploaded ${uploadedFileName}`
                         : "Current track"}
                   </div>
+                  {trackSource && (trackLocks.hideTerrain || trackLocks.hideCountry) && (
+                    <div className={styles.trackPickedMeta}>
+                      {[
+                        trackLocks.hideTerrain && trackSource.activityType
+                          ? SURFACE_TYPE_LABEL[trackSource.activityType]
+                          : null,
+                        trackLocks.hideCountry && trackSource.country
+                          ? `${flagEmoji(trackSource.country)} ${countryName(trackSource.country)}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  )}
                   <div className={styles.trackPickedMeta}>
                     {copyLoading
                       ? "Loading route…"
@@ -1668,7 +1814,7 @@ export function EventCreatePage() {
             {/* In edit mode a track already on the event shows above with its own Remove
                 button — the organizer removes it first, then these reappear to attach a new
                 one. Same "one active route, replace or remove" rule create mode already had. */}
-            {!copiedFrom && !uploadedFileName && !existingRouteAttached && (
+            {!trackAttached && (
               <div className={styles.trackChoices}>
                 <TrackUploadButton
                   onUploadRoute={handleUploadRoute}
@@ -1848,34 +1994,38 @@ export function EventCreatePage() {
                 )}
               </div>
 
-              <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="country">
-                  <MapPin aria-hidden="true" />
-                  Country
-                </label>
-                <select
-                  id="country"
-                  className={styles.input}
-                  value={country}
-                  onChange={(e) => {
-                    setCountry(e.target.value);
-                    setCountrySettled(true);
-                    // Israeli regions cannot describe a ride anywhere else — drop the area
-                    // rather than carry a stale key (and its Hebrew label) into another country.
-                    if (e.target.value !== "IL") {
-                      setRegion("");
-                      setArea("");
-                    }
-                  }}
-                >
-                  {orderedCountries(country).map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {flagEmoji(c.code)} {c.name}
-                    </option>
-                  ))}
-                </select>
-                <p className={styles.hint}>Riders searching this country will find your ride.</p>
-              </div>
+              {/* Country is the TRACK's when it has one (see Terrain above); an old track with no
+                  country still asks. */}
+              {!trackLocks.hideCountry && (
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="country">
+                    <MapPin aria-hidden="true" />
+                    Country
+                  </label>
+                  <select
+                    id="country"
+                    className={styles.input}
+                    value={country}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      setCountrySettled(true);
+                      // Israeli regions cannot describe a ride anywhere else — drop the area
+                      // rather than carry a stale key (and its Hebrew label) into another country.
+                      if (e.target.value !== "IL") {
+                        setRegion("");
+                        setArea("");
+                      }
+                    }}
+                  >
+                    {orderedCountries(country).map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {flagEmoji(c.code)} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={styles.hint}>Riders searching this country will find your ride.</p>
+                </div>
+              )}
 
               {/* Area is Israel-only — src/lib/regions.ts holds Israeli regions and nothing
                   else — so it is hidden rather than shown empty for a ride abroad. */}
@@ -2051,6 +2201,73 @@ export function EventCreatePage() {
                     tyres.
                   </p>
                 </div>
+              )}
+
+              {/* ROUTE DIFFICULTY / SEASON / SHADE — mtb and gravel only (sql/041). Three plain
+                  selects in the same style as Terrain above, and rendered ONLY for off-road
+                  rides so a road ride carries no empty MTB fields. Route difficulty is how hard
+                  the TRACK is: not the Level above (who the ride is pitched at) and not Terrain
+                  (the ground). Values are kept through a discipline switch, like the grade. */}
+              {trailMetadataApplies(activityType) && (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="routeDifficulty">
+                      <Gauge aria-hidden="true" />
+                      Route difficulty
+                    </label>
+                    <select
+                      id="routeDifficulty"
+                      className={styles.input}
+                      value={routeDifficulty ?? ""}
+                      onChange={(e) => setRouteDifficulty(asRouteDifficulty(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {ROUTE_DIFFICULTIES.map((key) => (
+                        <option key={key} value={key}>
+                          {ROUTE_DIFFICULTY_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailSeason">
+                      <CalendarDays aria-hidden="true" />
+                      Season
+                    </label>
+                    <select
+                      id="trailSeason"
+                      className={styles.input}
+                      value={season ?? ""}
+                      onChange={(e) => setSeason(asTrailSeason(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SEASONS.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SEASON_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="trailShade">
+                      <Sun aria-hidden="true" />
+                      Shade
+                    </label>
+                    <select
+                      id="trailShade"
+                      className={styles.input}
+                      value={shade ?? ""}
+                      onChange={(e) => setShade(asTrailShade(e.target.value))}
+                    >
+                      <option value="">Not specified</option>
+                      {TRAIL_SHADES.map((key) => (
+                        <option key={key} value={key}>
+                          {TRAIL_SHADE_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
 
               {/* Distance/climb, near the difficulty picker above — auto-filled from whatever

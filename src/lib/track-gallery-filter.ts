@@ -15,6 +15,7 @@
 
 import type { EventSummary } from "./local-db";
 import { type DurationBucketKey, matchesDurationBuckets } from "./ride-duration";
+import type { RouteDifficulty, TrailSeason, TrailShade } from "./trail-metadata";
 import type { SurfaceType } from "./surface-types";
 import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "./track-types";
 
@@ -49,6 +50,10 @@ export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
   name_asc: "Name (A–Z)",
 };
 
+/** The discipline Find Tracks opens on for a rider who has never picked one
+ *  (store/trackGalleryFiltersStore.ts seedSurface). */
+export const DEFAULT_TRACK_GALLERY_SURFACE: SurfaceType = "mtb";
+
 /** created_at DESC — the stable key the gallery has always paged against. */
 export const DEFAULT_TRACK_GALLERY_SORT: TrackGallerySort = "newest";
 
@@ -64,6 +69,12 @@ export interface TrackGalleryCriteria {
   /** Effective climb, m. At [CLIMB_MIN, CLIMB_MAX] = "any". */
   climbM: [number, number];
   durationBuckets: DurationBucketKey[];
+  /** events.route_difficulty / season / shade (sql/041) — how hard the TRACK is, when it is
+   *  pleasant, how shaded. Only offered while the ride-type filter includes mtb or gravel, and
+   *  empty = no narrowing. Not `level` (rider pitch) and not terrain. */
+  routeDifficulty: RouteDifficulty[];
+  season: TrailSeason[];
+  shade: TrailShade[];
   /** Only tracks this rider has hearted. Server-scoped to the caller's own favourites, so it
    *  is meaningless — and hidden — when signed out. */
   favoritesOnly: boolean;
@@ -76,6 +87,9 @@ export const DEFAULT_TRACK_GALLERY_CRITERIA: TrackGalleryCriteria = {
   distanceKm: [DISTANCE_MIN, DISTANCE_MAX],
   climbM: [CLIMB_MIN, CLIMB_MAX],
   durationBuckets: [],
+  routeDifficulty: [],
+  season: [],
+  shade: [],
   favoritesOnly: false,
 };
 
@@ -97,6 +111,9 @@ export function trackGalleryActiveFilterCount(
     (c.region ? 1 : 0) +
     c.surface.length +
     c.durationBuckets.length +
+    c.routeDifficulty.length +
+    c.season.length +
+    c.shade.length +
     (c.favoritesOnly ? 1 : 0) +
     (distanceNarrowed(c.distanceKm) ? 1 : 0) +
     (climbNarrowed(c.climbM) ? 1 : 0)
@@ -130,6 +147,11 @@ export function buildTrackGalleryQuery(
   if (criteria.durationBuckets.length > 0) {
     params.set("durationBuckets", criteria.durationBuckets.join(","));
   }
+  if (criteria.routeDifficulty.length > 0) {
+    params.set("routeDifficulty", criteria.routeDifficulty.join(","));
+  }
+  if (criteria.season.length > 0) params.set("season", criteria.season.join(","));
+  if (criteria.shade.length > 0) params.set("shade", criteria.shade.join(","));
 
   const [dMin, dMax] = criteria.distanceKm;
   if (dMin > DISTANCE_MIN) params.set("minDistanceKm", String(dMin));
@@ -236,6 +258,14 @@ export function applyTrackGalleryCriteria(
       if (climb == null || climb < cMin || climb > cMax) return false;
     }
     if (!matchesDurationBuckets(e.durationMin, c.durationBuckets)) return false;
+    if (
+      c.routeDifficulty.length > 0 &&
+      !c.routeDifficulty.includes(e.routeDifficulty as RouteDifficulty)
+    ) {
+      return false;
+    }
+    if (c.season.length > 0 && !c.season.includes(e.season as TrailSeason)) return false;
+    if (c.shade.length > 0 && !c.shade.includes(e.shade as TrailShade)) return false;
     return true;
   });
 

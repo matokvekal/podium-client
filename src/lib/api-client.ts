@@ -240,6 +240,24 @@ async function send(path: string, options: RequestOptions, retryOn401: boolean):
 }
 
 /**
+ * A binary GET (a file, not the JSON envelope). Resolves with the bytes untouched plus the
+ * response's Content-Disposition, or `null` for a 404 — "there is no such file", which is an
+ * answer, not a failure. Any other non-2xx status throws an ApiError like apiRequest does.
+ *
+ * Deliberately never decodes the body: the point of the one caller (the original GPX of a
+ * track) is that the bytes the rider saves are the bytes that were stored.
+ */
+export async function apiRequestBlob(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ blob: Blob; contentDisposition: string | null } | null> {
+  const response = await send(path, options, true);
+  if (response.status === 404) return null;
+  if (!response.ok) throw await readError(response);
+  return { blob: await response.blob(), contentDisposition: response.headers.get("Content-Disposition") };
+}
+
+/**
  * Performs a request and unwraps the `{ data }` envelope the API uses for everything built
  * for this app. The frozen transmitter endpoints answer with a bare object instead, so an
  * unwrapped body is returned as-is rather than treated as an error.

@@ -61,7 +61,9 @@ import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { distanceIconFor } from "./ActivityIcons";
+import { useRideChatStore } from "../store/rideChatStore";
 import styles from "./EventCard.module.css";
+import { RideChatButton } from "./RideChatButton";
 import {
   eventCoverBackground,
   FIGMA_TAG_LABEL,
@@ -170,6 +172,11 @@ export function EventCard({
   const ownerCover = useOwnerCover(event.ownerId, event.ownerCover);
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, ownerCover);
 
+  // The ride chat icon appears only on a ride this rider can chat in — the rides the list's one
+  // unread request (useRideChatUnread in EventsListPage) got an answer for. A Find Rides card
+  // for someone else's ride therefore shows none.
+  const hasChat = useRideChatStore((s) => s.summaries[event.id] != null);
+
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -226,6 +233,7 @@ export function EventCard({
               {status === "live" && <span className={styles.liveDot} aria-hidden="true" />}
               {FIGMA_TAG_LABEL[status]}
             </span>
+            {hasChat && <RideChatButton rideId={event.id} />}
             <button
               type="button"
               className={styles.heartBtn}

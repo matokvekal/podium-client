@@ -13,7 +13,7 @@
 
 .pageHeader {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: flex-start;
   justify-content: space-between;
   padding-block-end: var(--space-3);
@@ -55,6 +55,13 @@
   padding-block-start: var(--space-3);
 }
 
+/* More air BETWEEN cards on the page (the cards themselves are not bigger): at the global
+   12px gap one card's stats sat right against the next card's map, and the two read as one
+   block. The picker modal keeps its tighter grid. */
+.pageResults :global(.card-grid) {
+  gap: var(--space-5);
+}
+
 /* The Saved toggle borrows the Filter/Sort button's shape and only changes colour when it is
    on, so the toolbar reads as one row of equals rather than one shouting control. */
 .savedBtn[data-on="true"] {
@@ -66,7 +73,12 @@
 /* --- the disciplines, beside the title ---
    Icon-only toggles writing the same criteria.surface the Filter panel writes. They sit on the
    header row so the very first thing on the screen is also the filter a rider reaches for
-   first. Wraps under the title on a narrow phone rather than squeezing the heading. */
+   first.
+
+   ALWAYS ONE ROW — Road / Gravel / MTB never wrap (MTB used to drop under Road on a phone, which
+   read as two unrelated controls). The row keeps its width and the title beside it gives way
+   instead: .headerText has min-width: 0, so the heading wraps onto two lines before the
+   buttons ever do. */
 
 .headerRow {
   align-items: flex-start;
@@ -74,7 +86,8 @@
 
 .surfaceQuick {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
   gap: 4px;
   align-items: center;
   margin-inline-start: auto;
@@ -86,7 +99,7 @@
   gap: 1px;
   align-items: center;
   justify-content: center;
-  min-width: 46px;
+  min-width: 44px;
   height: 44px;
   padding: 0 4px;
   color: var(--text-muted);

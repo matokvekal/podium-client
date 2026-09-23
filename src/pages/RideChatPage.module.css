@@ -1,0 +1,230 @@
+/*
+ * Ride chat — mobile first. The page scrolls with the document (so the phone's own scrolling
+ * and keyboard handling apply), newest messages at the bottom, and the composer sticks to the
+ * bottom of the screen just above the app's fixed footer bar.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 720px;
+  min-height: calc(100dvh - 160px);
+  margin-inline: auto;
+}
+
+.header {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  color: var(--text);
+  border-radius: 50%;
+}
+
+.back:hover {
+  background: var(--surface-raised);
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* "Not private" — always visible under the header, quiet but unmistakable. */
+.notice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.centered {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  margin: var(--space-4) 0;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  max-width: 85%;
+}
+
+.message[data-mine] {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.meta {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding-inline: 4px;
+  font-size: var(--text-xs);
+}
+
+.author {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.role {
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1.6;
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-radius: 999px;
+}
+
+.time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bubble {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(17 62 126 / 0.08);
+}
+
+.message[data-mine] .bubble {
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  border-radius: var(--radius-lg) 4px var(--radius-lg) var(--radius-lg);
+}
+
+/* The composer: pinned to the bottom of the screen, above the app's fixed footer bar, so the
+   input is always where the thumb is and rises with the phone keyboard. */
+.composer {
+  position: sticky;
+  inset-block-end: calc(var(--footer-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-inline: calc(var(--space-4) * -1);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-block-start: 1px solid var(--border);
+}
+
+.composerRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.input {
+  flex: 1;
+  min-height: var(--tap-target);
+  max-height: 140px;
+  padding: 10px var(--space-3);
+  font: inherit;
+  /* 16px: anything smaller makes iOS zoom the page when the field is focused. */
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--text);
+  resize: none;
+  field-sizing: content;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+}
+
+.input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  color: var(--accent-text);
+  background: var(--accent-strong);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.send:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.composerNote,
+.composerError {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.composerNote {
+  color: var(--text-muted);
+}
+
+.composerError {
+  color: var(--status-danger);
+}

@@ -11,7 +11,7 @@
  * where it belongs, since it is a different intention rather than a lesser one.
  *
  * WHAT IS LEFT IN THIS FILE. The browser itself — toolbar, filters, sort, grid, paging — moved
- * to TrackGalleryBrowser, because the standalone Find Tracks page (/routes) is the same product
+ * to TrackGalleryBrowser, because the standalone Find Tracks page (/findtracks) is the same product
  * and must not drift from it. What remains here is only what a MODAL needs and a page does not:
  * the portal, the dimmed overlay, and the body scroll lock. Escape, focus and the close button
  * belong to the browser, which knows whether a filter panel is open and should close first.

@@ -13,6 +13,17 @@ describe("regions (client mirror of the server list)", () => {
     expect(classifyRegion(32.99, 35.69)).toBe("golan"); // Katzrin
   });
 
+  it("has the MTB sub-regions, matching the server's labels", () => {
+    expect(regionLabel("upper_galilee")).toBe("גליל עליון");
+    expect(regionLabel("lower_galilee")).toBe("גליל תחתון");
+    expect(regionLabel("western_galilee")).toBe("גליל מערבי");
+    expect(regionLabel("carmel")).toBe("כרמל / רמות מנשה");
+    expect(regionLabel("gilboa_valleys")).toBe("גלבוע ועמקים");
+    expect(regionLabel("south_hebron")).toBe("דרום הר חברון");
+    expect(classifyRegion(32.75, 35.3)).toBe("lower_galilee");
+    expect(classifyRegion(33.1, 35.45)).toBe("upper_galilee");
+  });
+
   it("returns null outside every box or on bad input", () => {
     expect(classifyRegion(48.85, 2.35)).toBeNull();
     expect(classifyRegion(null, 35)).toBeNull();

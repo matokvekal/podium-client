@@ -35,7 +35,9 @@ import {
   nearestPointOnRoute,
 } from "../lib/geo";
 import type { LiveRider } from "../lib/live-types";
+import type { RideStop } from "../lib/ride-stops";
 import { formatAge } from "../lib/time";
+import { addStopLayer } from "./ride-stop-layer";
 import styles from "./LiveRidersMap.module.css";
 import {
   bearingDeg,
@@ -76,6 +78,9 @@ interface LiveRidersMapProps {
   /** "dark" applies the Waze-like tile filter; "day" leaves the tiles as the ride page shows
    * them. The parent owns the toggle + persistence. Defaults to "day". */
   mapTheme?: "day" | "dark";
+  /** The ride's stop points (lib/ride-stops.ts, sql/049) — read-only ☕ pins with a Google
+   * Maps link. Optional; empty or absent draws nothing. */
+  stopPoints?: RideStop[];
 }
 
 export default function LiveRidersMap({
@@ -90,6 +95,7 @@ export default function LiveRidersMap({
   onToggleRider,
   recenter,
   mapTheme = "day",
+  stopPoints,
 }: LiveRidersMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -123,6 +129,26 @@ export default function LiveRidersMap({
       mapRef.current = null;
     };
   }, []);
+
+  // Ride stop points — their own layer, redrawn only when the list changes (never on a poll).
+  // Contained: a failure here leaves the live map exactly as it was without them.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !stopPoints || stopPoints.length === 0) return;
+    let layer: L.LayerGroup | null = null;
+    try {
+      layer = addStopLayer(map, stopPoints);
+    } catch (err) {
+      console.error("[LiveRidersMap] stop points not drawn", err);
+    }
+    return () => {
+      try {
+        layer?.remove();
+      } catch {
+        // map already removed on unmount
+      }
+    };
+  }, [stopPoints]);
 
   // Route line + start/finish markers — drawn reactively so a route that loads AFTER the map
   // mounts (the common case: results store resolves a tick later) still appears and still

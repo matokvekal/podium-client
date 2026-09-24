@@ -57,6 +57,7 @@ import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { initialOf, placeholderColorVar } from "../app/event-visuals";
 import type { RecenterCommand } from "../app/LiveRidersMap";
+import { useRideStops } from "../app/useRideStops";
 import { useLocationBroadcast } from "../app/useLocationBroadcast";
 import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
@@ -179,6 +180,8 @@ export function LiveEventPage() {
 
   const results = useResultsStore((s) => s.results);
   const loadResults = useResultsStore((s) => s.loadResults);
+  // The ride's stop points (sql/049) — own request, fails soft to "none" (app/useRideStops.ts).
+  const { stops: stopPoints } = useRideStops(eventId);
   const groups = useEventGroupsStore((s) =>
     eventId && s.byEvent[eventId] ? s.byEvent[eventId] : EMPTY_GROUPS,
   );
@@ -563,6 +566,7 @@ export function LiveEventPage() {
           onToggleRider={toggleRider}
           recenter={recenter}
           mapTheme={mapTheme}
+          stopPoints={stopPoints}
         />
       </Suspense>
 

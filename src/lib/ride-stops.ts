@@ -161,6 +161,32 @@ export async function searchPlaces(
 
 // ---- display helpers ------------------------------------------------------------------------
 
+/**
+ * Only well-formed stops from a GET response — a numeric id, a string label and a finite, in-range
+ * position. Anything else is dropped rather than drawn at a wrong place or shown as "km NaN".
+ */
+export function sanitizeRideStops(value: unknown): RideStop[] {
+  if (!Array.isArray(value)) return [];
+  const kinds = Object.keys(RIDE_STOP_KIND_ICON);
+  const out: RideStop[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const s = item as Partial<RideStop>;
+    if (typeof s.id !== "number" || !Number.isFinite(s.id)) continue;
+    if (typeof s.label !== "string" || !s.label.trim()) continue;
+    if (typeof s.lat !== "number" || !Number.isFinite(s.lat) || Math.abs(s.lat) > 90) continue;
+    if (typeof s.lng !== "number" || !Number.isFinite(s.lng) || Math.abs(s.lng) > 180) continue;
+    out.push({
+      ...(s as RideStop),
+      kind: typeof s.kind === "string" && kinds.includes(s.kind) ? s.kind : "coffee",
+    });
+  }
+  return out;
+}
+
+/** How long one place search may take before the creator is told it failed. */
+export const PLACE_SEARCH_TIMEOUT_MS = 10_000;
+
 /** "Open in Google Maps" for one stop — a plain lat,lng destination, no API key. */
 export function stopGoogleMapsUrl(stop: Pick<RideStop, "lat" | "lng">): string {
   // googleMapsUrl only returns null when given neither a location nor a point.

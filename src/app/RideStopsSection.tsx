@@ -21,6 +21,7 @@ import {
   createRideStop,
   deleteRideStop,
   kmAlongRoute,
+  PLACE_SEARCH_TIMEOUT_MS,
   type PlaceResult,
   RIDE_STOP_KIND_ICON,
   type RideStop,
@@ -81,16 +82,24 @@ export function RideStopsSection({ eventId, points, stopsState }: RideStopsSecti
     searchAbort.current = controller;
     setSearching(true);
     setError(null);
+    // A search that hangs must not leave "Searching…" up forever.
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, PLACE_SEARCH_TIMEOUT_MS);
     try {
       const found = await searchPlaces(q, points, controller.signal);
       setResults(found);
       // One clear hit: place the pin right away, one tap saved.
       if (found.length === 1) setDraft([found[0].lat, found[0].lng]);
     } catch (err) {
-      if ((err as { name?: string }).name !== "AbortError") {
+      // A deliberate cancel (Cancel, or a newer search) stays quiet; a timeout does not.
+      if (timedOut || (err as { name?: string }).name !== "AbortError") {
         setError("Search didn't work. Tap the map to place the stop instead.");
       }
     } finally {
+      window.clearTimeout(timer);
       if (searchAbort.current === controller) setSearching(false);
     }
   }

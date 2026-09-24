@@ -3,6 +3,7 @@ import {
   buildPlaceSearchUrl,
   kmAlongRoute,
   parsePlaceResults,
+  sanitizeRideStops,
   searchPlaces,
   stopErrorMessage,
   stopGoogleMapsUrl,
@@ -115,5 +116,31 @@ describe("stopErrorMessage", () => {
       "This ride already has 5 stops",
     );
     expect(stopErrorMessage("weird", "Fallback")).toBe("Fallback");
+  });
+});
+
+describe("sanitizeRideStops", () => {
+  const good = { id: 1, rideId: "r", label: "ok", lat: 32, lng: 35, kind: "water", sortOrder: 0 };
+
+  it("keeps well-formed stops and drops malformed ones", () => {
+    const out = sanitizeRideStops([
+      good,
+      { ...good, id: "2" },
+      { ...good, id: 3, label: "   " },
+      { ...good, id: 4, label: null },
+      { ...good, id: 5, lat: "32" },
+      { ...good, id: 6, lat: Number.NaN },
+      { ...good, id: 7, lng: 200 },
+      null,
+      "junk",
+    ]);
+    expect(out.map((s) => s.id)).toEqual([1]);
+    expect(out[0].kind).toBe("water");
+  });
+
+  it("an unknown kind reads as coffee; a non-array is no stops", () => {
+    expect(sanitizeRideStops([{ ...good, kind: "<b>" }])[0].kind).toBe("coffee");
+    expect(sanitizeRideStops(undefined)).toEqual([]);
+    expect(sanitizeRideStops({ stops: [] })).toEqual([]);
   });
 });

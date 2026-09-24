@@ -4,11 +4,20 @@
 //
 // Imported only by those two lazy map components — Leaflet stays out of the main bundle.
 //
-// The label is the creator's own text, so it is set with textContent, never as HTML.
+// The label is the creator's own text, so it is set with textContent, never as HTML. ⚠ That
+// includes the TOOLTIP: Leaflet assigns string tooltip / popup content with innerHTML, so the
+// label is always handed over as a DOM node, never as a string.
 
 import L from "leaflet";
 import { RIDE_STOP_KIND_ICON, type RideStop, stopGoogleMapsUrl } from "../lib/ride-stops";
 import { stopPointIcon } from "./map-icons";
+
+function tooltipContent(stop: RideStop): HTMLElement {
+  const span = document.createElement("span");
+  span.dir = "auto";
+  span.textContent = stop.label;
+  return span;
+}
 
 function popupContent(stop: RideStop): HTMLElement {
   const box = document.createElement("div");
@@ -52,7 +61,7 @@ export function addStopLayer(
       title: stop.label,
       zIndexOffset: 500,
     });
-    marker.bindTooltip(stop.label, { direction: "top", offset: [0, -12] });
+    marker.bindTooltip(tooltipContent(stop), { direction: "top", offset: [0, -12] });
     marker.bindPopup(() => popupContent(stop));
     if (options.draggable && options.onMoved) {
       const onMoved = options.onMoved;

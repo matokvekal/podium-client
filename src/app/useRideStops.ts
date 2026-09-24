@@ -9,6 +9,7 @@ import {
   fetchRideStops,
   type RideStop,
   type RideStopsLimits,
+  sanitizeRideStops,
 } from "../lib/ride-stops";
 
 export interface RideStopsState {
@@ -33,7 +34,7 @@ export function useRideStops(eventId: string | undefined): RideStopsState {
     fetchRideStops(eventId)
       .then((view) => {
         if (cancelled) return;
-        setStopsState(Array.isArray(view?.stops) ? view.stops : []);
+        setStopsState(sanitizeRideStops(view?.stops));
         setCanManage(view?.canManage === true);
         if (view?.limits) setLimits(view.limits);
       })

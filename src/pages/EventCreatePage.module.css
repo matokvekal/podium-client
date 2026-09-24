@@ -436,6 +436,50 @@
   min-height: 5rem;
 }
 
+/* Small "x" in the top-right corner of the name / description fields that empties them.
+   Right padding keeps typed text (incl. right-aligned Hebrew) from running under it. */
+.clearableWrap {
+  position: relative;
+}
+
+.clearableInput {
+  padding-right: 32px;
+}
+
+.clearBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.clearBtn:hover,
+.clearBtn:focus-visible {
+  color: var(--text);
+  background: var(--surface-2, var(--border));
+  outline: none;
+}
+
+.clearBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Single-line input: centre the x vertically in the 42px box. */
+.clearableWrap > .input + .clearBtn {
+  top: 10px;
+}
+
 /* --- difficulty signal bars (cellular-reception style) -------------------- */
 
 /* flex-wrap: the bars are a fixed 192px and never shrink; if the column is too tight for the

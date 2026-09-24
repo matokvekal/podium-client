@@ -645,6 +645,8 @@ export function EventCreatePage() {
    * land on top of that choice and put the old distance/climb back.
    */
   const trackChoiceTouchedRef = useRef(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [loadingEvent, setLoadingEvent] = useState(isEditing);
 
@@ -1736,17 +1738,34 @@ export function EventCreatePage() {
               <Target aria-hidden="true" />
               Event name
             </label>
-            <input
-              id="name"
-              className={`${styles.input} ${invalidName ? styles.inputInvalid : ""}`}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (e.target.value.trim()) setInvalidName(false);
-              }}
-              placeholder="e.g. Saturday ride"
-              required
-            />
+            <div className={styles.clearableWrap}>
+              <input
+                ref={nameInputRef}
+                id="name"
+                className={`${styles.input} ${styles.clearableInput} ${invalidName ? styles.inputInvalid : ""}`}
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (e.target.value.trim()) setInvalidName(false);
+                }}
+                placeholder="e.g. Saturday ride"
+                required
+              />
+              {name && (
+                <button
+                  type="button"
+                  className={styles.clearBtn}
+                  aria-label="Clear event name"
+                  title="Clear"
+                  onClick={() => {
+                    setName("");
+                    nameInputRef.current?.focus();
+                  }}
+                >
+                  <X aria-hidden="true" />
+                </button>
+              )}
+            </div>
           </div>
 
           <fieldset className={styles.routeFieldset} data-invalid={invalidRoute}>
@@ -2061,21 +2080,38 @@ export function EventCreatePage() {
                   <FileText aria-hidden="true" />
                   Description
                 </label>
-                <textarea
-                  id="description"
-                  rows={3}
-                  className={`${styles.textarea} ${invalidDescription ? styles.inputInvalid : ""}`}
-                  placeholder={'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'}
-                  value={description}
-                  maxLength={DESCRIPTION_MAX_CHARS}
-                  /* Not the dominant-script detection the event page uses: this text is being
+                <div className={styles.clearableWrap}>
+                  <textarea
+                    ref={descriptionInputRef}
+                    id="description"
+                    rows={3}
+                    className={`${styles.textarea} ${styles.clearableInput} ${invalidDescription ? styles.inputInvalid : ""}`}
+                    placeholder={'e.g. "2 groups: strong 50km, weak 20km, next Saturday"'}
+                    value={description}
+                    maxLength={DESCRIPTION_MAX_CHARS}
+                    /* Not the dominant-script detection the event page uses: this text is being
                      typed. Re-deciding the whole field's direction on a keystroke moves the
                      caret under the organizer's hands, so the browser's own per-paragraph
                      "auto" — which settles on the first strong character and then stays put —
                      is the right behaviour in an input. */
-                  dir="auto"
-                  onChange={(e) => handleDescriptionChange(e.target.value)}
-                />
+                    dir="auto"
+                    onChange={(e) => handleDescriptionChange(e.target.value)}
+                  />
+                  {description && (
+                    <button
+                      type="button"
+                      className={styles.clearBtn}
+                      aria-label="Clear description"
+                      title="Clear"
+                      onClick={() => {
+                        handleDescriptionChange("");
+                        descriptionInputRef.current?.focus();
+                      }}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
                 {description.length >= DESCRIPTION_COUNTER_VISIBLE_FROM && (
                   <p
                     className={`${styles.counter} ${
@@ -2718,7 +2754,11 @@ export function EventCreatePage() {
             title="The track browser hit a problem"
             onDismiss={() => setGalleryOpen(false)}
           >
-            <TrackGallerySheet onPick={pickEventToCopy} onClose={() => setGalleryOpen(false)} />
+            <TrackGallerySheet
+              onPick={pickEventToCopy}
+              onClose={() => setGalleryOpen(false)}
+              initialSurface={activityType}
+            />
           </ErrorBoundary>
         )}
 

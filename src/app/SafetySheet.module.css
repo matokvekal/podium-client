@@ -121,7 +121,9 @@
   border-color: color-mix(in srgb, var(--status-live) 40%, transparent);
 }
 
-/* Round badge behind the icon. overflow: hidden keeps every animation inside it. */
+/* Round badge behind the icon. overflow: hidden keeps every animation inside it — except the
+   rear-light dot below, which deliberately sits half outside (a light on the rim, not inside
+   the lamp). */
 .iconBadge {
   display: grid;
   place-items: center;
@@ -135,6 +137,13 @@
   transition:
     background 200ms ease,
     color 200ms ease;
+}
+
+/* The "lights" badge alone gets a little red rear-light dot on its rim, on top of the bulb
+   icon's own opacity animation below — the pair read as one blinking light, not two. */
+.iconBadge[data-anim="blink"] {
+  position: relative;
+  overflow: visible;
 }
 
 .item[data-checked] .iconBadge {
@@ -280,7 +289,21 @@
   animation: anim-bob 2.4s ease-in-out infinite;
 }
 .item:not([data-checked]) .iconBadge[data-anim="blink"] .itemIcon {
-  animation: anim-blink 2s ease-in-out infinite;
+  animation: anim-blink 1.8s linear infinite;
+}
+
+/* Rear-light dot: a small red glow riding the badge's rim, flashing in the same irregular
+   double-pulse a bike tail light actually uses (flash-flash-pause), not a steady metronome. */
+.item:not([data-checked]) .iconBadge[data-anim="blink"]::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--status-danger);
+  animation: anim-rear-glow 1.8s linear infinite;
 }
 .item:not([data-checked]) .iconBadge[data-anim="drip"] .itemIcon {
   animation: anim-drip 2.2s ease-in infinite;
@@ -306,14 +329,38 @@
   }
 }
 
+/* Flash-flash-pause — a real bike tail light's rhythm, not a steady metronome. Shares its
+   timing with anim-rear-glow below so the bulb and the rim dot pulse together. */
 @keyframes anim-blink {
   0%,
-  45%,
   100% {
+    opacity: 0.35;
+  }
+  8%,
+  24% {
     opacity: 1;
   }
-  20% {
+  16%,
+  32% {
     opacity: 0.35;
+  }
+}
+
+@keyframes anim-rear-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-danger) 0%, transparent);
+  }
+  8%,
+  24% {
+    opacity: 1;
+    box-shadow: 0 0 6px 2px color-mix(in srgb, var(--status-danger) 70%, transparent);
+  }
+  16%,
+  32% {
+    opacity: 0.25;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-danger) 0%, transparent);
   }
 }
 
@@ -378,6 +425,11 @@
 @media (prefers-reduced-motion: reduce) {
   .item:not([data-checked]) .iconBadge[data-anim] .itemIcon {
     animation: none;
+  }
+  .item:not([data-checked]) .iconBadge[data-anim="blink"]::after {
+    animation: none;
+    opacity: 0.6;
+    box-shadow: none;
   }
   .checkMark,
   .progressFill,

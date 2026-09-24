@@ -1,8 +1,8 @@
 /*
  * The ride chat button — ONE look everywhere (ride card and ride page) so a rider learns it
- * once: a solid navy circle with a white chat bubble.
+ * once: a solid blue circle with a white chat bubble.
  *
- * Unread messages show as a bare red number at the top corner (no pill, no background).
+ * Unread messages show as a small red bubble with the count, tucked onto the top corner.
  * Nothing unread shows nothing.
  */
 
@@ -20,7 +20,7 @@
   background: var(--chat);
   border: none;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgb(30 58 138 / 0.4);
+  box-shadow: 0 2px 6px rgb(47 123 245 / 0.4);
   cursor: pointer;
   transition:
     transform var(--beat-1) ease,
@@ -53,15 +53,23 @@
   position: absolute;
   inset-block-start: -5px;
   inset-inline-end: -7px;
-  font-size: 11px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
   font-weight: var(--weight-bold);
-  line-height: 1;
-  color: #e11d48;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: var(--status-danger);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  box-sizing: content-box;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
 
-/* A new message arriving gives the count one small pop, so it is noticed. */
+/* A new message arriving gives the bubble one small pop, so it is noticed. */
 .badge {
   animation: chat-badge-pop var(--beat-3) ease-out;
 }

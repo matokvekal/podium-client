@@ -1,6 +1,6 @@
 /**
- * The ride chat button — on a ride card and on the ride page: a navy circle with a chat
- * bubble and a red unread count (nothing when there is nothing unread). Tapping it opens
+ * The ride chat button — on a ride card and on the ride page: a blue circle with a chat
+ * bubble and a red unread-count bubble (nothing when there is nothing unread). Tapping it opens
  * /events/:eventId/chat.
  *
  * It reads its count from store/rideChatStore.ts and fetches NOTHING itself: the list or page

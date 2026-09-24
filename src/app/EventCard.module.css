@@ -360,7 +360,10 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Columns sized to their content and spread across the card, so a long value like
+     "Intermediate" takes the room it needs and stays on one line. */
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border);
@@ -372,7 +375,7 @@
    as Distance / Elevation / Est.Time, then Level / Terrain - which is how the two hardness
    answers end up side by side, where they are meant to be read together. */
 .stats[data-tiles="5"] {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, auto);
 }
 
 .stat {
@@ -394,7 +397,7 @@
   font-size: 0.82rem;
   font-weight: var(--weight-bold);
   color: var(--text);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .statLabel {

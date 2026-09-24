@@ -1928,13 +1928,21 @@ export function EventDetailPage() {
                     <span className={styles.infoCellValue}>{event.area}</span>
                   </div>
                 )}
-                {event.location && (
+                {(event.location || event.meetingPoint) && (
                   <div className={styles.infoCell}>
                     <span className={styles.infoCellHead}>
                       <MapPin width={13} height={13} aria-hidden="true" />
                       Meeting Point
                     </span>
-                    <span className={styles.infoCellValue}>{event.location}</span>
+                    {/* `location` is free text about the ROUTE's own area ("Ashkelon"), copied
+                        forward from ride to ride and often stale — it says nothing about a
+                        meeting-point override set on THIS ride, which is coordinates only, no
+                        text. Showing the old text next to a corrected pin is exactly the
+                        confusing "why do I still see an old ride's point" report this fixes:
+                        the pin/Waze/Maps were already right, only this label still lied. */}
+                    <span className={styles.infoCellValue}>
+                      {event.meetingPoint ? "Custom meeting point" : event.location}
+                    </span>
                     {(wazeHref || googleMapsHref) && (
                       <span className={styles.infoCellLinks}>
                         {wazeHref && (

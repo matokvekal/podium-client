@@ -102,6 +102,7 @@ import {
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
+import { getRideImage } from "../lib/ride-images";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import {
@@ -1178,11 +1179,10 @@ export function EventDetailPage() {
   const organizerAvatarProps = organizerIsRealOwner
     ? { ...ownerAvatarProps, seed: ownerAvatarProps.seed ?? organizer }
     : { avatarUrl: null, identity: null, localSelection: null, seed: organizer };
-  const coverBackground = eventCoverBackground(
-    event.id,
-    extras.coverImageDataUrl,
-    ownerCoverOptions,
-  );
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
+    ...ownerCoverOptions,
+    builtInRideImageUrl: getRideImage(event.rideImageKey)?.src ?? null,
+  });
   const riderCount = realRiderCount;
   // Start-list capacity. event.participantCount is the authoritative "joined" count (approved +
   // pending) from GET /events/:eventId; the roster-length poll is only a pre-fetch stand-in for
@@ -1934,14 +1934,12 @@ export function EventDetailPage() {
                       <MapPin width={13} height={13} aria-hidden="true" />
                       Meeting Point
                     </span>
-                    {/* `location` is free text about the ROUTE's own area ("Ashkelon"), copied
-                        forward from ride to ride and often stale — it says nothing about a
-                        meeting-point override set on THIS ride, which is coordinates only, no
-                        text. Showing the old text next to a corrected pin is exactly the
-                        confusing "why do I still see an old ride's point" report this fixes:
-                        the pin/Waze/Maps were already right, only this label still lied. */}
+                    {/* `location` is now the meeting-point's own description too — the Edit Ride
+                        picker writes both together (see EventCreatePage.tsx's "Change meeting
+                        point"). The generic fallback only shows if the organizer set a custom
+                        pin but left the description blank; it never papers over a real one. */}
                     <span className={styles.infoCellValue}>
-                      {event.meetingPoint ? "Custom meeting point" : event.location}
+                      {event.location || (event.meetingPoint ? "Custom meeting point" : null)}
                     </span>
                     {(wazeHref || googleMapsHref) && (
                       <span className={styles.infoCellLinks}>

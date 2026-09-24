@@ -119,6 +119,10 @@ export interface EventCoverOptions {
   ownerCover?: UserVisualAsset | null;
   /** This device's temporary pick — only when the viewer IS the owner. */
   localCover?: LocalVisualSelection | null;
+  /** The organizer's built-in ride-image pick for THIS event, already resolved to a static URL
+   *  via lib/ride-images.ts's getRideImage(event.rideImageKey)?.src. Null for every ride until
+   *  one is chosen, and safely null again for an unrecognized/retired key. */
+  builtInRideImageUrl?: string | null;
 }
 
 export function eventCoverBackground(
@@ -135,6 +139,7 @@ export function eventCoverBackground(
     ownerCover: options?.ownerCover,
     localCover: options?.localCover,
     legacyEventCoverDataUrl: coverImageDataUrl,
+    builtInRideImageUrl: options?.builtInRideImageUrl,
   });
   // Nothing in the chain answered — fall back to this event's own built-in scene, as today.
   const url = (resolved.url ?? generatedCoverUrl(seed)).replaceAll('"', "%22");

@@ -49,6 +49,7 @@ import { Link } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
+import { getRideImage } from "../lib/ride-images";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import {
@@ -171,7 +172,10 @@ export function EventCard({
   // The organizer's own cover when they have one, else this event's local cover, else the
   // built-in scene — one chain, in lib/user-identity.ts. See useOwnerCover.
   const ownerCover = useOwnerCover(event.ownerId, event.ownerCover);
-  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, ownerCover);
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
+    ...ownerCover,
+    builtInRideImageUrl: getRideImage(event.rideImageKey)?.src ?? null,
+  });
 
   // The ride chat icon appears only on a ride this rider can chat in — the rides the list's one
   // unread request (useRideChatUnread in EventsListPage) got an answer for. A Find Rides card

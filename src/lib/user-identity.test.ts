@@ -110,6 +110,48 @@ describe("resolveEventCover", () => {
     ).toBe("local-preset");
   });
 
+  describe("built-in ride image (sql/051)", () => {
+    const rideImageUrl = "/ride-images/sukkot-01.webp";
+
+    it("never displaces an existing legacy per-device cover", () => {
+      const r = resolveEventCover({
+        ownerId: 7,
+        legacyEventCoverDataUrl: legacy,
+        builtInRideImageUrl: rideImageUrl,
+      });
+      expect(r).toEqual({ url: legacy, origin: "legacy-event", presetId: null });
+    });
+
+    it("outranks the owner's own server cover and local pick", () => {
+      expect(
+        resolveEventCover({
+          ownerId: 7,
+          ownerCover: { url: "https://cdn/c.webp" },
+          builtInRideImageUrl: rideImageUrl,
+        }).origin,
+      ).toBe("built-in-ride-image");
+      expect(
+        resolveEventCover({
+          ownerId: 7,
+          localCover: local({ presetId: "cover-night-01" }),
+          builtInRideImageUrl: rideImageUrl,
+        }).origin,
+      ).toBe("built-in-ride-image");
+    });
+
+    it("resolves to the exact url the caller passed", () => {
+      const r = resolveEventCover({ ownerId: 7, builtInRideImageUrl: rideImageUrl });
+      expect(r).toEqual({ url: rideImageUrl, origin: "built-in-ride-image", presetId: null });
+    });
+
+    it("falls through cleanly when null/undefined — an unset or unrecognized key", () => {
+      expect(resolveEventCover({ ownerId: 7, builtInRideImageUrl: null }).origin).not.toBe(
+        "built-in-ride-image",
+      );
+      expect(resolveEventCover({ ownerId: 7 }).origin).not.toBe("built-in-ride-image");
+    });
+  });
+
   it("keeps the legacy event cover when the owner has chosen NOTHING", () => {
     const r = resolveEventCover({ ownerId: 7, legacyEventCoverDataUrl: legacy });
     expect(r).toEqual({ url: legacy, origin: "legacy-event", presetId: null });

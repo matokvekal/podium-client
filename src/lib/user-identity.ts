@@ -17,13 +17,18 @@
  * an automatic fallback must never displace an image somebody actually chose. A deterministic
  * default is a fallback, not a choice.
  *
- *   cover:   custom per-event cover (`event.customCover`) → owner server upload → owner server
- *            preset → owner local upload → owner local preset → deterministic owner default
- *            → caller's own fallback
+ *   cover:   custom per-event cover (`event.customCover`) → built-in ride image chosen for THIS
+ *            event → owner server upload → owner server preset → owner local upload → owner
+ *            local preset → deterministic owner default → caller's own fallback
  *
  *   The per-event cover is FIRST: a cover uploaded for one specific event stays that event's
  *   cover even after its organizer later chooses a profile cover. New events carry no per-event
  *   cover, so they fall straight through to the organizer's identity, which is the point.
+ *
+ *   The built-in ride image (events.rideImageKey, sql/051) sits just below it for the same
+ *   reason: it is also an explicit pick FOR THIS RIDE, just server-synced instead of
+ *   device-local, so it outranks the owner's general identity but must never displace an
+ *   existing legacy per-device cover.
  *
  *   avatar:  server upload → server preset → local upload → local preset
  *            → provider photo (Google) → caller's own fallback (the initial placeholder)
@@ -85,6 +90,7 @@ export type VisualOrigin =
   | "local-preset"
   | "provider-photo"
   | "legacy-event"
+  | "built-in-ride-image"
   | "default-preset"
   | "fallback";
 
@@ -196,6 +202,14 @@ export interface EventCoverInput {
    * file header for why it sits below explicit owner choices but above anything automatic.
    */
   legacyEventCoverDataUrl?: string | null;
+  /**
+   * The organizer's built-in ride-image pick for THIS event (events.rideImageKey, sql/051),
+   * already resolved to a static URL by the caller via lib/ride-images.ts's getRideImage() —
+   * this module has no static-asset knowledge of its own. Null/undefined for every ride until
+   * an organizer picks one, and for a ride whose stored key this build no longer recognizes
+   * (getRideImage returns null rather than a broken url).
+   */
+  builtInRideImageUrl?: string | null;
 }
 
 /**
@@ -211,6 +225,15 @@ export function resolveEventCover(input: EventCoverInput): ResolvedVisual {
     // later picks a profile cover — see the "old events keep their cover" rule.
     (input.legacyEventCoverDataUrl
       ? { url: input.legacyEventCoverDataUrl, origin: "legacy-event" as const, presetId: null }
+      : null) ??
+    // Also a choice FOR THIS EVENT, just server-synced — see the file header. Never displaces
+    // an existing legacy local cover, but outranks the owner's general identity below.
+    (input.builtInRideImageUrl
+      ? {
+          url: input.builtInRideImageUrl,
+          origin: "built-in-ride-image" as const,
+          presetId: null,
+        }
       : null) ??
     fromServerAsset(input.ownerCover, "cover") ??
     fromLocalSelection(input.localCover, "cover") ??

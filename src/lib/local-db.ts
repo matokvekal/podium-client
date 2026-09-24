@@ -231,6 +231,15 @@ export interface EventSummary {
    * a capacity — the real cap is the organizer's plan limit and never comes down to the client.
    */
   expectedParticipants?: number | null;
+  /**
+   * The organizer's choice of a built-in ride cover photo — a key into lib/ride-images.ts
+   * (server: events.ride_image_key, sql/051-events-ride-image.sql). On the SUMMARY so a card
+   * can show it with no per-card detail call. `null`/absent = no built-in image chosen; the
+   * existing cover chain (owner's avatar/cover, generated placeholder) applies. Resolve with
+   * `getRideImage(event.rideImageKey)?.src` — never render the key itself, and never assume an
+   * unrecognized key is broken (getRideImage returns null, the chain falls through).
+   */
+  rideImageKey?: string | null;
 }
 
 /**

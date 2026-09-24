@@ -56,6 +56,23 @@ describe("rider", () => {
     expect(link().textContent).toContain("5/6");
   });
 
+  it("the status pill's mood is frown at 0, meh partway, smile at all 6", () => {
+    render(<SafetyChecklistLink trackFor={rider()} />);
+    const pill = () => link().querySelector("[data-mood]") as HTMLElement;
+
+    expect(pill().getAttribute("data-mood")).toBe("empty");
+
+    open();
+    fireEvent.click(box("Helmet"));
+    close();
+    expect(pill().getAttribute("data-mood")).toBe("partial");
+
+    open();
+    for (const label of ALL.slice(1)) fireEvent.click(box(label));
+    close();
+    expect(pill().getAttribute("data-mood")).toBe("ready");
+  });
+
   it("the whole row (label text) toggles the checkbox", () => {
     render(<SafetyChecklistLink trackFor={rider()} />);
     open();

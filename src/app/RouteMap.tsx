@@ -9,7 +9,7 @@
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { config } from "../lib/config";
 import type { RideStop } from "../lib/ride-stops";
 import {
@@ -43,10 +43,15 @@ interface RouteMapProps {
   onMapTap?: (lat: number, lng: number) => void;
 }
 
+/** Module-level so the default is the SAME array every render. An inline `= []` default was a new
+ * array each render, and the map effect below depends on it: every re-render of the ride page
+ * destroyed and rebuilt the whole map — and dropped the stop pins with it. */
+const NO_REST_STOPS: [number, number][] = [];
+
 export default function RouteMap({
   points,
   heightPx = 220,
-  restStops = [],
+  restStops = NO_REST_STOPS,
   stopPoints,
   editableStops = false,
   onStopMoved,
@@ -56,6 +61,9 @@ export default function RouteMap({
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  // Bumped each time a Leaflet map is created, so the stop / draft layers below redraw on EVERY
+  // new map — never left behind on a map that was torn down.
+  const [mapGen, setMapGen] = useState(0);
   // Callbacks read through refs so a parent re-render never rebuilds the map or its layers.
   const onStopMovedRef = useRef(onStopMoved);
   onStopMovedRef.current = onStopMoved;
@@ -102,6 +110,7 @@ export default function RouteMap({
     map.on("click", (e: L.LeafletMouseEvent) => onMapTapRef.current?.(e.latlng.lat, e.latlng.lng));
 
     map.fitBounds(line.getBounds(), { padding: [24, 24] });
+    setMapGen((n) => n + 1);
     // Leaflet mis-measures inside a flex/tab container until it's told to re-check its size.
     requestAnimationFrame(() => map.invalidateSize());
 
@@ -115,7 +124,7 @@ export default function RouteMap({
   // Saved stop points — their own layer, drawn after the map above exists (effects run in
   // order) and redrawn only when the stops change. A failure here is contained: the route map
   // keeps working without the pins.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: points rebuilds the map, so the pins must be redrawn on it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mapGen is the "a new map exists" signal — the pins must be redrawn on it
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !stopPoints || stopPoints.length === 0) return;
@@ -135,13 +144,13 @@ export default function RouteMap({
         // The map itself may already be gone (route changed) — nothing left to clean.
       }
     };
-  }, [points, stopPoints, editableStops]);
+  }, [mapGen, stopPoints, editableStops]);
 
   // The red "new stop" pin while the creator is adding one. Brought into view when it lands
   // outside it (a search result elsewhere); a tap inside the view leaves the zoom alone.
   const draftLat = draftPoint?.[0];
   const draftLng = draftPoint?.[1];
-  // biome-ignore lint/correctness/useExhaustiveDependencies: points rebuilds the map, so the pin must be redrawn on it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mapGen is the "a new map exists" signal — the pin must be redrawn on it
   useEffect(() => {
     const map = mapRef.current;
     if (!map || draftLat == null || draftLng == null) return;
@@ -166,7 +175,7 @@ export default function RouteMap({
         // see above
       }
     };
-  }, [points, draftLat, draftLng]);
+  }, [mapGen, draftLat, draftLng]);
 
   return <div ref={containerRef} className={styles.map} style={{ height: heightPx }} />;
 }

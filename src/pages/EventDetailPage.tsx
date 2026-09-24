@@ -75,6 +75,8 @@ import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
 import { SafetySheet } from "../app/SafetySheet";
+import { useSafetyChecks } from "../app/useSafetyChecks";
+import { SAFETY_ITEM_IDS } from "../lib/safety-checklist";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
 
@@ -163,41 +165,6 @@ function SedanIcon() {
   );
 }
 
-/**
- * "Track copied from <ride>" — the credit line under the route preview, shown when this ride's
- * track came from another ride (server: events.copied_from_event_id, sql/025).
- *
- * The server sends the source ride's ID, not its name, so the name is fetched here — best
- * effort, and the whole point of this component is what happens when that fails. A source ride
- * can be cancelled, deleted, or private to someone else, and none of those are errors: the ride
- * and the track are separate entities, and the record of where a track came from deliberately
- * outlives the ride it came from. So a name that will not resolve degrades to plain,
- * unlinked text rather than a dead link or a disappearing credit.
- */
-function CopiedFromCredit({ sourceEventId }: { sourceEventId: string }) {
-  const [name, setName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiRequest<{ name?: string }>(`/events/${sourceEventId}`)
-      .then((source) => {
-        if (!cancelled && source?.name) setName(source.name);
-      })
-      .catch(() => {
-        // Gone, cancelled, or not ours to see. The credit stays, the link does not.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceEventId]);
-
-  return (
-    <p className={styles.routeCredit}>
-      Track copied from{" "}
-      {name ? <Link to={`/events/${sourceEventId}`}>{name}</Link> : "another ride"}
-    </p>
-  );
-}
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
 // RouteMap above.
 const ShareEventSheet = lazy(() =>
@@ -431,6 +398,9 @@ export function EventDetailPage() {
   }, [ownsEvent, eventId, invite]);
   const [connectOpen, setConnectOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
+  // The rider's own ticks for THIS ride (kept on this device): the link below is green when every
+  // item is ticked and red until then.
+  const safety = useSafetyChecks(eventId);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -1600,7 +1570,13 @@ export function EventDetailPage() {
 
         {/* Safety checklist — a quiet link, same sheet the create form opens. Basic pre-ride
             kit; disturbs nothing on the page. */}
-        <button type="button" className={styles.safetyLink} onClick={() => setSafetyOpen(true)}>
+        <button
+          type="button"
+          className={`${styles.safetyLink} ${safety.complete ? styles.safetyOk : styles.safetyPending}`}
+          onClick={() => setSafetyOpen(true)}
+          aria-label={`Safety checklist — ${safety.checked.length} of ${SAFETY_ITEM_IDS.length} ticked`}
+          title={safety.complete ? "Everything on the list is ticked" : "Not everything is ticked yet"}
+        >
           <LifeBuoy aria-hidden="true" width={15} height={15} />
           Safety checklist
         </button>
@@ -1849,9 +1825,6 @@ export function EventDetailPage() {
                   durationMin={event.durationMin ?? estimatedMin}
                   routeDistanceKm={results.route.distanceKm}
                 />
-                {event.copiedFromEventId && (
-                  <CopiedFromCredit sourceEventId={event.copiedFromEventId} />
-                )}
               </div>
             )}
 
@@ -2302,7 +2275,7 @@ export function EventDetailPage() {
         </Suspense>
       )}
 
-      {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
+      {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} checks={safety} />}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

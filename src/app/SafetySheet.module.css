@@ -72,11 +72,25 @@
 }
 
 .item {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The tappable row: checkbox, icon, text. */
+.row {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 2px 0 0;
+  accent-color: var(--status-live-strong);
+  cursor: pointer;
 }
 
 .item:last-child {

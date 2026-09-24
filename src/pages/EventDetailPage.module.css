@@ -1110,6 +1110,17 @@
   text-underline-offset: 3px;
 }
 
+/* Status of the rider's own ticks: green once every item is ticked, red until then. Declared after
+   .safetyLink so they win over its colour; the text is mixed toward --text so it stays readable
+   in both themes, and the aria-label carries the count. */
+.safetyOk {
+  color: color-mix(in srgb, var(--status-live-strong) 60%, var(--text));
+}
+
+.safetyPending {
+  color: color-mix(in srgb, var(--status-danger) 75%, var(--text));
+}
+
 /* --- stat strip -------------------------------------------------------------------------- */
 
 /* auto-fit, not a fixed 5 columns: this strip renders only the tiles that have real values,
@@ -1259,16 +1270,6 @@
 .routeDownloadBtn:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
-}
-
-/* "Track copied from <ride>" — a credit under the map, deliberately quiet: it names whose work
-   this ride is built on without competing with the route itself. Sits at the same muted weight
-   as .routeMeta above. The link half is absent when the source ride is gone, so this styles the
-   text, not the anchor. */
-.routeCredit {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
 }
 
 /* --- info strip ---------------------------------------------------------------------------- */

@@ -148,6 +148,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { ElevationProfile } from "../app/ElevationProfile";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SafetySheet } from "../app/SafetySheet";
+import { useSafetyChecks } from "../app/useSafetyChecks";
 import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
@@ -503,6 +504,8 @@ export function EventCreatePage() {
       : "",
   );
   const [safetyOpen, setSafetyOpen] = useState(false);
+  // No ride exists yet, so the ticks live only in memory while this form is open.
+  const safetyChecks = useSafetyChecks(null);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
   const [organizerGroup, setOrganizerGroupInput] = useState(
@@ -2611,7 +2614,7 @@ export function EventCreatePage() {
           </ErrorBoundary>
         )}
 
-        {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
+        {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} checks={safetyChecks} />}
       </div>
     </section>
   );

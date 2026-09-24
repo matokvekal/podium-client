@@ -156,6 +156,7 @@ import { config } from "../lib/config";
 import { COUNTRIES, flagEmoji, orderedCountries } from "../lib/countries";
 import { defaultRideCountry } from "../lib/default-ride-country";
 import { effectiveLimits } from "../lib/entitlements";
+import { createGenerationGuard } from "../lib/generation-guard";
 import {
   DESCRIPTION_COUNTER_VISIBLE_FROM,
   DESCRIPTION_COUNTER_WARN_FROM,
@@ -645,6 +646,19 @@ export function EventCreatePage() {
    * land on top of that choice and put the old distance/climb back.
    */
   const trackChoiceTouchedRef = useRef(false);
+  /**
+   * Bumped every time the organizer settles on a track (upload, copy-from-ride, clear, or the
+   * Find Tracks deep-link effect below) — each of those also kicks off an async fetch of the
+   * FULL geometry for a nicer preview. Without this, an organizer who briefly considered an old
+   * track and then uploaded their own GPX before that first fetch resolved would have the old
+   * track's points silently land on top of the new upload the moment it finally came back — a
+   * real bug reported directly ("i create ride and upload track but somehow as other user i see
+   * the meeting point of a few weeks old [ride]"): the "meeting point" is just points[0] of
+   * whatever route got saved, so the stale geometry looked like a wrong meeting point. Every
+   * such fetch captures a generation token at the moment it starts and checks it's still
+   * current (lib/generation-guard.ts) before applying its result.
+   */
+  const trackGenerationRef = useRef(createGenerationGuard());
   const nameInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -967,6 +981,7 @@ export function EventCreatePage() {
 
   async function pickEventToCopy(event: EventSummary) {
     trackChoiceTouchedRef.current = true;
+    const generation = trackGenerationRef.current.next();
     setCopiedFrom(event);
     // A replacement track — the server POST is a full replace, so an already-attached route
     // needs no separate detach.
@@ -1022,6 +1037,9 @@ export function EventCreatePage() {
 
     try {
       const route = await apiRequest<EventRoute | null>(`/events/${event.id}/route`);
+      // The organizer moved on to a different track (or uploaded their own) while this was in
+      // flight — applying it now would silently overwrite their newer, real choice.
+      if (!trackGenerationRef.current.isCurrent(generation)) return;
       if (!route) {
         // The source event has no saved route — never fabricate one (BUGS.md: never show
         // mock/fake route). The invalidRoute flag surfaces the missing-route state.
@@ -1040,6 +1058,7 @@ export function EventCreatePage() {
 
   function clearCopiedTrack() {
     trackChoiceTouchedRef.current = true;
+    trackGenerationRef.current.next();
     // Edit mode: if the track being removed is the one already saved on the server, remember
     // to detach it on Save (DELETE /events/:id/route). Picking a replacement afterwards clears
     // this again — the replacement's POST is a full replace and needs no separate delete.
@@ -1063,6 +1082,7 @@ export function EventCreatePage() {
 
   function handleUploadRoute(uploaded: UploadedTrack) {
     trackChoiceTouchedRef.current = true;
+    trackGenerationRef.current.next();
     // A replacement track — the server POST is a full replace, so no separate detach is owed
     // even if this event already had a route.
     setExistingRouteAttached(false);
@@ -1144,6 +1164,7 @@ export function EventCreatePage() {
     if (isEditing) return;
     const picked = pickedTrack;
     if (!picked?.fromRouteId) return;
+    const generation = trackGenerationRef.current.next();
     setFromRouteId(picked.fromRouteId);
     applyTrackFacts({
       name: picked.fromRouteName,
@@ -1176,6 +1197,10 @@ export function EventCreatePage() {
       elevationM: number | null;
     }>(`/routes/${picked.fromRouteId}`)
       .then((route) => {
+        // The organizer already moved on (uploaded their own file, picked a different ride to
+        // copy, or cleared the track) while this preview fetch was in flight — applying it now
+        // would silently overwrite their newer choice with this stale one.
+        if (!trackGenerationRef.current.isCurrent(generation)) return;
         if (route.trackPoints?.length && route.distanceKm != null) {
           setCopiedRoute({
             points: route.trackPoints,

@@ -216,22 +216,26 @@ export function RideStopsSection({ eventId, points, stopsState }: RideStopsSecti
             )}
             {results && results.length > 1 && (
               <ul className={styles.results}>
-                {results.map((r) => (
-                  <li key={`${r.lat},${r.lng}`}>
-                    <button
-                      type="button"
-                      className={styles.resultBtn}
-                      data-selected={
-                        (draft && draft[0] === r.lat && draft[1] === r.lng) || undefined
-                      }
-                      onClick={() => setDraft([r.lat, r.lng])}
-                      dir="auto"
-                    >
-                      <MapPin width={14} height={14} aria-hidden="true" />
-                      <span>{r.name}</span>
-                    </button>
-                  </li>
-                ))}
+                {results.map((r) => {
+                  // Selected is shown by the check icon AND aria-pressed, not by colour alone.
+                  const selected = !!draft && draft[0] === r.lat && draft[1] === r.lng;
+                  const Icon = selected ? Check : MapPin;
+                  return (
+                    <li key={`${r.lat},${r.lng}`}>
+                      <button
+                        type="button"
+                        className={styles.resultBtn}
+                        data-selected={selected || undefined}
+                        aria-pressed={selected}
+                        onClick={() => setDraft([r.lat, r.lng])}
+                        dir="auto"
+                      >
+                        <Icon width={14} height={14} aria-hidden="true" />
+                        <span>{r.name}</span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

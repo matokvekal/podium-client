@@ -25,8 +25,9 @@
   border-radius: 4px;
 }
 
-/* Rider's status: red with a count until everything is ticked, then green "✓ Ready". Text,
-   not colour alone, carries the state. */
+/* Rider's status: a face + count that reads at a glance — frowning red at zero, neutral amber
+   partway through, smiling green once everything is ticked. The icon carries the state, not
+   colour alone, so it still reads under colour-blindness or a monochrome screen. */
 .status {
   --pill-hue: var(--status-danger);
   display: inline-flex;
@@ -46,18 +47,10 @@
   border: 1px solid color-mix(in srgb, var(--pill-hue) 40%, transparent);
 }
 
-.status::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--pill-hue);
+.status[data-mood="partial"] {
+  --pill-hue: var(--status-pending);
 }
 
-.status[data-ready] {
+.status[data-mood="ready"] {
   --pill-hue: var(--status-live-strong);
-}
-
-.status[data-ready]::before {
-  display: none;
 }

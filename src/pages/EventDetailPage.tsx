@@ -1581,15 +1581,19 @@ export function EventDetailPage() {
         </div>
 
         {/* Safety checklist — a quiet link, same list the create form opens. A rider (never the
-            creator, never a rejected sign-up) gets a personal red/green status and can tick
-            items off. */}
+            creator, never a rejected sign-up) gets a personal status and can tick items off —
+            but only before the ride is over: it's pre-ride kit prep, so once the ride has
+            finished or been cancelled there is nothing left to prepare for, and the rider goes
+            back to the plain read-only link like everyone else. */}
         <SafetyChecklistLink
           trackFor={
             event.myParticipant != null &&
             event.myParticipant.registrationStatus !== "rejected" &&
             !event.isOwner &&
             profile?.id != null &&
-            eventId
+            eventId &&
+            displayStatus !== "finished" &&
+            displayStatus !== "cancelled"
               ? { userId: profile.id, rideId: eventId }
               : null
           }

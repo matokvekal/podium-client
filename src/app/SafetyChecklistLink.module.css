@@ -1,0 +1,63 @@
+/* "Safety checklist" — a quiet inline link under the ride's chip row, not a button-styled
+   control. Only the label is underlined; the rider's status pill sits beside it. */
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent, #2563eb);
+  cursor: pointer;
+}
+
+.linkText {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Rider's status: red with a count until everything is ticked, then green "✓ Ready". Text,
+   not colour alone, carries the state. */
+.status {
+  --pill-hue: var(--status-danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  /* Hue blended toward the theme's text colour: readable small text in light and dark. */
+  color: color-mix(in srgb, var(--pill-hue) 55%, var(--text));
+  background: color-mix(in srgb, var(--pill-hue) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-hue) 40%, transparent);
+}
+
+.status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pill-hue);
+}
+
+.status[data-ready] {
+  --pill-hue: var(--status-live-strong);
+}
+
+.status[data-ready]::before {
+  display: none;
+}

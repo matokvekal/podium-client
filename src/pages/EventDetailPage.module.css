@@ -1093,23 +1093,6 @@
   --chip-hue: var(--status-danger);
 }
 
-/* "Safety checklist" — a quiet inline link under the chip row, not a button-styled control. */
-.safetyLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: 0.82rem;
-  font-weight: var(--weight-medium);
-  color: var(--accent, #2563eb);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 /* --- stat strip -------------------------------------------------------------------------- */
 
 /* auto-fit, not a fixed 5 columns: this strip renders only the tiles that have real values,

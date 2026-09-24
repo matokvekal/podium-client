@@ -49,7 +49,6 @@ import {
   Circle,
   Coffee,
   Download,
-  LifeBuoy,
   Link2,
   MapPin,
   MapPinned,
@@ -75,7 +74,7 @@ import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
 import { RideStopsSection } from "../app/RideStopsSection";
-import { SafetySheet } from "../app/SafetySheet";
+import { SafetyChecklistLink } from "../app/SafetyChecklistLink";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
 import { useRideStops } from "../app/useRideStops";
@@ -398,7 +397,6 @@ export function EventDetailPage() {
     if (ownsEvent && eventId) useInvitedEventsStore.getState().removeInvite(eventId);
   }, [ownsEvent, eventId, invite]);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [safetyOpen, setSafetyOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -1582,12 +1580,20 @@ export function EventDetailPage() {
           )}
         </div>
 
-        {/* Safety checklist — a quiet link, same sheet the create form opens. Basic pre-ride
-            kit; disturbs nothing on the page. */}
-        <button type="button" className={styles.safetyLink} onClick={() => setSafetyOpen(true)}>
-          <LifeBuoy aria-hidden="true" width={15} height={15} />
-          Safety checklist
-        </button>
+        {/* Safety checklist — a quiet link, same list the create form opens. A rider (never the
+            creator, never a rejected sign-up) gets a personal red/green status and can tick
+            items off. */}
+        <SafetyChecklistLink
+          trackFor={
+            event.myParticipant != null &&
+            event.myParticipant.registrationStatus !== "rejected" &&
+            !event.isOwner &&
+            profile?.id != null &&
+            eventId
+              ? { userId: profile.id, rideId: eventId }
+              : null
+          }
+        />
 
         {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
             live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
@@ -2290,8 +2296,6 @@ export function EventDetailPage() {
           />
         </Suspense>
       )}
-
-      {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} />}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

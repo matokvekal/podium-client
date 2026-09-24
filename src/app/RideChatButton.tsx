@@ -1,6 +1,6 @@
 /**
- * The ride chat button — on a ride card and on the ride page: a purple circle with a chat
- * bubble and a count badge (red unread count, or a quiet 0). Tapping it opens
+ * The ride chat button — on a ride card and on the ride page: a navy circle with a chat
+ * bubble and a red unread count (nothing when there is nothing unread). Tapping it opens
  * /events/:eventId/chat.
  *
  * It reads its count from store/rideChatStore.ts and fetches NOTHING itself: the list or page
@@ -47,16 +47,12 @@ export function RideChatButton({
       title={label}
     >
       <MessageCircle className={styles.icon} fill="currentColor" aria-hidden="true" />
-      {/* Always drawn — red with the count when there is something new, a quiet 0 otherwise
-          (see the stylesheet). key=unread replays the pop when a new message lands. */}
-      <span
-        key={unread}
-        className={styles.badge}
-        data-zero={unread === 0 || undefined}
-        aria-hidden="true"
-      >
-        {unreadBadgeText(unread)}
-      </span>
+      {/* Only when something is unread. key=unread replays the pop when a new message lands. */}
+      {unread > 0 && (
+        <span key={unread} className={styles.badge} aria-hidden="true">
+          {unreadBadgeText(unread)}
+        </span>
+      )}
     </button>
   );
 }

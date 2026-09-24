@@ -74,6 +74,7 @@ import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
 import { RideStopsSection } from "../app/RideStopsSection";
+import { RouteWeatherSection } from "../app/RouteWeatherSection";
 import { SafetyChecklistLink } from "../app/SafetyChecklistLink";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
@@ -1847,6 +1848,16 @@ export function EventDetailPage() {
                   points={results.route.points}
                   durationMin={event.durationMin ?? estimatedMin}
                   routeDistanceKm={results.route.distanceKm}
+                />
+                {/* Along-the-route sky check for long rides — a single point (above) can miss
+                    weather that changes over 50-100+ km. Isolated feature: own cache, own
+                    module, client-side only (asked for directly). Renders nothing on short
+                    rides. */}
+                <RouteWeatherSection
+                  event={event}
+                  userId={profile?.id}
+                  points={results.route.points}
+                  durationMin={event.durationMin ?? estimatedMin}
                 />
                 {/* No "Track copied from <ride>" line here any more (asked for directly): where a
                     track came from is bookkeeping (events.copied_from_event_id still records it for

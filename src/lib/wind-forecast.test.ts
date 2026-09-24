@@ -50,6 +50,8 @@ function fakeProvider(): WindProvider & { calls: number } {
         directionDeg: 270,
         gustKmh: 22,
         temperatureC: 19,
+        weatherCode: 2,
+        isDay: true,
       }));
     },
   };
@@ -209,7 +211,15 @@ describe("loadWindForecast", () => {
 });
 
 describe("wind cache hygiene", () => {
-  const sample = { timeMs: START, speedKmh: 1, directionDeg: 1, gustKmh: null, temperatureC: null };
+  const sample = {
+    timeMs: START,
+    speedKmh: 1,
+    directionDeg: 1,
+    gustKmh: null,
+    temperatureC: null,
+    weatherCode: null,
+    isDay: null,
+  };
 
   it("treats corrupt or foreign-version entries as a miss", () => {
     const storage = memoryStorage({
@@ -222,7 +232,7 @@ describe("wind cache hygiene", () => {
         samples: [sample],
       }),
       [windCacheKey("c")]: JSON.stringify({
-        v: 3,
+        v: 4,
         eventId: "c",
         signature: "s",
         fetchedAt: 1,
@@ -237,7 +247,7 @@ describe("wind cache hygiene", () => {
   it("a future fetchedAt (clock change) is not fresh", () => {
     expect(
       isWindCacheFresh(
-        { v: 3, eventId: "a", signature: "s", fetchedAt: 5000, samples: [sample] },
+        { v: 4, eventId: "a", signature: "s", fetchedAt: 5000, samples: [sample] },
         1000,
       ),
     ).toBe(false);
@@ -247,14 +257,14 @@ describe("wind cache hygiene", () => {
     const old = { ...sample, timeMs: START - 3 * 86_400_000 };
     const storage = memoryStorage({
       [`${WIND_CACHE_PREFIX}old`]: JSON.stringify({
-        v: 3,
+        v: 4,
         eventId: "old",
         signature: "s",
         fetchedAt: 1,
         samples: [old],
       }),
       [`${WIND_CACHE_PREFIX}new`]: JSON.stringify({
-        v: 3,
+        v: 4,
         eventId: "new",
         signature: "s",
         fetchedAt: 1,

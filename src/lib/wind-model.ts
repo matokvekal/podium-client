@@ -55,6 +55,10 @@ export interface WindSample {
   gustKmh: number | null;
   /** Air temperature at 2 m, °C — one plain row under the wind, never coloured. Null if absent. */
   temperatureC: number | null;
+  /** WMO weather code for this hour's sky icon (lib/weather-codes.ts). Null if absent. */
+  weatherCode: number | null;
+  /** Daytime at this hour — picks sun vs moon for a clear sky. Null if absent. */
+  isDay: boolean | null;
 }
 
 export function windStrength(speedKmh: number): WindStrength {

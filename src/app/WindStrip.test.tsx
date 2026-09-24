@@ -34,6 +34,8 @@ function openMeteoReply(startMs: number) {
       wind_direction_10m: times.map(() => 90),
       wind_gusts_10m: times.map(() => 35),
       temperature_2m: times.map(() => 19.4),
+      weathercode: times.map(() => 3), // overcast — same icon day or night
+      is_day: times.map(() => 1),
     },
   };
   return one;
@@ -106,6 +108,8 @@ describe("WindStrip forecast", () => {
     for (const t of screen.getAllByText("19°")) expect(t.getAttribute("style")).toBeNull();
     // No rider-position claims of any kind.
     expect(screen.queryByText(/headwind|tailwind|crosswind/i)).toBeNull();
+    // Sky condition: one icon per column, from the same request (no second fetch).
+    expect(screen.getAllByText("☁️")).toHaveLength(4);
 
     const keys = Object.keys(localStorage);
     expect(keys).toEqual(["elnino.wind.evt-1"]);

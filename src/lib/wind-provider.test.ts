@@ -14,6 +14,8 @@ function body(
   dirs: (number | null)[],
   gusts: (number | null)[],
   temps?: (number | null)[],
+  codes?: (number | null)[],
+  isDays?: (number | null)[],
 ) {
   return {
     hourly_units: { time: "unixtime", wind_speed_10m: "km/h" },
@@ -23,6 +25,8 @@ function body(
       wind_direction_10m: dirs,
       wind_gusts_10m: gusts,
       temperature_2m: temps ?? speeds.map(() => null),
+      weathercode: codes,
+      is_day: isDays,
     },
   };
 }
@@ -34,8 +38,22 @@ describe("readOpenMeteoResponse", () => {
 
   it("returns the stamp itself when a column lands exactly on an hour", () => {
     expect(readOpenMeteoResponse(data, [MS(0), MS(60)])).toEqual([
-      { speedKmh: 10, directionDeg: 90, gustKmh: 14, temperatureC: null },
-      { speedKmh: 20, directionDeg: 90, gustKmh: 26, temperatureC: null },
+      {
+        speedKmh: 10,
+        directionDeg: 90,
+        gustKmh: 14,
+        temperatureC: null,
+        weatherCode: null,
+        isDay: null,
+      },
+      {
+        speedKmh: 20,
+        directionDeg: 90,
+        gustKmh: 26,
+        temperatureC: null,
+        weatherCode: null,
+        isDay: null,
+      },
     ]);
   });
 
@@ -78,10 +96,26 @@ describe("readOpenMeteoResponse", () => {
     expect(r?.gustKmh).toBeNull();
     expect(r?.speedKmh).toBeCloseTo(15, 6);
   });
+
+  it("sky condition is the nearest stamp, never blended — no half-rain, half-clear", () => {
+    const withSky = body([10, 20], [90, 90], [14, 26], [18, 20], [0, 63], [1, 0]);
+    const [closerToPrev] = readOpenMeteoResponse(withSky, [MS(10)]); // 10 min past :00
+    expect(closerToPrev?.weatherCode).toBe(0);
+    expect(closerToPrev?.isDay).toBe(true);
+    const [closerToNext] = readOpenMeteoResponse(withSky, [MS(50)]); // 10 min before :60
+    expect(closerToNext?.weatherCode).toBe(63);
+    expect(closerToNext?.isDay).toBe(false);
+  });
+
+  it("missing weathercode/is_day is null, not a guess", () => {
+    const [r] = readOpenMeteoResponse(data, [MS(0)]);
+    expect(r?.weatherCode).toBeNull();
+    expect(r?.isDay).toBeNull();
+  });
 });
 
 describe("openMeteoWindProvider.fetchWind", () => {
-  it("makes ONE request for ONE place: the three wind variables in km/h, plus air temperature", async () => {
+  it("makes ONE request for ONE place: wind, air temperature and sky condition", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -101,14 +135,14 @@ describe("openMeteoWindProvider.fetchWind", () => {
     expect(url.searchParams.get("latitude")).toBe("32.0123");
     expect(url.searchParams.get("longitude")).toBe("34.8000");
     expect(url.searchParams.get("hourly")).toBe(
-      "wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m",
+      "wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weathercode,is_day",
     );
     expect(url.searchParams.get("wind_speed_unit")).toBe("kmh");
     expect(url.searchParams.get("timeformat")).toBe("unixtime");
     expect(url.searchParams.get("start_date")).toBe("2026-09-26");
     expect(url.searchParams.get("end_date")).toBe("2026-09-26");
-    // Wind + air temperature only: no rain, cloud or daily aggregates in the query.
-    expect(url.search).not.toMatch(/precipitation|cloud|daily|rain|snow/);
+    // No rain/cloud amounts or daily aggregates — weathercode is the only sky-condition field.
+    expect(url.search).not.toMatch(/precipitation|cloudcover|daily|rainfall|snowfall/);
   });
 
   it("reaches into the next UTC day when the last column is within an hour of midnight", async () => {

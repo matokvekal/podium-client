@@ -10,12 +10,14 @@
 //
 //   GET https://api.open-meteo.com/v1/forecast
 //     latitude / longitude                 one location — the pilot asks about one place per ride
-//     hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m
+//     hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weathercode,is_day
 //     wind_speed_unit=kmh                  the default, sent anyway so it can never drift
 //     timeformat=unixtime & timezone=UTC   hour stamps as epoch seconds: no timezone parsing
 //     start_date / end_date                bounds the payload to the ride's day(s)
 //   Forecast range: today … today + 15 days (forecast_days max 16); beyond that the API 400s.
 //   wind_direction_10m is degrees the wind blows FROM (meteorological).
+//   weathercode/is_day: the sky-condition icon on the wind strip — nearest-stamp only, never
+//   blended (a code halfway between "clear" and "rain" means nothing).
 
 /** The provider's answer for one instant. Speeds in km/h, direction = where the wind blows FROM. */
 export interface WindReading {
@@ -24,6 +26,10 @@ export interface WindReading {
   gustKmh: number | null;
   /** °C at 2 m. Null when the provider sent none — the wind readings do not depend on it. */
   temperatureC: number | null;
+  /** WMO weather code (see lib/weather-codes.ts) for the sky icon. Null when absent. */
+  weatherCode: number | null;
+  /** Whether this hour is daytime — picks sun vs moon for a clear sky. Null when absent. */
+  isDay: boolean | null;
 }
 
 export interface WindProvider {
@@ -57,6 +63,8 @@ interface OpenMeteoBody {
     wind_direction_10m?: (number | null)[];
     wind_gusts_10m?: (number | null)[];
     temperature_2m?: (number | null)[];
+    weathercode?: (number | null)[];
+    is_day?: (number | null)[];
   };
 }
 
@@ -76,6 +84,8 @@ function readingAt(
   dirs: readonly (number | null)[],
   gusts: readonly (number | null)[] | undefined,
   temps: readonly (number | null)[] | undefined,
+  codes: readonly (number | null)[] | undefined,
+  isDays: readonly (number | null)[] | undefined,
   timeMs: number,
 ): WindReading | null {
   const seconds = timeMs / 1000;
@@ -116,7 +126,14 @@ function readingAt(
   const tb = temps?.[next];
   const temperatureC = typeof ta === "number" && typeof tb === "number" ? ta + (tb - ta) * w : null;
 
-  return { speedKmh, directionDeg, gustKmh, temperatureC };
+  // Sky condition is nearest-stamp, never blended — there is no "half rain, half clear".
+  const nearest = w < 0.5 ? prev : next;
+  const codeAt = codes?.[nearest];
+  const weatherCode = typeof codeAt === "number" ? codeAt : null;
+  const isDayAt = isDays?.[nearest];
+  const isDay = typeof isDayAt === "number" ? isDayAt === 1 : null;
+
+  return { speedKmh, directionDeg, gustKmh, temperatureC, weatherCode, isDay };
 }
 
 /** Pure, so it can be tested against a captured response without a network. */
@@ -133,7 +150,16 @@ export function readOpenMeteoResponse(
     return timesMs.map(() => null);
   }
   return timesMs.map((t) =>
-    readingAt(times, speeds, dirs, hourly?.wind_gusts_10m, hourly?.temperature_2m, t),
+    readingAt(
+      times,
+      speeds,
+      dirs,
+      hourly?.wind_gusts_10m,
+      hourly?.temperature_2m,
+      hourly?.weathercode,
+      hourly?.is_day,
+      t,
+    ),
   );
 }
 
@@ -150,7 +176,7 @@ export const openMeteoWindProvider: WindProvider = {
     url.searchParams.set("longitude", place.lng.toFixed(4));
     url.searchParams.set(
       "hourly",
-      "wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m",
+      "wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weathercode,is_day",
     );
     url.searchParams.set("wind_speed_unit", "kmh");
     url.searchParams.set("timeformat", "unixtime");

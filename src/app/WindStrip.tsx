@@ -23,6 +23,7 @@
 import { useMemo } from "react";
 import { estimateDurationMin } from "../lib/ride-duration";
 import { formatLocalClockParts } from "../lib/time";
+import { weatherCodeInfo, weatherIcon } from "../lib/weather-codes";
 import { type WindLabels, windLabels, windLanguage } from "../lib/wind-labels";
 import { showGust, type WindSample, windCellColors, windStrength } from "../lib/wind-model";
 import { useCountryStore } from "../store/countryStore";
@@ -75,8 +76,10 @@ function WindColumn({
   const speed = Math.round(sample.speedKmh);
   const gust = showGust(sample.speedKmh, sample.gustKmh) ? Math.round(sample.gustKmh) : null;
   const clock = formatLocalClockParts(new Date(sample.timeMs));
+  const sky = weatherCodeInfo(sample.weatherCode);
   const description = [
     [clock?.time, clock?.suffix].filter(Boolean).join(" "),
+    sample.weatherCode != null ? sky.label : null,
     `${labels.strength[level]} ${speed} ${labels.unit}`,
     `${labels.from} ${Math.round(sample.directionDeg)}°`,
     gust != null ? `${labels.gust} ${gust}` : null,
@@ -88,6 +91,9 @@ function WindColumn({
   return (
     <li className={styles.col} title={description} aria-label={description}>
       <span className={styles.time}>{clock?.time ?? "—"}</span>
+      <span className={styles.icon} aria-hidden="true">
+        {sample.weatherCode != null ? weatherIcon(sample.weatherCode, sample.isDay) : ""}
+      </span>
       <span className={styles.cell} style={windCellColors(sample.speedKmh)}>
         {speed}
       </span>
@@ -146,6 +152,7 @@ export function WindStrip({ event, points, durationMin, routeDistanceKm }: WindS
       {/* Row labels sit in the chart's left gutter and stay put while the columns scroll. */}
       <div className={styles.labels} aria-hidden="true">
         <span className={styles.time}>&nbsp;</span>
+        <span className={styles.icon}>&nbsp;</span>
         <span className={styles.rowLabelCell}>{labels.unit}</span>
         <span className={styles.arrowRow} />
         {gustRow && <span className={styles.rowLabelText}>{labels.gust}</span>}

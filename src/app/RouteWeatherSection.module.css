@@ -1,0 +1,100 @@
+/* Route weather: a small, plain list directly under the wind strip — same left/right gutters
+   as WindStrip.module.css so the two read as one stack, not two unrelated cards. */
+
+.wrap {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 14px 0 42px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.refresh:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.spinning {
+  animation: route-weather-spin 1s linear infinite;
+}
+
+@keyframes route-weather-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3.5rem 3rem 1.25rem auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  color: var(--text-muted);
+}
+
+.time {
+  color: var(--text);
+}
+
+.icon {
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.temp {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.message {
+  margin: 4px 0 0;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+}
+
+.updated {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}

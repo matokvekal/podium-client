@@ -151,6 +151,10 @@ import { SafetySheet } from "../app/SafetySheet";
 import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
 import { useAuth } from "../auth/AuthContext";
+import {
+  BUILT_IN_RIDE_IMAGES_ENABLED,
+  USER_RIDE_IMAGE_UPLOAD_VISIBLE,
+} from "../config/ride-image-flags";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 import { COUNTRIES, flagEmoji, orderedCountries } from "../lib/countries";
@@ -180,6 +184,7 @@ import {
   joinDuration,
   splitDuration,
 } from "../lib/ride-duration";
+import { selectableRideImages } from "../lib/ride-images";
 import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import type { TrackHandoff } from "../lib/track-handoff";
@@ -266,6 +271,9 @@ interface ExistingEvent {
   /** The organizer's meeting-point override (sql/050), or null/absent when there isn't one —
    *  edit mode then starts the picker showing the route's own start point. */
   meetingPoint?: { lat: number; lon: number } | null;
+  /** The organizer's built-in ride-image pick (sql/051), or null/absent when none is chosen —
+   *  edit mode then starts the gallery with nothing selected. */
+  rideImageKey?: string | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -564,6 +572,11 @@ export function EventCreatePage() {
   // app/useOwnerCover.ts). Edit: an event that already has a custom cover keeps it (the effect
   // below re-hydrates this and handleSubmit re-persists it) — the upload UI is just disabled.
   const [coverImageDataUrl, setCoverImageDataUrl] = useState<string | null>(null);
+  // The organizer's built-in ride-image pick (events.rideImageKey, sql/051). null = none chosen
+  // (falls back to the cover chain — owner's avatar/cover, then a generated placeholder). Create:
+  // stays null unless the organizer taps one in the gallery. Edit: hydrated from the loaded
+  // event below and re-sent on every save, same as every other simple field on this page.
+  const [rideImageKey, setRideImageKey] = useState<string | null>(null);
   // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
   // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
   // on every edit save risked adding a duplicate roster row each time.
@@ -762,6 +775,9 @@ export function EventCreatePage() {
         setRouteDifficulty(asRouteDifficulty(found.routeDifficulty));
         setSeason(asTrailSeason(found.season));
         setShade(asTrailShade(found.shade));
+        // Server-only, same as terrainGrade above: no local-extras fallback for a ride this
+        // device did not create.
+        setRideImageKey(found.rideImageKey ?? null);
         // Server-persisted effective elevation wins — it survives logout/login and is the
         // same on every device, and `serverHasElevation` keeps the stale local extras below
         // off it. NOT marked "edited": a prefilled value is what the ride currently says, not
@@ -1479,6 +1495,9 @@ export function EventCreatePage() {
             routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
             season: trailMetadataApplies(activityType) ? season : null,
             shade: trailMetadataApplies(activityType) ? shade : null,
+            // The organizer's built-in ride-image pick (sql/051). Always sent, so choosing
+            // another image or clearing back to "No image" on an edit really does.
+            rideImageKey,
           },
         });
         await saveExtras(eventId);
@@ -1554,6 +1573,9 @@ export function EventCreatePage() {
           routeDifficulty: trailMetadataApplies(activityType) ? routeDifficulty : null,
           season: trailMetadataApplies(activityType) ? season : null,
           shade: trailMetadataApplies(activityType) ? shade : null,
+          // The organizer's built-in ride-image pick (sql/051), if they chose one before
+          // saving. null on every ride that never touched the gallery.
+          rideImageKey,
           // "I'm riding too" — part of THIS request on purpose, never a follow-up call. See
           // the imRiding state's doc comment above. Always sent, so an unticked box is an
           // explicit false and the organizer stays off the start list.
@@ -1880,11 +1902,27 @@ export function EventCreatePage() {
             {/* Meeting point (sql/050): defaults to the route's own start point, which is what
                 almost every ride keeps — "so normally the rider does NOTHING," confirmed
                 directly. The override never touches the route/GPX, only where the pin (and
-                Waze/Google Maps) point to. */}
+                Waze/Google Maps) point to. The description reuses the form's own `location`
+                field — the same text the event page already shows under "Meeting Point" — so
+                setting a custom pin is also the moment to say what's actually there ("parking
+                lot behind the gas station"), not just leave whatever text happened to be
+                sitting in that field from an old copied ride. */}
             {copiedRoute && (
               <div className={styles.meetingPointRow}>
                 {meetingPointEditing ? (
                   <>
+                    <label className={styles.fieldLabel} htmlFor="meetingPointLocation">
+                      Meeting point description
+                    </label>
+                    <input
+                      id="meetingPointLocation"
+                      className={styles.input}
+                      dir="auto"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Parking lot behind the gas station"
+                      maxLength={255}
+                    />
                     <p className={styles.hint}>Tap the map, or drag the pin, to place it.</p>
                     <div className={styles.meetingPointActions}>
                       <button
@@ -1911,7 +1949,8 @@ export function EventCreatePage() {
                 ) : (
                   <>
                     <p className={styles.hint}>
-                      Meeting point: {meetingPoint ? "custom" : "same as route start"}
+                      Meeting point:{" "}
+                      {meetingPoint ? location.trim() || "Custom (no description yet)" : "same as route start"}
                     </p>
                     <div className={styles.meetingPointActions}>
                       {meetingPoint && (
@@ -2783,25 +2822,66 @@ export function EventCreatePage() {
             Safety checklist
           </button>
 
-          {/* Event cover — disabled for now. The event automatically uses the organizer's own
-              profile cover photo (see app/useOwnerCover.ts / eventCoverBackground), so there is
-              nothing to upload here yet. Kept visible, greyed out, so the slot is familiar when
-              custom covers ship. */}
-          <div className={styles.field} aria-disabled="true">
-            <span className={styles.fieldLabel}>
-              <ImagePlus aria-hidden="true" />
-              Event cover
-            </span>
-            <button type="button" className={styles.trackBtn} disabled>
-              <span className={styles.trackBtnLabel}>
-                <ImagePlus aria-hidden="true" size={18} className={styles.trackBtnIcon} />
-                Upload cover image — coming soon
+          {/* Ride image — a fixed set of built-in photos the organizer picks from. No upload:
+              see the "no upload in V1" plan. Not mandatory; "No image" clears the pick and the
+              event falls back to the existing cover chain (owner's own profile cover, then a
+              generated placeholder — app/useOwnerCover.ts / eventCoverBackground). */}
+          {BUILT_IN_RIDE_IMAGES_ENABLED && (
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>
+                <ImagePlus aria-hidden="true" />
+                Ride image
               </span>
-            </button>
-            <p className={styles.hint}>
-              Your profile cover photo is used automatically. Custom event covers coming soon.
-            </p>
-          </div>
+              <div className={styles.rideImageGrid}>
+                <button
+                  type="button"
+                  data-active={rideImageKey === null}
+                  className={styles.rideImageSwatch}
+                  aria-label="No image"
+                  aria-pressed={rideImageKey === null}
+                  title="No image"
+                  onClick={() => setRideImageKey(null)}
+                >
+                  <span className={styles.rideImageNone}>No image</span>
+                </button>
+                {selectableRideImages().map((image) => (
+                  <button
+                    key={image.key}
+                    type="button"
+                    data-active={rideImageKey === image.key}
+                    className={styles.rideImageSwatch}
+                    aria-label={image.label}
+                    aria-pressed={rideImageKey === image.key}
+                    title={image.label}
+                    onClick={() => setRideImageKey(image.key)}
+                  >
+                    <img src={image.src} alt="" />
+                  </button>
+                ))}
+              </div>
+              <p className={styles.hint}>Optional — pick one of our built-in ride photos.</p>
+            </div>
+          )}
+
+          {/* Event cover — disabled for now, kept as-is: the built-in ride image above is the
+              new, additional option, not a replacement. See USER_RIDE_IMAGE_UPLOAD_VISIBLE. */}
+          {USER_RIDE_IMAGE_UPLOAD_VISIBLE && (
+            <div className={styles.field} aria-disabled="true">
+              <span className={styles.fieldLabel}>
+                <ImagePlus aria-hidden="true" />
+                Event cover
+              </span>
+              <button type="button" className={styles.trackBtn} disabled>
+                <span className={styles.trackBtnLabel}>
+                  <ImagePlus aria-hidden="true" size={18} className={styles.trackBtnIcon} />
+                  Upload cover image — coming soon
+                </span>
+              </button>
+              <p className={styles.hint}>
+                Your profile cover photo is used automatically. Custom event covers coming soon.
+              </p>
+            </div>
+          )}
 
           <button
             className={styles.launchBtn}

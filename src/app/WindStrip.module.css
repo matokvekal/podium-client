@@ -64,6 +64,15 @@
   color: var(--text-muted);
 }
 
+/* Sky-condition icon, directly under the time and above the wind cell — "on top of the wind". */
+.icon {
+  display: block;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
 .text {
   height: 12px;
   line-height: 12px;

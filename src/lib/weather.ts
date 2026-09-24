@@ -15,6 +15,8 @@
 // plan/server-tasks.md for what real support needs (either geocoding Location, or capturing
 // lat/lon directly when a route is attached).
 
+import { weatherCodeInfo } from "./weather-codes";
+
 export interface DayForecast {
   date: string; // YYYY-MM-DD
   tempMinC: number;
@@ -31,31 +33,6 @@ export interface DayForecast {
   /** Which Open-Meteo endpoint this came from — lets a caller show "forecast" vs "recorded". */
   source: "forecast" | "historical";
 }
-
-// WMO weather codes — the small subset Open-Meteo actually returns for `daily.weathercode`.
-const WEATHER_CODES: Record<number, { label: string; emoji: string }> = {
-  0: { label: "Clear sky", emoji: "☀️" },
-  1: { label: "Mostly clear", emoji: "🌤️" },
-  2: { label: "Partly cloudy", emoji: "⛅" },
-  3: { label: "Overcast", emoji: "☁️" },
-  45: { label: "Fog", emoji: "🌫️" },
-  48: { label: "Fog", emoji: "🌫️" },
-  51: { label: "Light drizzle", emoji: "🌦️" },
-  53: { label: "Drizzle", emoji: "🌦️" },
-  55: { label: "Dense drizzle", emoji: "🌧️" },
-  61: { label: "Light rain", emoji: "🌦️" },
-  63: { label: "Rain", emoji: "🌧️" },
-  65: { label: "Heavy rain", emoji: "🌧️" },
-  71: { label: "Light snow", emoji: "🌨️" },
-  73: { label: "Snow", emoji: "🌨️" },
-  75: { label: "Heavy snow", emoji: "❄️" },
-  80: { label: "Rain showers", emoji: "🌦️" },
-  81: { label: "Rain showers", emoji: "🌧️" },
-  82: { label: "Violent showers", emoji: "⛈️" },
-  95: { label: "Thunderstorm", emoji: "⛈️" },
-  96: { label: "Thunderstorm, hail", emoji: "⛈️" },
-  99: { label: "Thunderstorm, hail", emoji: "⛈️" },
-};
 
 const FORECAST_HORIZON_DAYS = 16; // Open-Meteo's actual daily-forecast range.
 
@@ -94,7 +71,7 @@ async function fetchDaily(
     const cloudCover: number | undefined = data?.daily?.cloudcover_mean?.[0];
     if (code == null || tempMax == null || tempMin == null) return null;
 
-    const known = WEATHER_CODES[code] ?? { label: "—", emoji: "🌡️" };
+    const known = weatherCodeInfo(code);
     return {
       date: targetDate,
       tempMinC: Math.round(tempMin),

@@ -69,6 +69,8 @@ export async function loadWindForecast(options: LoadWindOptions): Promise<WindFo
         directionDeg: reading.directionDeg,
         gustKmh: reading.gustKmh,
         temperatureC: reading.temperatureC,
+        weatherCode: reading.weatherCode,
+        isDay: reading.isDay,
       });
     });
     if (samples.length === 0) throw new Error("no wind readings");

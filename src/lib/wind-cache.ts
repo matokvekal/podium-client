@@ -20,8 +20,9 @@ export const WIND_CACHE_TTL_MS = 3 * 60 * 60 * 1000;
 const PRUNE_AFTER_RIDE_MS = 24 * 60 * 60 * 1000;
 
 // v2: the position-along-the-route model (km / heading per sample) was dropped for a plain
-// hourly window. v3: samples carry the air temperature. Older entries read as a miss.
-const CACHE_VERSION = 3;
+// hourly window. v3: samples carry the air temperature. v4: samples carry a sky-condition code
+// and day/night flag. Older entries read as a miss.
+const CACHE_VERSION = 4;
 
 /** The slice of Storage this needs, so tests can pass a plain in-memory object. */
 export type WindStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
@@ -56,7 +57,9 @@ function isSample(value: unknown): value is WindSample {
     typeof s.speedKmh === "number" &&
     typeof s.directionDeg === "number" &&
     (s.gustKmh === null || typeof s.gustKmh === "number") &&
-    (s.temperatureC === null || typeof s.temperatureC === "number")
+    (s.temperatureC === null || typeof s.temperatureC === "number") &&
+    (s.weatherCode === null || typeof s.weatherCode === "number") &&
+    (s.isDay === null || typeof s.isDay === "boolean")
   );
 }
 

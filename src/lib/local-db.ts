@@ -279,6 +279,9 @@ export interface EventDetail extends EventSummary {
   requiresBib: boolean;
   description: string | null;
   finishedAt: string | null;
+  /** When the ride actually went live (server sql/048); null before it has, or from an older
+   *  server. The live screen's Elapsed clock counts from this — lib/ride-elapsed.ts. */
+  startedAt?: string | null;
   isOwner: boolean;
   requiresApproval: boolean;
   isPaused: boolean;
@@ -286,6 +289,11 @@ export interface EventDetail extends EventSummary {
   showParticipants: boolean;
   showLiveLocations: boolean;
   myParticipant: MyParticipant | null;
+  /**
+   * What THIS viewer may do with the ride, decided by the server (server authz/capabilities.ts)
+   * — e.g. "event:chat". Optional: a cached detail or an older server omits it.
+   */
+  capabilities?: string[];
   /**
    * Start-list capacity. `participantCount` (approved + pending) and `isFull` are sent to every
    * viewer; the server 409s (EVENT_FULL) when a join hits the cap, so client checks are UX only.

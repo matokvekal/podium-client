@@ -196,20 +196,15 @@
   flex: 1;
 }
 
-.titleRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
+/* Its own line under the date + image, full card width, so a long name wraps by words. */
 .title {
-  flex: 1;
+  display: block;
   min-width: 0;
   font-size: 0.98rem;
   font-weight: var(--weight-bold);
   line-height: 1.25;
   color: var(--text);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .tag {
@@ -279,6 +274,20 @@
   cursor: pointer;
 }
 
+/* Chat on top, heart under it, at the card's side. */
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+  margin: -4px -4px 0 0;
+}
+
+.sideActions > button {
+  margin: 0;
+}
+
 .heartBtn[data-on="true"] {
   color: var(--status-danger);
 }
@@ -292,6 +301,7 @@
 .chipRow {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
@@ -350,7 +360,10 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Columns sized to their content and spread across the card, so a long value like
+     "Intermediate" takes the room it needs and stays on one line. */
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border);
@@ -362,7 +375,7 @@
    as Distance / Elevation / Est.Time, then Level / Terrain - which is how the two hardness
    answers end up side by side, where they are meant to be read together. */
 .stats[data-tiles="5"] {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, auto);
 }
 
 .stat {
@@ -384,7 +397,7 @@
   font-size: 0.82rem;
   font-weight: var(--weight-bold);
   color: var(--text);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .statLabel {

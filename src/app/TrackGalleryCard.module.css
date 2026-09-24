@@ -19,8 +19,12 @@
      makes the card its own stacking context, so everything Leaflet does stays inside it and
      the page's own layering is all that matters outside. */
   isolation: isolate;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  /* SEPARATION FROM THE PAGE. This used to be --surface-raised with the soft --border — a pale
+     blue on the pale blue page wash, so a card's text ran straight into the next card's map
+     and read as belonging to it. A solid surface and the stronger border give each card a
+     visible edge; the size is unchanged. */
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   transition:
@@ -82,6 +86,63 @@
   position: absolute;
   inset: 0;
   animation: map-fade var(--beat-2) ease-out;
+}
+
+/* --- the trail facts, over the map ---
+   Difficulty / shade / season as small badges in the top-right corner (Leaflet's zoom owns the
+   top-left, attribution the bottom). Over the map rather than under it so an MTB card is no
+   taller than any other. They never take a tap: the map below must still pan and zoom. Above
+   Leaflet's controls (800) — safe because .card isolates its own stacking context. */
+.trailFacts {
+  position: absolute;
+  inset-block-start: var(--sp-2);
+  inset-inline-end: var(--sp-2);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+  max-width: 60%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.trailFact {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--text);
+  background: rgb(255 255 255 / 0.9);
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+.trailFactDifficulty {
+  color: var(--accent-text);
+  background: var(--accent-strong);
+}
+
+.trailFactIcon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .trailFact {
+    background: rgb(22 27 34 / 0.9);
+  }
+
+  .trailFactDifficulty {
+    background: var(--accent-strong);
+  }
 }
 
 /* Fades in over the underlay rather than replacing it, so the route never appears to jump

@@ -43,14 +43,21 @@
 
 import {
   ArrowDownToLine,
+  CalendarDays,
+  Check,
   Clock,
+  CloudSun,
+  Gauge,
   Heart,
   MapPin,
   Mountain,
   MoveRight,
   Repeat,
   Route as RouteIcon,
+  Share2,
+  Sun,
   ThumbsUp,
+  Trees,
   User,
 } from "lucide-react";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -67,6 +74,20 @@ import {
   terrainDescriptionFor,
   terrainLabelFor,
 } from "../lib/terrain-grade";
+import {
+  asRouteDifficulty,
+  asTrailSeason,
+  asTrailShade,
+  ROUTE_DIFFICULTY_LABEL,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASON_SHORT,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADE_SHORT,
+  type TrailShade,
+  trailMetadataApplies,
+} from "../lib/trail-metadata";
+import { trackHandoffState } from "../lib/track-handoff";
+import { trackSharePath } from "../lib/track-share-url";
 import { resolveTrackLikes, useTrackLikesStore } from "../store/trackLikesStore";
 import { useIsOrganizer } from "../store/userModeStore";
 import { type DistanceIcon, distanceIconFor } from "./ActivityIcons";
@@ -107,6 +128,12 @@ function Stat({
     </div>
   );
 }
+
+const SHADE_ICON: Record<TrailShade, DistanceIcon> = {
+  shaded: Trees,
+  partial: CloudSun,
+  exposed: Sun,
+};
 
 /** The underlay's coordinate space. Rendered via viewBox, so these are ratios as much as px. */
 const THUMB_W = 320;
@@ -232,6 +259,25 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
    */
   const terrain = terrainApplies(event.activityType) ? asTerrainGrade(event.terrainGrade) : null;
 
+  /**
+   * THE TRAIL FACTS (sql/041) — how hard the track is, how much shade, when it is good to ride.
+   * Off-road only (mtb / gravel), and only the ones the ride actually states: a missing field is
+   * simply not drawn, never guessed. There is no water field anywhere in the data, so there is
+   * no water badge.
+   *
+   * Drawn as badges in the map's top-right corner (the zoom control owns top-left) rather than as
+   * another row under it, so an MTB card is exactly as tall as any other.
+   */
+  const trailFacts = trailMetadataApplies(event.activityType)
+    ? {
+        difficulty: asRouteDifficulty(event.routeDifficulty),
+        shade: asTrailShade(event.shade),
+        season: asTrailSeason(event.season),
+      }
+    : null;
+  const hasTrailFacts =
+    trailFacts != null && (trailFacts.difficulty || trailFacts.shade || trailFacts.season);
+
   // LOOP OR POINT-TO-POINT, derived from the geometry the card already has. This is the honest
   // answer to "where does it start and end": the map below already marks both ends, and the
   // one thing a rider cannot see at card size is whether they finish back at the car. Naming
@@ -245,6 +291,30 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
     if (!start || !end) return null;
     return haversineDistanceKm(start, end) <= LOOP_TOLERANCE_KM ? "loop" : "point-to-point";
   }, [previewPoints]);
+
+  // SHARE THIS ONE TRACK — /mtb/<routes.id> (lib/track-share-url.ts). The device's own share
+  // sheet when it has one (every phone), else the link is copied. Works signed out: the track
+  // page it opens is public.
+  const [shareCopied, setShareCopied] = useState(false);
+  async function handleShare() {
+    if (routeId == null) return;
+    const url = `${window.location.origin}${trackSharePath(event.activityType, routeId)}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: event.name, url });
+      } catch {
+        // Dismissed — not an error.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch {
+      window.prompt("Copy this link", url);
+    }
+  }
 
   function handleLike() {
     if (routeId == null || likedByMe || busy) return;
@@ -284,6 +354,42 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
               <TrackMiniMap points={mapPoints} label={event.name} onExplore={handleExplore} />
             </Suspense>
           </div>
+        )}
+
+        {hasTrailFacts && trailFacts && (
+          <ul className={styles.trailFacts} aria-label="Trail">
+            {trailFacts.difficulty && (
+              <li
+                className={`${styles.trailFact} ${styles.trailFactDifficulty}`}
+                title={`קושי המסלול: ${ROUTE_DIFFICULTY_LABEL[trailFacts.difficulty]}`}
+              >
+                <Gauge className={styles.trailFactIcon} aria-hidden="true" />
+                {ROUTE_DIFFICULTY_LABEL[trailFacts.difficulty]}
+              </li>
+            )}
+            {trailFacts.shade &&
+              (() => {
+                const ShadeIcon = SHADE_ICON[trailFacts.shade];
+                return (
+                  <li className={styles.trailFact} title={TRAIL_SHADE_LABEL[trailFacts.shade]}>
+                    <ShadeIcon className={styles.trailFactIcon} aria-hidden="true" />
+                    <span aria-hidden="true">{TRAIL_SHADE_SHORT[trailFacts.shade]}</span>
+                    <span className={styles.statLabelText}>
+                      {TRAIL_SHADE_LABEL[trailFacts.shade]}
+                    </span>
+                  </li>
+                );
+              })()}
+            {trailFacts.season && (
+              <li className={styles.trailFact} title={TRAIL_SEASON_LABEL[trailFacts.season]}>
+                <CalendarDays className={styles.trailFactIcon} aria-hidden="true" />
+                <span aria-hidden="true">{TRAIL_SEASON_SHORT[trailFacts.season]}</span>
+                <span className={styles.statLabelText}>
+                  {TRAIL_SEASON_LABEL[trailFacts.season]}
+                </span>
+              </li>
+            )}
+          </ul>
         )}
       </div>
 
@@ -437,6 +543,23 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
             </button>
           )}
 
+          {routeId != null && (
+            <button
+              type="button"
+              className={styles.likeBtn}
+              data-on={shareCopied}
+              onClick={handleShare}
+              aria-label={shareCopied ? "Link copied" : `Share ${event.name}`}
+              title={shareCopied ? "Link copied" : "Share"}
+            >
+              {shareCopied ? (
+                <Check className={styles.likeIcon} aria-hidden="true" />
+              ) : (
+                <Share2 className={styles.likeIcon} aria-hidden="true" />
+              )}
+            </button>
+          )}
+
           {variant === "page" ? (
             // Organizer-only, exactly as TrackCard's "Plan a ride" is: a rider in Rider mode
             // browses and saves tracks, but creating a ride is not something they can do, and
@@ -445,14 +568,7 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
               <Link
                 className={styles.useBtn}
                 to="/events/new"
-                state={{
-                  fromRouteId: routeId,
-                  fromRouteName: event.name,
-                  fromRoutePlace: place ?? null,
-                  fromRouteDistanceKm: distanceKm ?? null,
-                  fromRouteClimbM: climbM ?? null,
-                  fromRouteSurface: event.activityType ?? null,
-                }}
+                state={trackHandoffState(event)}
               >
                 <RouteIcon width={15} height={15} aria-hidden="true" />
                 Ride it

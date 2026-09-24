@@ -50,6 +50,10 @@ export const TRACK_SORT_LABEL: Record<TrackGallerySort, string> = {
   name_asc: "Name (A–Z)",
 };
 
+/** The discipline Find Tracks opens on for a rider who has never picked one
+ *  (store/trackGalleryFiltersStore.ts seedSurface). */
+export const DEFAULT_TRACK_GALLERY_SURFACE: SurfaceType = "mtb";
+
 /** created_at DESC — the stable key the gallery has always paged against. */
 export const DEFAULT_TRACK_GALLERY_SORT: TrackGallerySort = "newest";
 

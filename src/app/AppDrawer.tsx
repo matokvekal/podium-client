@@ -73,6 +73,14 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
     navigate(path);
   }
 
+  // Signing in from the menu comes back to the page it was opened on — a shared /mtb/<id> track
+  // or a ride page — rather than dropping the rider on the home screen. postLoginDestination
+  // still sends account pages and "/" home.
+  function goToLogin() {
+    onClose();
+    navigate("/login", { state: { from: `${window.location.pathname}${window.location.search}` } });
+  }
+
   return (
     <>
       {open && <div className="drawer-overlay" onClick={onClose} aria-hidden="true" />}
@@ -154,9 +162,17 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               effectively invisible — the page itself was behind RequireOrganizer too (App.tsx),
               so a rider could neither see the link nor reach the URL. Only the "Ride it" button
               on a card stays organizer-only. */}
-          <NavLink to="/findtracks" className="drawer__nav-item" onClick={onClose}>
+          {/* FEATURED — highlighted in the menu at all times, not only while you are on it
+              (asked for directly): it is the library every ride starts from, and a plain row
+              among the others is how it went unnoticed. */}
+          <NavLink
+            to="/findtracks"
+            className="drawer__nav-item drawer__nav-item--featured"
+            onClick={onClose}
+          >
             <MapIcon aria-hidden="true" />
             Find Tracks
+            <span className="drawer__nav-tag">New</span>
           </NavLink>
           {status === "signed-in" && (
             <NavLink to="/teams" className="drawer__nav-item" onClick={onClose}>
@@ -225,7 +241,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
               </button>
             </>
           ) : (
-            <button type="button" className="drawer__nav-item" onClick={() => go("/login")}>
+            <button type="button" className="drawer__nav-item" onClick={goToLogin}>
               <User aria-hidden="true" />
               Register / Login
             </button>

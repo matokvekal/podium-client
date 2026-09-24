@@ -49,7 +49,6 @@ import {
   Circle,
   Coffee,
   Download,
-  LifeBuoy,
   Link2,
   MapPin,
   MapPinned,
@@ -74,11 +73,11 @@ import { WindStrip } from "../app/WindStrip";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
-import { SafetySheet } from "../app/SafetySheet";
-import { useSafetyChecks } from "../app/useSafetyChecks";
-import { SAFETY_ITEM_IDS } from "../lib/safety-checklist";
+import { RideStopsSection } from "../app/RideStopsSection";
+import { SafetyChecklistLink } from "../app/SafetyChecklistLink";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
+import { useRideStops } from "../app/useRideStops";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -132,6 +131,8 @@ import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useResultsStore } from "../store/resultsStore";
+import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
+import { canOpenRideChat } from "../lib/ride-chat";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -140,7 +141,6 @@ import styles from "./EventDetailPage.module.css";
 const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
-const RouteMap = lazy(() => import("../app/RouteMap"));
 
 /**
  * A low, smooth-roofed sedan in the same 24px outline style as the lucide icons around it (lucide's
@@ -166,7 +166,7 @@ function SedanIcon() {
 }
 
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
-// RouteMap above.
+// the route map (app/RideStopsSection.tsx lazy-loads RouteMap).
 const ShareEventSheet = lazy(() =>
   import("../app/ShareEventSheet").then((m) => ({
     default: m.ShareEventSheet,
@@ -397,10 +397,6 @@ export function EventDetailPage() {
     if (ownsEvent && eventId) useInvitedEventsStore.getState().removeInvite(eventId);
   }, [ownsEvent, eventId, invite]);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [safetyOpen, setSafetyOpen] = useState(false);
-  // The rider's own ticks for THIS ride (kept on this device): the link below is green when every
-  // item is ticked and red until then.
-  const safety = useSafetyChecks(eventId);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -412,6 +408,9 @@ export function EventDetailPage() {
   const resultsLoading = useResultsStore((state) => state.loading);
   const resultsError = useResultsStore((state) => state.error);
   const loadResults = useResultsStore((state) => state.loadResults);
+  // The ride's stop points (sql/049) — own request, fails soft to "none" (app/useRideStops.ts),
+  // so nothing else on this page waits on it or breaks with it.
+  const rideStops = useRideStops(eventId);
 
   const [forecast, setForecast] = useState<DayForecast | null>(null);
 
@@ -993,6 +992,12 @@ export function EventDetailPage() {
     event?.owner?.avatar,
   );
 
+  // Ride chat: drawn only for someone on the ride (lib/ride-chat.ts canOpenRideChat), with its
+  // unread badge refreshed once now and every ~5 min — one request, never per ride. Above the
+  // early returns below so the hook order never changes.
+  const canChat = signedIn && event != null && canOpenRideChat(event);
+  useRideChatUnread(canChat && event ? [event.id] : [], canChat);
+
   if (loading) {
     return (
       <div className="row">
@@ -1115,6 +1120,10 @@ export function EventDetailPage() {
   // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
   // tile that read a hard-coded "soon" until now; rest stops / accessibility show as chips.
   const restStops = event.restStops ?? null;
+  // The ☕ chip counts the ride's real stop points when it has any; a ride without points shows
+  // the organizer's typed number exactly as before. The duration estimate keeps using the typed
+  // number (restStops above) — unchanged.
+  const restStopsShown = rideStops.stops.length > 0 ? rideStops.stops.length : restStops;
 
   /** How technical the ground is (sql/038) — mtb/gravel only, where a scale exists to read it
    *  against. Orthogonal to `level` above: that one is who the ride is pitched at. */
@@ -1312,6 +1321,9 @@ export function EventDetailPage() {
                 could only ever hand out a code that answers "no event has that code": an
                 invitation to something nobody can accept. Riders who were there still reach it
                 from My Rides, and anyone else from the Past filter — neither needs a link. */}
+            {/* Ride chat — the riders on this ride and its organizers (server: "event:chat").
+                Kept after the ride finishes, so History still opens it. */}
+            {canChat && <RideChatButton rideId={event.id} variant="page" />}
             {canShare && (
               <button
                 type="button"
@@ -1526,12 +1538,12 @@ export function EventDetailPage() {
               Support vehicle
             </span>
           )}
-          {restStops != null && (
+          {restStopsShown != null && (
             <span className={styles.chip} data-kind="rest" title="Planned rest / regroup stops">
               <Coffee width={13} height={13} aria-hidden="true" />
-              {restStops === 0
+              {restStopsShown === 0
                 ? "No rest stops"
-                : `${restStops} rest ${restStops === 1 ? "stop" : "stops"}`}
+                : `${restStopsShown} rest ${restStopsShown === 1 ? "stop" : "stops"}`}
             </span>
           )}
           {event.requiresApproval && (
@@ -1568,18 +1580,20 @@ export function EventDetailPage() {
           )}
         </div>
 
-        {/* Safety checklist — a quiet link, same sheet the create form opens. Basic pre-ride
-            kit; disturbs nothing on the page. */}
-        <button
-          type="button"
-          className={`${styles.safetyLink} ${safety.complete ? styles.safetyOk : styles.safetyPending}`}
-          onClick={() => setSafetyOpen(true)}
-          aria-label={`Safety checklist — ${safety.checked.length} of ${SAFETY_ITEM_IDS.length} ticked`}
-          title={safety.complete ? "Everything on the list is ticked" : "Not everything is ticked yet"}
-        >
-          <LifeBuoy aria-hidden="true" width={15} height={15} />
-          Safety checklist
-        </button>
+        {/* Safety checklist — a quiet link, same list the create form opens. A rider (never the
+            creator, never a rejected sign-up) gets a personal red/green status and can tick
+            items off. */}
+        <SafetyChecklistLink
+          trackFor={
+            event.myParticipant != null &&
+            event.myParticipant.registrationStatus !== "rejected" &&
+            !event.isOwner &&
+            profile?.id != null &&
+            eventId
+              ? { userId: profile.id, rideId: eventId }
+              : null
+          }
+        />
 
         {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
             live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
@@ -1807,9 +1821,14 @@ export function EventDetailPage() {
                     GPX
                   </button>
                 </div>
-                <Suspense fallback={<div className="row muted">Loading the map…</div>}>
-                  <RouteMap points={results.route.points} />
-                </Suspense>
+                {/* The route map with the ride's stop points and the Stop / Break list under it.
+                    With no stops (or if loading them failed) this is the same plain map as
+                    before. */}
+                <RideStopsSection
+                  eventId={event.id}
+                  points={results.route.points}
+                  stopsState={rideStops}
+                />
                 {/* showEmpty: a route with no elevation series keeps this slot (a neutral placeholder,
                     no invented values) so the wind strip below never moves up into it. */}
                 <ElevationProfile
@@ -1825,6 +1844,9 @@ export function EventDetailPage() {
                   durationMin={event.durationMin ?? estimatedMin}
                   routeDistanceKm={results.route.distanceKm}
                 />
+                {/* No "Track copied from <ride>" line here any more (asked for directly): where a
+                    track came from is bookkeeping (events.copied_from_event_id still records it for
+                    the reuse count), not something a rider needs on the ride page. */}
               </div>
             )}
 
@@ -2274,8 +2296,6 @@ export function EventDetailPage() {
           />
         </Suspense>
       )}
-
-      {safetyOpen && <SafetySheet onClose={() => setSafetyOpen(false)} checks={safety} />}
 
       {/* Bottom sheet, not a popover — "the organizer action not seen" (a small dropdown was
           getting clipped/missed); a full-width sheet sliding up ~1/3 of the screen is both

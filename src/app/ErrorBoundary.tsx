@@ -38,6 +38,38 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
+// Every lazy() sheet in this app (ShareEventSheet, ConnectRidesSheet, TrackGallerySheet, ...)
+// is a dynamic import of a hashed file — /assets/ShareEventSheet-<hash>.js and its CSS. A
+// deploy replaces those files wholesale, so a tab left open across a deploy asks for a hash
+// that is simply gone: the browser reports it as a failed CSS preload or a failed module
+// import, never as a 404 Error we could branch on directly, only as this message text.
+//
+// "Try again" cannot fix this — it re-runs the same import() against the same missing file
+// and fails the same way. Only a full reload helps: it fetches the CURRENT index.html, which
+// points at the CURRENT hashes. So this one error class gets a reload instead of the crash
+// card, once per tab (the guard stops a genuinely broken deploy from reload-looping forever).
+const STALE_CHUNK_PATTERN =
+  /unable to preload css for|failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i;
+
+const STALE_CHUNK_RELOAD_KEY = "elnino.staleChunkReloaded";
+
+function isStaleChunkError(error: Error): boolean {
+  return STALE_CHUNK_PATTERN.test(error.message || "");
+}
+
+function reloadOnceForStaleChunk(): boolean {
+  try {
+    if (sessionStorage.getItem(STALE_CHUNK_RELOAD_KEY)) return false;
+    sessionStorage.setItem(STALE_CHUNK_RELOAD_KEY, "1");
+  } catch {
+    // Storage blocked (private mode): fall through to the ordinary crash card rather than
+    // risk reloading forever with no way to remember it already tried once.
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 
@@ -49,6 +81,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Kept for a desktop browser's console, where there IS one. Not the primary channel —
     // see the file comment for why the message is also rendered on screen.
     console.error("[ErrorBoundary]", error, info.componentStack);
+    if (isStaleChunkError(error)) reloadOnceForStaleChunk();
   }
 
   private reset = () => {

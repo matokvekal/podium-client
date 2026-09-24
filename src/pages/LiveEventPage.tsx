@@ -57,6 +57,7 @@ import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { initialOf, placeholderColorVar } from "../app/event-visuals";
 import type { RecenterCommand } from "../app/LiveRidersMap";
+import { useRideStops } from "../app/useRideStops";
 import { useLocationBroadcast } from "../app/useLocationBroadcast";
 import { useMyIdentity } from "../app/useMyIdentity";
 import { useAuth } from "../auth/AuthContext";
@@ -77,6 +78,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { isLocationManuallyStopped } from "../lib/location-broadcast";
+import { rideElapsedMs } from "../lib/ride-elapsed";
 import { formatAge } from "../lib/time";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { resolveUserAvatar, type UserVisualAsset } from "../lib/user-identity";
@@ -178,6 +180,8 @@ export function LiveEventPage() {
 
   const results = useResultsStore((s) => s.results);
   const loadResults = useResultsStore((s) => s.loadResults);
+  // The ride's stop points (sql/049) — own request, fails soft to "none" (app/useRideStops.ts).
+  const { stops: stopPoints } = useRideStops(eventId);
   const groups = useEventGroupsStore((s) =>
     eventId && s.byEvent[eventId] ? s.byEvent[eventId] : EMPTY_GROUPS,
   );
@@ -512,7 +516,9 @@ export function LiveEventPage() {
     ? (ridersById.get(event.myParticipant.id)?.distanceKm ?? null)
     : null;
   const progressKm = myDistance ?? (leaderDistance > 0 ? leaderDistance : null);
-  const elapsedMs = event?.startsAt ? Math.max(0, now - new Date(event.startsAt).getTime()) : null;
+  // From when the ride actually went live (events.started_at), not the planned start — see
+  // lib/ride-elapsed.ts for the fallbacks.
+  const elapsedMs = event ? rideElapsedMs(event, now) : null;
   const remainingKm =
     results?.route?.distanceKm != null && progressKm != null
       ? Math.max(0, results.route.distanceKm - progressKm)
@@ -560,6 +566,7 @@ export function LiveEventPage() {
           onToggleRider={toggleRider}
           recenter={recenter}
           mapTheme={mapTheme}
+          stopPoints={stopPoints}
         />
       </Suspense>
 

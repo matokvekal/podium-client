@@ -47,6 +47,23 @@ export const TRAIL_SHADE_LABEL: Record<TrailShade, string> = {
   exposed: "חשוף לשמש",
 };
 
+/**
+ * The same words cut down for a track card's corner badges, where a whole phrase would not fit.
+ * The full label above stays the badge's tooltip / accessible name, so nothing is lost.
+ */
+export const TRAIL_SHADE_SHORT: Record<TrailShade, string> = {
+  shaded: "מוצל",
+  partial: "חצי צל",
+  exposed: "שמש",
+};
+
+export const TRAIL_SEASON_SHORT: Record<TrailSeason, string> = {
+  all_year: "כל השנה",
+  all_year_summer_ok: "כל השנה",
+  winter_spring: "חורף–אביב",
+  spring_autumn: "אביב–סתיו",
+};
+
 const GATED_SURFACES: readonly SurfaceType[] = ["mtb", "gravel"];
 
 /** Does this kind of ride collect / show route difficulty, season and shade? */

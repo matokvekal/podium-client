@@ -36,6 +36,7 @@ import {
   parseFindTracksPath,
 } from "../lib/find-tracks-url";
 import type { EventSummary } from "../lib/local-db";
+import { trackHandoffState } from "../lib/track-handoff";
 
 export function TracksPage() {
   const navigate = useNavigate();
@@ -71,16 +72,7 @@ export function TracksPage() {
    */
   function openCreateWithTrack(event: EventSummary) {
     if (event.routeId == null) return;
-    navigate("/events/new", {
-      state: {
-        fromRouteId: event.routeId,
-        fromRouteName: event.name,
-        fromRoutePlace: event.location ?? event.area ?? null,
-        fromRouteDistanceKm: event.distanceKm ?? null,
-        fromRouteClimbM: event.elevationGain ?? null,
-        fromRouteSurface: event.activityType ?? null,
-      },
-    });
+    navigate("/events/new", { state: trackHandoffState(event) });
   }
 
   return (

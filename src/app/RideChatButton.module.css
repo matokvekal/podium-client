@@ -1,0 +1,87 @@
+/*
+ * The ride chat button — ONE look everywhere (ride card and ride page) so a rider learns it
+ * once: a solid blue circle with a white chat bubble.
+ *
+ * Unread messages show as a small red bubble with the count, tucked onto the top corner.
+ * Nothing unread shows nothing.
+ */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: -4px 4px 0 0;
+  padding: 0;
+  color: #fff;
+  background: var(--chat);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgb(47 123 245 / 0.4);
+  cursor: pointer;
+  transition:
+    transform var(--beat-1) ease,
+    background var(--beat-1) ease;
+}
+
+.btn:hover {
+  background: var(--chat-strong);
+  transform: scale(1.06);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--chat);
+  outline-offset: 2px;
+}
+
+/* The ride page: a little bigger, beside the hero's other round buttons. */
+.btnPage {
+  width: 32px;
+  height: 32px;
+  margin: 0 4px 0 0;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
+.badge {
+  position: absolute;
+  inset-block-start: -5px;
+  inset-inline-end: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: var(--status-danger);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  box-sizing: content-box;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* A new message arriving gives the bubble one small pop, so it is noticed. */
+.badge {
+  animation: chat-badge-pop var(--beat-3) ease-out;
+}
+
+@keyframes chat-badge-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

@@ -6,8 +6,9 @@
  * cockpit backup, and it stays until asked to delete it.
  *
  * Layout, top to bottom:
- *   row 1   date block (AUG / 29 / FRI) · thumbnail · title · status pill · favourite heart
- *   row 2   tag chips — surface, visibility, "Approval Required"
+ *   row 1   date block (AUG / 29 / FRI) · thumbnail · chips (status, surface, visibility, ...)
+ *           · chat stacked above the favourite heart at the side
+ *   row 2   title, full card width
  *   row 3   four stats — distance, elevation, est. time, difficulty
  *   row 4   footer — date + time, location, participants
  *
@@ -61,7 +62,9 @@ import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { distanceIconFor } from "./ActivityIcons";
+import { useRideChatStore } from "../store/rideChatStore";
 import styles from "./EventCard.module.css";
+import { RideChatButton } from "./RideChatButton";
 import {
   eventCoverBackground,
   FIGMA_TAG_LABEL,
@@ -170,6 +173,11 @@ export function EventCard({
   const ownerCover = useOwnerCover(event.ownerId, event.ownerCover);
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, ownerCover);
 
+  // The ride chat icon appears only on a ride this rider can chat in — the rides the list's one
+  // unread request (useRideChatUnread in EventsListPage) got an answer for. A Find Rides card
+  // for someone else's ride therefore shows none.
+  const hasChat = useRideChatStore((s) => s.summaries[event.id] != null);
+
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -220,30 +228,12 @@ export function EventCard({
         />
 
         <div className={styles.headMain}>
-          <div className={styles.titleRow}>
-            <span className={styles.title}>{event.name}</span>
+          <div className={styles.chipRow}>
+            {/* Status first, in the same row as the surface / visibility chips. */}
             <span className={styles.tag} data-status={status}>
               {status === "live" && <span className={styles.liveDot} aria-hidden="true" />}
               {FIGMA_TAG_LABEL[status]}
             </span>
-            <button
-              type="button"
-              className={styles.heartBtn}
-              data-on={favorite}
-              onClick={handleFavorite}
-              aria-pressed={favorite}
-              aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
-            >
-              <Heart
-                width={18}
-                height={18}
-                aria-hidden="true"
-                fill={favorite ? "currentColor" : "none"}
-              />
-            </button>
-          </div>
-
-          <div className={styles.chipRow}>
             {/* This ride shares one share-link with another of the organizer's rides that day
                 (server: sql/037). On the card so the "Created" list shows at a glance which
                 rides are connected, instead of the organizer having to open each one to find
@@ -297,7 +287,31 @@ export function EventCard({
                 absence) from a guess would be a claim about how to join this ride. */}
           </div>
         </div>
+
+        {/* Chat stacked on top of the heart, at the card's side. */}
+        <div className={styles.sideActions}>
+          {hasChat && <RideChatButton rideId={event.id} />}
+          <button
+            type="button"
+            className={styles.heartBtn}
+            data-on={favorite}
+            onClick={handleFavorite}
+            aria-pressed={favorite}
+            aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
+          >
+            <Heart
+              width={18}
+              height={18}
+              aria-hidden="true"
+              fill={favorite ? "currentColor" : "none"}
+            />
+          </button>
+        </div>
       </div>
+
+      {/* The name gets the card's full width under the date and image — beside them a long
+          Hebrew name ("טרומן מודיעין לטרון") broke into three-letter fragments. */}
+      <span className={styles.title}>{event.name}</span>
 
       {/* Four tiles normally; five when the ride has a terrain grade, and then the grid drops
           to three columns so it wraps cleanly as 3 + 2 (Distance/Elevation/Est.Time, then

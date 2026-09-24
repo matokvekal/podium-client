@@ -9,12 +9,17 @@
 // mount) — an Israeli opens the picker scoped to Israel without touching anything, and can
 // widen to "Any country". `countrySeeded` marks that the seed has run so it never overrides a
 // choice the rider made and persisted.
+//
+// DISCIPLINE works the same way (seedSurface): a rider with no choice yet opens on MTB, and
+// whatever they pick after that is what the next visit restores — it is part of the persisted
+// criteria, so the Road / Gravel / MTB row remembers itself with no extra storage key.
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   DEFAULT_TRACK_GALLERY_CRITERIA,
   DEFAULT_TRACK_GALLERY_SORT,
+  DEFAULT_TRACK_GALLERY_SURFACE,
   type TrackGalleryCriteria,
   type TrackGallerySort,
 } from "../lib/track-gallery-filter";
@@ -23,11 +28,18 @@ interface TrackGalleryFiltersState {
   criteria: TrackGalleryCriteria;
   sort: TrackGallerySort;
   countrySeeded: boolean;
+  /** Whether the first-visit discipline default (MTB) has been applied — see seedSurface. */
+  surfaceSeeded: boolean;
   /** Merge a partial patch into the criteria — the sheet toggles one group at a time. */
   setCriteria(patch: Partial<TrackGalleryCriteria>): void;
   setSort(sort: TrackGallerySort): void;
   /** Set the country ONCE, before the rider has touched the filter (idempotent after). */
   seedCountry(code: string | null): void;
+  /**
+   * Give a rider with no discipline choice yet the default one (MTB), ONCE. A rider who already
+   * has one keeps it — including one persisted before this default existed.
+   */
+  seedSurface(): void;
   /** Reset the filters, but keep the country on the rider's default rather than "Any". */
   clearFilters(defaultCountry: string | null): void;
 }
@@ -59,12 +71,22 @@ export const useTrackGalleryFiltersStore = create<TrackGalleryFiltersState>()(
       criteria: DEFAULT_TRACK_GALLERY_CRITERIA,
       sort: DEFAULT_TRACK_GALLERY_SORT,
       countrySeeded: false,
+      surfaceSeeded: false,
       setCriteria: (patch) => set((s) => ({ criteria: { ...s.criteria, ...patch } })),
       setSort: (sort) => set({ sort }),
       seedCountry: (code) =>
         set((s) =>
           s.countrySeeded ? s : { criteria: { ...s.criteria, country: code }, countrySeeded: true },
         ),
+      seedSurface: () =>
+        set((s) => {
+          if (s.surfaceSeeded) return s;
+          if (s.criteria.surface.length > 0) return { surfaceSeeded: true };
+          return {
+            criteria: { ...s.criteria, surface: [DEFAULT_TRACK_GALLERY_SURFACE] },
+            surfaceSeeded: true,
+          };
+        }),
       // Reset criteria only — the chosen sort is a separate control ("this is how I like the
       // list"), so "Clear filters" leaves it be. Country goes back to the rider's default, not
       // to "Any": clearing filters shouldn't dump them into every country.
@@ -84,6 +106,7 @@ export const useTrackGalleryFiltersStore = create<TrackGalleryFiltersState>()(
             criteria: DEFAULT_TRACK_GALLERY_CRITERIA,
             sort: cleanSort(state?.sort),
             countrySeeded: false,
+            surfaceSeeded: false,
           };
         }
         const state = persisted as Partial<TrackGalleryFiltersState>;
@@ -91,12 +114,14 @@ export const useTrackGalleryFiltersStore = create<TrackGalleryFiltersState>()(
           criteria: { ...DEFAULT_TRACK_GALLERY_CRITERIA, ...(state.criteria ?? {}) },
           sort: cleanSort(state.sort),
           countrySeeded: state.countrySeeded ?? false,
+          surfaceSeeded: state.surfaceSeeded ?? false,
         };
       },
       partialize: (state) => ({
         criteria: state.criteria,
         sort: state.sort,
         countrySeeded: state.countrySeeded,
+        surfaceSeeded: state.surfaceSeeded,
       }),
     },
   ),

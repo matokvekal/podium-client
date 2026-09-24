@@ -67,6 +67,11 @@ export interface TrackGalleryBrowserProps {
    * the rider changes one of those filters. See lib/find-tracks-url.ts.
    */
   urlSync?: { facets: FindTracksFacets; onChange: (facets: FindTracksFacets) => void };
+  /**
+   * Modal only — the discipline of the ride being created. The gallery opens filtered to it, so
+   * a road ride is offered road tracks first. The rider can still change it like any filter.
+   */
+  initialSurface?: SurfaceType;
 }
 
 /**
@@ -96,6 +101,7 @@ export function TrackGalleryBrowser({
   onPick,
   onClose,
   urlSync,
+  initialSurface,
 }: TrackGalleryBrowserProps) {
   const isModal = variant === "modal";
   const [source, setSource] = useState<GallerySource>("all");
@@ -116,6 +122,7 @@ export function TrackGalleryBrowser({
   const setCriteria = useTrackGalleryFiltersStore((s) => s.setCriteria);
   const setSort = useTrackGalleryFiltersStore((s) => s.setSort);
   const seedCountry = useTrackGalleryFiltersStore((s) => s.seedCountry);
+  const seedSurface = useTrackGalleryFiltersStore((s) => s.seedSurface);
   const clearFiltersAction = useTrackGalleryFiltersStore((s) => s.clearFilters);
   const clearFilters = () => {
     clearFiltersAction(defaultCountry);
@@ -129,11 +136,22 @@ export function TrackGalleryBrowser({
   //
   // Not when the address names a country: a shared /findtracks/il/mtb link must show what its
   // sender saw, whoever opens it. The effect below applies the URL instead.
+  //
+  // The discipline is seeded the same way: a rider who has never picked one opens on MTB, and
+  // every later pick is persisted with the rest of the criteria, so the next visit restores it.
   const urlCountry = urlSync?.facets.country;
   const urlType = urlSync?.facets.type;
   useEffect(() => {
-    if (urlCountry === undefined) seedCountry(defaultCountry);
-  }, [seedCountry, defaultCountry, urlCountry]);
+    if (urlCountry !== undefined) return;
+    seedCountry(defaultCountry);
+    seedSurface();
+  }, [seedCountry, seedSurface, defaultCountry, urlCountry]);
+
+  // The create form knows what kind of ride this is — open on that discipline rather than
+  // whatever was last picked on Find Tracks. Once per open; the rider's own changes stand.
+  useEffect(() => {
+    if (initialSurface) setCriteria({ surface: [initialSurface] });
+  }, [initialSurface, setCriteria]);
 
   // Address bar -> filters. Runs when the URL's country or discipline changes (opening a link,
   // back/forward). It skips when the filters already imply this URL — that is what stops the
@@ -597,7 +615,9 @@ export function TrackGalleryBrowser({
                   <ChipButton
                     key={key}
                     on={criteria.routeDifficulty.includes(key)}
-                    onClick={() => patch({ routeDifficulty: toggle(criteria.routeDifficulty, key) })}
+                    onClick={() =>
+                      patch({ routeDifficulty: toggle(criteria.routeDifficulty, key) })
+                    }
                   >
                     {ROUTE_DIFFICULTY_LABEL[key]}
                   </ChipButton>

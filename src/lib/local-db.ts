@@ -67,6 +67,10 @@ export interface EventSummary {
   location: string | null;
   /** Optional — not yet in the frozen API contract; older/unmigrated events won't have it. */
   area?: string | null;
+  /** The organizer's meeting-point override (server sql/050), or null/absent when there isn't
+   *  one — the map pin and Waze/Google-Maps links then fall back to the route's own start
+   *  point. Never the route/GPX itself — see EventDetailPage.tsx's routePoint. */
+  meetingPoint?: { lat: number; lon: number } | null;
   ownerId: number | null;
   /** Owner's nickname if set, else "first last" (either half optional), else null — resolved
    * server-side (event.queries.ts). Null for a legacy/ownerless event or an owner who set

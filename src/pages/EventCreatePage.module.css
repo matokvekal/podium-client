@@ -905,6 +905,37 @@
   overflow: hidden;
 }
 
+.meetingPointRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meetingPointActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.meetingPointBtn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.meetingPointBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .mapLoading {
   padding: var(--space-3);
   font-size: 0.8rem;

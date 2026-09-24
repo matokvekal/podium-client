@@ -20,15 +20,18 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { EventSummary } from "../lib/local-db";
+import type { SurfaceType } from "../lib/surface-types";
 import { TrackGalleryBrowser } from "./TrackGalleryBrowser";
 import styles from "./TrackGallerySheet.module.css";
 
 interface TrackGallerySheetProps {
   onPick: (event: EventSummary) => void;
   onClose: () => void;
+  /** The ride's discipline — the gallery opens filtered to it. */
+  initialSurface?: SurfaceType;
 }
 
-export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
+export function TrackGallerySheet({ onPick, onClose, initialSurface }: TrackGallerySheetProps) {
   // Body scroll lock. This is the app's first full-screen modal — the bottom sheets are short
   // enough that the page scrolling behind them is merely untidy. Here the modal owns the whole
   // viewport and its own scroller, so without this a flick past the end scrolls the create form
@@ -45,7 +48,12 @@ export function TrackGallerySheet({ onPick, onClose }: TrackGallerySheetProps) {
     <>
       <div className={styles.overlay} onClick={onClose} aria-hidden="true" />
       <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="Choose a track">
-        <TrackGalleryBrowser variant="modal" onPick={onPick} onClose={onClose} />
+        <TrackGalleryBrowser
+          variant="modal"
+          onPick={onPick}
+          onClose={onClose}
+          initialSurface={initialSurface}
+        />
       </div>
     </>,
     document.body,

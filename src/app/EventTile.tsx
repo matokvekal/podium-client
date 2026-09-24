@@ -22,6 +22,7 @@ import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
+import { getRideImage } from "../lib/ride-images";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
@@ -88,11 +89,10 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   const distanceKm = event.distanceKm ?? extras.distanceKm ?? null;
   const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const ownerCoverOptions = useOwnerCover(event.ownerId, event.ownerCover);
-  const coverBackground = eventCoverBackground(
-    event.id,
-    extras.coverImageDataUrl,
-    ownerCoverOptions,
-  );
+  const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
+    ...ownerCoverOptions,
+    builtInRideImageUrl: getRideImage(event.rideImageKey)?.src ?? null,
+  });
 
   function handleEdit(e: MouseEvent) {
     e.preventDefault();

@@ -190,3 +190,26 @@ export function restStopIcon(color = "#3edda4"): L.DivIcon {
     iconAnchor: [9, 9],
   });
 }
+
+/**
+ * A saved ride stop point (lib/ride-stops.ts) — the kind's emoji in a round badge. Bigger than
+ * restStopIcon above so a finger can grab it to drag on the creator's map.
+ */
+export function stopPointIcon(emoji = "☕", color = "#3edda4"): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;">${emoji}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
+/** The red, draggable "new stop goes here" pin while the creator is adding a stop. */
+export function draftStopIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "podium-map-icon",
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#e5484d;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);"></div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+  });
+}

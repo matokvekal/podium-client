@@ -74,9 +74,11 @@ import { WindStrip } from "../app/WindStrip";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RideDescription } from "../app/RideDescription";
+import { RideStopsSection } from "../app/RideStopsSection";
 import { SafetySheet } from "../app/SafetySheet";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
+import { useRideStops } from "../app/useRideStops";
 
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
@@ -140,7 +142,6 @@ import styles from "./EventDetailPage.module.css";
 const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
 
-const RouteMap = lazy(() => import("../app/RouteMap"));
 
 /**
  * A low, smooth-roofed sedan in the same 24px outline style as the lucide icons around it (lucide's
@@ -166,7 +167,7 @@ function SedanIcon() {
 }
 
 // The qrcode package is real weight for a sheet most sessions never open — lazy, same as
-// RouteMap above.
+// the route map (app/RideStopsSection.tsx lazy-loads RouteMap).
 const ShareEventSheet = lazy(() =>
   import("../app/ShareEventSheet").then((m) => ({
     default: m.ShareEventSheet,
@@ -409,6 +410,9 @@ export function EventDetailPage() {
   const resultsLoading = useResultsStore((state) => state.loading);
   const resultsError = useResultsStore((state) => state.error);
   const loadResults = useResultsStore((state) => state.loadResults);
+  // The ride's stop points (sql/049) — own request, fails soft to "none" (app/useRideStops.ts),
+  // so nothing else on this page waits on it or breaks with it.
+  const rideStops = useRideStops(eventId);
 
   const [forecast, setForecast] = useState<DayForecast | null>(null);
 
@@ -1118,6 +1122,10 @@ export function EventDetailPage() {
   // Ride plan (sql/022) — server-only, no local fallback. `durationText` fills the "Est. Time"
   // tile that read a hard-coded "soon" until now; rest stops / accessibility show as chips.
   const restStops = event.restStops ?? null;
+  // The ☕ chip counts the ride's real stop points when it has any; a ride without points shows
+  // the organizer's typed number exactly as before. The duration estimate keeps using the typed
+  // number (restStops above) — unchanged.
+  const restStopsShown = rideStops.stops.length > 0 ? rideStops.stops.length : restStops;
 
   /** How technical the ground is (sql/038) — mtb/gravel only, where a scale exists to read it
    *  against. Orthogonal to `level` above: that one is who the ride is pitched at. */
@@ -1532,12 +1540,12 @@ export function EventDetailPage() {
               Support vehicle
             </span>
           )}
-          {restStops != null && (
+          {restStopsShown != null && (
             <span className={styles.chip} data-kind="rest" title="Planned rest / regroup stops">
               <Coffee width={13} height={13} aria-hidden="true" />
-              {restStops === 0
+              {restStopsShown === 0
                 ? "No rest stops"
-                : `${restStops} rest ${restStops === 1 ? "stop" : "stops"}`}
+                : `${restStopsShown} rest ${restStopsShown === 1 ? "stop" : "stops"}`}
             </span>
           )}
           {event.requiresApproval && (
@@ -1807,9 +1815,14 @@ export function EventDetailPage() {
                     GPX
                   </button>
                 </div>
-                <Suspense fallback={<div className="row muted">Loading the map…</div>}>
-                  <RouteMap points={results.route.points} />
-                </Suspense>
+                {/* The route map with the ride's stop points and the Stop / Break list under it.
+                    With no stops (or if loading them failed) this is the same plain map as
+                    before. */}
+                <RideStopsSection
+                  eventId={event.id}
+                  points={results.route.points}
+                  stopsState={rideStops}
+                />
                 {/* showEmpty: a route with no elevation series keeps this slot (a neutral placeholder,
                     no invented values) so the wind strip below never moves up into it. */}
                 <ElevationProfile

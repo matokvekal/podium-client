@@ -1,0 +1,237 @@
+/* Ride stop points — the inline add bar above the ride map and the Stop / Break list under it.
+   Mobile first: every control is at least --tap-target tall, nothing floats over the map. */
+
+.addBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.searchRow,
+.editForm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.editForm {
+  flex: 1;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-target);
+  padding: 0 10px;
+  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.iconBtn,
+.navBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.iconBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.iconBtn[data-danger] {
+  color: var(--status-danger);
+}
+
+.navBtn {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.resultBtn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  text-align: start;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.resultBtn svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.resultBtn[data-selected] {
+  border-color: #e5484d;
+  box-shadow: inset 0 0 0 1px #e5484d;
+}
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.saveBtn,
+.addBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--tap-target);
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: var(--weight-bold);
+  color: var(--accent-text);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.saveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.addBtn {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--status-danger);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.counter {
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap; /* on a narrow phone the buttons drop under the label instead of crushing it */
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.icon {
+  flex: none;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.label {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.88rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.km {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.actions {
+  flex: none;
+  display: inline-flex;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.confirmBtn {
+  flex: none;
+  min-height: var(--tap-target);
+  padding: 0 12px;
+  font-size: 0.8rem;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  background: var(--status-danger);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}

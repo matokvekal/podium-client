@@ -1077,7 +1077,12 @@ export function EventDetailPage() {
    */
   const canSeeRiders = viewerOwnsRide || event.showParticipants;
 
-  const routePoint = results?.route?.points[0] ?? null;
+  // The organizer's meeting-point override (sql/050) wins when set — "route.points[0] = actual
+  // cycling route start, meetingPoint = nearby parking lot," asked for directly. Falls back to
+  // the route's own start point, exactly today's behaviour, when there is no override.
+  const routePoint: [number, number] | null = event.meetingPoint
+    ? [event.meetingPoint.lat, event.meetingPoint.lon]
+    : (results?.route?.points[0] ?? null);
   // "not all events have team so each event can be ready if have name date /place" — asked
   // for directly, and this is where that lands: a published event offers Start outright, with
   // no extra readiness gate on top of it. No team requirement, no minimum rider count, no

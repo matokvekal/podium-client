@@ -263,6 +263,9 @@ interface ExistingEvent {
   /** The organizer's expected head-count (sql/028), or null when they left it blank. Prefills
    *  the "Expected riders" field in edit mode. */
   expectedParticipants?: number | null;
+  /** The organizer's meeting-point override (sql/050), or null/absent when there isn't one —
+   *  edit mode then starts the picker showing the route's own start point. */
+  meetingPoint?: { lat: number; lon: number } | null;
 }
 
 const EVENT_ROUTE_MAX_POINTS = 5000;
@@ -637,6 +640,17 @@ export function EventCreatePage() {
    */
   const [existingRouteAttached, setExistingRouteAttached] = useState(false);
   const [removeExistingRoute, setRemoveExistingRoute] = useState(false);
+  /**
+   * The organizer's meeting-point override (events.meeting_lat/meeting_lon, sql/050), or null to
+   * use the attached route's own start point — the default, and what almost every ride keeps.
+   * Set only through the small map picker below ("Change meeting point"); never touched by
+   * picking/uploading/removing a track, so switching tracks never silently discards a meeting
+   * point the organizer chose on purpose.
+   */
+  const [meetingPoint, setMeetingPoint] = useState<{ lat: number; lon: number } | null>(null);
+  const [meetingPointEditing, setMeetingPointEditing] = useState(false);
+  /** The pin's position while the picker is open, uncommitted until "Save meeting point". */
+  const [meetingPointDraft, setMeetingPointDraft] = useState<[number, number] | null>(null);
   /** Any track on the form — a known one, an uploaded file, or (edit) the saved one. */
   const trackAttached =
     copiedFrom != null || fromRouteId != null || uploadedFileName != null || existingRouteAttached;
@@ -769,6 +783,7 @@ export function EventCreatePage() {
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
+        if (found.meetingPoint) setMeetingPoint(found.meetingPoint);
       } catch {
         // Cached summary (if any) is already on screen — a failed refresh isn't fatal here.
       } finally {
@@ -1440,6 +1455,9 @@ export function EventCreatePage() {
             // survives logout/login and shows the same on every device. `null` clears it
             // (falls back to the attached route's climb).
             elevationGainM,
+            // The organizer's meeting-point override (sql/050). `null` clears it (falls back to
+            // the attached route's own start point); never touches the route/GPX itself.
+            meetingPoint,
             // Ride plan — server columns (sql/022). `null` clears duration / rest stops.
             durationMin,
             restStops,
@@ -1515,6 +1533,9 @@ export function EventCreatePage() {
           // null when neither. Server persists it as events.elevation_gain_m; every viewer and
           // a post-logout reload then see this exact number.
           elevationGainM,
+          // The organizer's meeting-point override (sql/050), if they set one before saving.
+          // null on every ride that never touched the picker — the default, route.points[0].
+          meetingPoint,
           // Ride plan — server columns (sql/022). Persisted, so every viewer's card fills its
           // "Est. Time" slot and shows the accessibility marker without a device-local copy.
           durationMin,
@@ -1844,9 +1865,80 @@ export function EventCreatePage() {
                     points={copiedRoute.points}
                     heightPx={160}
                     restStops={uploadedRestStops}
+                    // The meeting-point picker reuses THIS map rather than opening a second one —
+                    // the draft pin is only wired up while the picker is actually open.
+                    draftPoint={meetingPointEditing ? meetingPointDraft : null}
+                    onDraftMoved={(lat, lng) => setMeetingPointDraft([lat, lng])}
+                    onMapTap={
+                      meetingPointEditing ? (lat, lng) => setMeetingPointDraft([lat, lng]) : undefined
+                    }
                   />
                 </Suspense>
                 <ElevationProfile points={copiedRoute.points} elevations={copiedRoute.elevations} />
+              </div>
+            )}
+            {/* Meeting point (sql/050): defaults to the route's own start point, which is what
+                almost every ride keeps — "so normally the rider does NOTHING," confirmed
+                directly. The override never touches the route/GPX, only where the pin (and
+                Waze/Google Maps) point to. */}
+            {copiedRoute && (
+              <div className={styles.meetingPointRow}>
+                {meetingPointEditing ? (
+                  <>
+                    <p className={styles.hint}>Tap the map, or drag the pin, to place it.</p>
+                    <div className={styles.meetingPointActions}>
+                      <button
+                        type="button"
+                        className={styles.meetingPointBtn}
+                        onClick={() => setMeetingPointEditing(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.meetingPointBtn}
+                        disabled={!meetingPointDraft}
+                        onClick={() => {
+                          if (!meetingPointDraft) return;
+                          setMeetingPoint({ lat: meetingPointDraft[0], lon: meetingPointDraft[1] });
+                          setMeetingPointEditing(false);
+                        }}
+                      >
+                        Save meeting point
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.hint}>
+                      Meeting point: {meetingPoint ? "custom" : "same as route start"}
+                    </p>
+                    <div className={styles.meetingPointActions}>
+                      {meetingPoint && (
+                        <button
+                          type="button"
+                          className={styles.meetingPointBtn}
+                          onClick={() => setMeetingPoint(null)}
+                        >
+                          Use route default
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.meetingPointBtn}
+                        onClick={() => {
+                          const start = meetingPoint
+                            ? ([meetingPoint.lat, meetingPoint.lon] as [number, number])
+                            : copiedRoute.points[0];
+                          setMeetingPointDraft(start);
+                          setMeetingPointEditing(true);
+                        }}
+                      >
+                        Change meeting point
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {/* Two ways to get a track, side by side and deliberately NOT equal in weight.

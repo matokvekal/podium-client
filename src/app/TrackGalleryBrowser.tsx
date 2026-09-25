@@ -22,7 +22,15 @@
  * explores a card's map, and only on-screen cards hold a live map.
  */
 
-import { ArrowUp, ArrowUpDown, Heart, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  ArrowUp,
+  ArrowUpDown,
+  Heart,
+  LocateFixed,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
@@ -31,14 +39,6 @@ import { type FindTracksFacets, facetsFromCriteria, sameFacets } from "../lib/fi
 import type { EventSummary } from "../lib/local-db";
 import { IL_REGIONS, regionLabel } from "../lib/regions";
 import { DURATION_BUCKETS } from "../lib/ride-duration";
-import {
-  ROUTE_DIFFICULTIES,
-  ROUTE_DIFFICULTY_LABEL,
-  TRAIL_SEASON_LABEL,
-  TRAIL_SEASONS,
-  TRAIL_SHADE_LABEL,
-  TRAIL_SHADES,
-} from "../lib/trail-metadata";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import {
   TRACK_SORT_LABEL,
@@ -47,6 +47,14 @@ import {
   trackGalleryActiveFilterCount,
 } from "../lib/track-gallery-filter";
 import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "../lib/track-types";
+import {
+  ROUTE_DIFFICULTIES,
+  ROUTE_DIFFICULTY_LABEL,
+  TRAIL_SEASON_LABEL,
+  TRAIL_SEASONS,
+  TRAIL_SHADE_LABEL,
+  TRAIL_SHADES,
+} from "../lib/trail-metadata";
 import { useTrackGalleryFiltersStore } from "../store/trackGalleryFiltersStore";
 import { type DistanceIcon, GravelBikeIcon, MtbBikeIcon, RoadBikeIcon } from "./ActivityIcons";
 import { RangeSlider } from "./RangeSlider";
@@ -96,6 +104,44 @@ function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
+/**
+ * "Near Me" — a ONE-SHOT device fix, requested only when the rider taps the toggle (never on
+ * page load, never a `watchPosition`). Same conventions as useAutoCheckIn.ts /
+ * useLocationBroadcast.ts: Permissions-API pre-check where available, `code === 1`
+ * (PERMISSION_DENIED) stops it for this session rather than re-prompting in a loop, any other
+ * error (no signal, timeout) is folded into the same "denied" state — the page must keep
+ * working either way, so the exact reason is not worth a second UI state.
+ */
+type NearMeState =
+  | { status: "off" }
+  | { status: "requesting" }
+  | { status: "on"; lat: number; lon: number; radiusKm: 10 | 20 }
+  | { status: "denied" }
+  | { status: "unsupported" };
+
+const NEAR_ME_GEO_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 15_000,
+  // A fix up to a minute old is fine — this narrows a list, it is not live tracking.
+  maximumAge: 60_000,
+};
+
+function getNearMeFix(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, NEAR_ME_GEO_OPTIONS);
+  });
+}
+
+async function nearMeLocationBlocked(): Promise<boolean> {
+  try {
+    const permission = await navigator.permissions?.query({ name: "geolocation" });
+    return permission?.state === "denied";
+  } catch {
+    // No Permissions API (older Safari) — the getCurrentPosition error below is the signal.
+    return false;
+  }
+}
+
 export function TrackGalleryBrowser({
   variant,
   onPick,
@@ -105,6 +151,7 @@ export function TrackGalleryBrowser({
 }: TrackGalleryBrowserProps) {
   const isModal = variant === "modal";
   const [source, setSource] = useState<GallerySource>("all");
+  const [nearMe, setNearMe] = useState<NearMeState>({ status: "off" });
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -174,8 +221,60 @@ export function TrackGalleryBrowser({
     if (!signedIn && criteria.favoritesOnly) setCriteria({ favoritesOnly: false });
   }, [signedIn, criteria.favoritesOnly, setCriteria]);
 
+  // Near Me only applies to the server-searched "all" tracks — "My tracks" is one fully-loaded
+  // page from the store with no per-row distance to sort by. Switching away turns it off rather
+  // than leaving it silently inert.
+  useEffect(() => {
+    if (source !== "all") setNearMe({ status: "off" });
+  }, [source]);
+
+  async function toggleNearMe() {
+    if (nearMe.status === "on" || nearMe.status === "requesting") {
+      setNearMe({ status: "off" });
+      return;
+    }
+    if (!("geolocation" in navigator)) {
+      setNearMe({ status: "unsupported" });
+      return;
+    }
+    setNearMe({ status: "requesting" });
+    if (await nearMeLocationBlocked()) {
+      setNearMe({ status: "denied" });
+      return;
+    }
+    try {
+      const fix = await getNearMeFix();
+      setNearMe({
+        status: "on",
+        lat: fix.coords.latitude,
+        lon: fix.coords.longitude,
+        radiusKm: 10,
+      });
+    } catch {
+      // Denied or any other failure (no signal, timeout) — see the type's doc comment above.
+      setNearMe({ status: "denied" });
+    }
+  }
+
+  const near =
+    nearMe.status === "on" ? { lat: nearMe.lat, lon: nearMe.lon, radiusKm: nearMe.radiusKm } : null;
+
   const { rides, total, loading, loadingMore, error, hasMore, loadMore, loadMoreProblem, retry } =
-    useTrackGallery(source, search, criteria, sort);
+    useTrackGallery(source, search, criteria, sort, near);
+
+  // 10 km -> 20 km, ONCE: if the first near-me page comes back empty, widen the search a single
+  // time rather than leaving the rider looking at "no tracks" when a slightly bigger radius
+  // would have found some. Never expands past 20, and never re-fires for the same fix.
+  const nearMeExpandedRef = useRef(false);
+  useEffect(() => {
+    if (nearMe.status !== "on") {
+      nearMeExpandedRef.current = false;
+      return;
+    }
+    if (nearMe.radiusKm !== 10 || loading || total > 0 || nearMeExpandedRef.current) return;
+    nearMeExpandedRef.current = true;
+    setNearMe((s) => (s.status === "on" ? { ...s, radiusKm: 20 } : s));
+  }, [nearMe, loading, total]);
 
   // Cards are memoized, and callers pass a fresh onPick every render (TracksPage builds it
   // inline). Routing it through a ref keeps the identity the cards see constant, so typing in the
@@ -376,6 +475,37 @@ export function TrackGalleryBrowser({
           </button>
         )}
       </div>
+
+      {/* Near Me — only meaningful for the server-searched "all" tracks (see the effect above).
+          One-shot device fix, requested only on tap; the page works exactly as before if it is
+          denied, unavailable, or unsupported. */}
+      {source === "all" && (
+        <div className={styles.nearMeRow}>
+          <button
+            type="button"
+            className={nearMe.status === "on" ? "button" : "button button--quiet"}
+            onClick={() => void toggleNearMe()}
+            disabled={nearMe.status === "requesting"}
+            aria-pressed={nearMe.status === "on"}
+          >
+            <LocateFixed aria-hidden="true" width={16} height={16} />
+            {nearMe.status === "requesting" ? "Finding you…" : "Near Me"}
+            {nearMe.status === "on" && (
+              <span className={styles.nearMeRadius}>within {nearMe.radiusKm} km</span>
+            )}
+          </button>
+          {nearMe.status === "denied" && (
+            <span className={styles.nearMeHint}>
+              Couldn't use your location — Find Tracks still works as normal.
+            </span>
+          )}
+          {nearMe.status === "unsupported" && (
+            <span className={styles.nearMeHint}>
+              Location isn't available on this device — Find Tracks still works as normal.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Sticky on the page so the filters stay reachable however far a rider has scrolled — on
           a phone, scrolling back to the top to change one chip is what makes a long list

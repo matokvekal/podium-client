@@ -49,6 +49,7 @@ import {
   CloudSun,
   Gauge,
   Heart,
+  LocateFixed,
   MapPin,
   Mountain,
   MoveRight,
@@ -74,6 +75,8 @@ import {
   terrainDescriptionFor,
   terrainLabelFor,
 } from "../lib/terrain-grade";
+import { trackHandoffState } from "../lib/track-handoff";
+import { trackSharePath } from "../lib/track-share-url";
 import {
   asRouteDifficulty,
   asTrailSeason,
@@ -86,8 +89,6 @@ import {
   type TrailShade,
   trailMetadataApplies,
 } from "../lib/trail-metadata";
-import { trackHandoffState } from "../lib/track-handoff";
-import { trackSharePath } from "../lib/track-share-url";
 import { resolveTrackLikes, useTrackLikesStore } from "../store/trackLikesStore";
 import { useIsOrganizer } from "../store/userModeStore";
 import { type DistanceIcon, distanceIconFor } from "./ActivityIcons";
@@ -152,6 +153,12 @@ const NOT_YET = "soon";
  *  ride that starts at the car park and ends at the café across the road is still a loop to
  *  the rider deciding whether they need a lift home. */
 const LOOP_TOLERANCE_KM = 0.4;
+
+/** "2.4 km away" close in, "15 km away" once the decimal stops being useful — Near Me
+ *  (app/TrackGalleryBrowser.tsx). */
+function formatDistanceFromMe(km: number): string {
+  return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+}
 
 interface TrackGalleryCardProps {
   event: EventSummary;
@@ -403,11 +410,7 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
           imply a flat ride, which is a different claim from "unknown". */}
       {preview && preview.points.length > 1 && preview.elevations && (
         <div className={styles.profile}>
-          <ElevationProfile
-            points={preview.points}
-            elevations={preview.elevations}
-            heightPx={44}
-          />
+          <ElevationProfile points={preview.points} elevations={preview.elevations} heightPx={44} />
         </div>
       )}
 
@@ -454,13 +457,20 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
         {/* Place, shape and difficulty share ONE line. They are all qualifiers on the same
             question — where is this and what kind of riding — and giving each its own row was
             most of the card's wasted height. Any of the three may be missing. */}
-        {(place || shape || difficulty || terrain) && (
+        {(place || shape || difficulty || terrain || event.distanceFromMeKm != null) && (
           <p className={styles.place}>
             {place && (
               <>
                 <MapPin className={styles.placeIcon} aria-hidden="true" />
                 <span className={styles.placeName}>{place}</span>
               </>
+            )}
+            {/* Near Me (app/TrackGalleryBrowser.tsx) — only present when that search is active. */}
+            {event.distanceFromMeKm != null && (
+              <span className={styles.chip}>
+                <LocateFixed className={styles.chipIcon} aria-hidden="true" />
+                {formatDistanceFromMe(event.distanceFromMeKm)} away
+              </span>
             )}
             {shape && (
               <span className={styles.chip}>
@@ -565,11 +575,7 @@ export const TrackGalleryCard = memo(function TrackGalleryCard({
             // browses and saves tracks, but creating a ride is not something they can do, and
             // a button that leads to a redirect is worse than no button.
             isOrganizer && (
-              <Link
-                className={styles.useBtn}
-                to="/events/new"
-                state={trackHandoffState(event)}
-              >
+              <Link className={styles.useBtn} to="/events/new" state={trackHandoffState(event)}>
                 <RouteIcon width={15} height={15} aria-hidden="true" />
                 Ride it
               </Link>

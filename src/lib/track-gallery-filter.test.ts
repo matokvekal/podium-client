@@ -79,6 +79,51 @@ describe("buildTrackGalleryQuery", () => {
     const p = buildTrackGalleryQuery(crit({ durationBuckets: ["1to2", "gt5"] }), "newest", "");
     expect(p.get("durationBuckets")).toBe("1to2,gt5");
   });
+
+  describe("near (Near Me)", () => {
+    it("adds nearLat/nearLon/nearRadiusKm and overrides sort to near_me", () => {
+      const p = buildTrackGalleryQuery(crit(), "distance_asc", "", {
+        lat: 32.05,
+        lon: 34.78,
+        radiusKm: 10,
+      });
+      expect(p.get("sort")).toBe("near_me");
+      expect(p.get("nearLat")).toBe("32.05");
+      expect(p.get("nearLon")).toBe("34.78");
+      expect(p.get("nearRadiusKm")).toBe("10");
+    });
+
+    it("null (the default) leaves the query exactly as before — turning Near Me off restores the stored sort", () => {
+      const withNear = buildTrackGalleryQuery(crit(), "distance_asc", "", {
+        lat: 32.05,
+        lon: 34.78,
+        radiusKm: 10,
+      });
+      expect(withNear.get("sort")).toBe("near_me");
+
+      const withoutNear = buildTrackGalleryQuery(crit(), "distance_asc", "", null);
+      expect(withoutNear.get("sort")).toBe("distance_asc");
+      expect(withoutNear.has("nearLat")).toBe(false);
+      expect(withoutNear.has("nearLon")).toBe(false);
+      expect(withoutNear.has("nearRadiusKm")).toBe(false);
+
+      // Same as calling with no 4th argument at all.
+      const omitted = buildTrackGalleryQuery(crit(), "distance_asc", "");
+      expect([...omitted.entries()]).toEqual([...withoutNear.entries()]);
+    });
+
+    it("combines with every other active filter rather than replacing them", () => {
+      const p = buildTrackGalleryQuery(
+        crit({ country: "IL", surface: ["mtb"] }),
+        "newest",
+        "",
+        { lat: 32.05, lon: 34.78, radiusKm: 20 },
+      );
+      expect(p.get("country")).toBe("IL");
+      expect(p.get("activityType")).toBe("mtb");
+      expect(p.get("nearRadiusKm")).toBe("20");
+    });
+  });
 });
 
 describe("trackGalleryActiveFilterCount", () => {

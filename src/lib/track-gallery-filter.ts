@@ -15,9 +15,9 @@
 
 import type { EventSummary } from "./local-db";
 import { type DurationBucketKey, matchesDurationBuckets } from "./ride-duration";
-import type { RouteDifficulty, TrailSeason, TrailShade } from "./trail-metadata";
 import type { SurfaceType } from "./surface-types";
 import { CLIMB_MAX, CLIMB_MIN, DISTANCE_MAX, DISTANCE_MIN } from "./track-types";
+import type { RouteDifficulty, TrailSeason, TrailShade } from "./trail-metadata";
 
 export type TrackGallerySort =
   | "newest"
@@ -121,14 +121,31 @@ export function trackGalleryActiveFilterCount(
 }
 
 /**
+ * The rider's own device position, sent only while "Near Me" is active — see
+ * app/TrackGalleryBrowser.tsx. Deliberately NOT part of TrackGalleryCriteria: that type is
+ * persisted (store/trackGalleryFiltersStore.ts), and a "don't ask for location on page load"
+ * feature must never remember "was on" across a reload.
+ */
+export interface NearMePosition {
+  lat: number;
+  lon: number;
+  radiusKm: number;
+}
+
+/**
  * The query string for one page of GET /events/public. `limit` / `offset` / paging are the
  * hook's job; this adds `q`, `sort`, `uniqueTracks` and every active filter, and OMITS anything
  * at its default so the URL only carries real narrowing.
+ *
+ * `near`, when given, overrides the `sort` param to `"near_me"` and adds
+ * `nearLat`/`nearLon`/`nearRadiusKm` — WITHOUT touching the `sort` argument's own value, so the
+ * caller's persisted sort choice is exactly what comes back once Near Me is turned off again.
  */
 export function buildTrackGalleryQuery(
   criteria: TrackGalleryCriteria,
   sort: TrackGallerySort,
   search: string,
+  near: NearMePosition | null = null,
 ): URLSearchParams {
   const params = new URLSearchParams();
 
@@ -137,8 +154,14 @@ export function buildTrackGalleryQuery(
 
   // sort is sent explicitly (it is the gallery's paging key, not merely the server default),
   // and uniqueTracks always — the picker wants one row per track, not one per ride.
-  params.set("sort", sort);
+  params.set("sort", near ? "near_me" : sort);
   params.set("uniqueTracks", "1");
+
+  if (near) {
+    params.set("nearLat", String(near.lat));
+    params.set("nearLon", String(near.lon));
+    params.set("nearRadiusKm", String(near.radiusKm));
+  }
 
   if (criteria.favoritesOnly) params.set("favoritesOnly", "1");
   if (criteria.country) params.set("country", criteria.country);

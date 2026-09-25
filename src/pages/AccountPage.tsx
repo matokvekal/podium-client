@@ -5,23 +5,30 @@
  * Loads:    nothing — the profile is already in AuthContext
  * Actions:  choose an avatar and a cover, edit the profile, sign out
  * State:    the chosen images (store/userIdentityStore.ts) and this page's busy/error flags
- * Calls:    PATCH /users/me, POST /auth/logout
+ * Calls:    PATCH /users/me, GET /profile-images, PUT /users/me/avatar, POST /auth/logout
  *
- * ── The avatar/cover picker is DEVICE-LOCAL for now ────────────────────────────────────────
+ * ── The preset/upload picker is DEVICE-LOCAL for now ───────────────────────────────────────
  *
- * There is no server field for a user's avatar/cover and no upload endpoint yet, so a pick is
+ * There is no server field for a user's PRESET/UPLOAD avatar/cover choice yet, so that pick is
  * saved on this device and the page says so, in the same spirit as the event cover hint on
  * EventCreatePage and the country field on ProfileSetupPage — both built ahead of their server
- * column. Nothing here claims to be synced and no upload request is made. The moment
- * GET /users/me starts returning these fields (serverSupportsVisualIdentity), the server value
- * wins and AuthContext reconciles the local copy away.
+ * column. Nothing here claims that path is synced and no upload request is made for it. The
+ * moment GET /users/me starts returning these fields (serverSupportsVisualIdentity), the server
+ * value wins and AuthContext reconciles the local copy away.
+ *
+ * ── The GALLERY picker (avatar only) IS server-synced, from day one ───────────────────────
+ *
+ * A pick from the operator-managed gallery (lib/profile-images.ts) is a real PUT to
+ * /users/me/avatar — there is no device-local copy, no fallback chain to reconcile, and the
+ * account page adopts the server's response immediately (AuthContext's applyProfile). It is
+ * additive to, and does not replace, the local preset/upload flow above.
  *
  * Signing out revokes this session on the server and clears the tokens locally. If the
  * request cannot be made — a rider halfway up a climb with no signal — the local sign-out
  * still happens, and the session dies on its own when the refresh token expires.
  */
 
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { Avatar } from "../app/Avatar";
 import { UserModeToggle } from "../app/UserModeToggle";
 import { useMyIdentity } from "../app/useMyIdentity";
@@ -42,6 +49,7 @@ import {
   type ImageSpec,
   processIdentityImage,
 } from "../lib/image-processing";
+import { fetchProfileImages, type ProfileImage, selectGalleryImage } from "../lib/profile-images";
 import {
   resolveUserAvatar,
   resolveUserCover,
@@ -161,6 +169,7 @@ export function AccountPage() {
               serverSupports={serverSupports}
               busy={busy}
               onBusyChange={setBusy}
+              currentAvatarUrl={me.avatarUrl}
             />
             <IdentitySlot
               type="cover"
@@ -317,6 +326,7 @@ function IdentitySlot({
   serverSupports,
   busy,
   onBusyChange,
+  currentAvatarUrl,
 }: {
   type: IdentityAssetType;
   userId: number;
@@ -326,15 +336,64 @@ function IdentitySlot({
   serverSupports: boolean;
   busy: boolean;
   onBusyChange: (busy: boolean) => void;
+  /** The rider's current effective avatar URL (me.avatarUrl) — only meaningful for
+   *  type === "avatar", used solely to mark which gallery thumbnail (if any) is active. */
+  currentAvatarUrl?: string | null;
 }) {
   const selectPreset = useUserIdentityStore((s) => s.selectPreset);
   const setUpload = useUserIdentityStore((s) => s.setUpload);
   const clearSlot = useUserIdentityStore((s) => s.clearSlot);
+  const { applyProfile } = useAuth();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   // Held so an oversized animated GIF can be retried as a still, if the rider chooses to.
   const [flattenable, setFlattenable] = useState<File | null>(null);
+
+  // The operator-managed gallery — avatar only (see lib/profile-images.ts). `null` gallery
+  // means "not fetched yet"; an empty array is a real, valid "nothing available right now".
+  const [gallery, setGallery] = useState<ProfileImage[] | null>(null);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (type !== "avatar") return;
+    let cancelled = false;
+    setGalleryLoading(true);
+    setGalleryError(null);
+    fetchProfileImages()
+      .then((images) => {
+        if (!cancelled) setGallery(images);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGalleryError("Could not load the gallery. Your current picture is unchanged.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGalleryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [type]);
+
+  async function onSelectGalleryImage(key: string) {
+    setError(null);
+    setFlattenable(null);
+    setGalleryError(null);
+    onBusyChange(true);
+    try {
+      const updated = await selectGalleryImage(key);
+      // Server-synced from the moment it is chosen — no device-local copy to write, unlike
+      // selectPreset/setUpload above. See the file header's "GALLERY picker" note.
+      applyProfile(updated);
+    } catch {
+      setGalleryError("Could not save that picture. Try again.");
+    } finally {
+      onBusyChange(false);
+    }
+  }
 
   const spec = SPEC[type];
   const title = type === "avatar" ? "Profile picture" : "Cover image";
@@ -419,6 +478,49 @@ function IdentitySlot({
               >
                 Use its first frame instead
               </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {type === "avatar" && (
+        <div className={styles.group}>
+          <div className={styles.groupLabel}>Gallery</div>
+
+          {galleryLoading && <p className={styles.hint}>Loading…</p>}
+
+          {galleryError && (
+            <p className={`banner banner--error ${styles.error}`} role="alert">
+              {galleryError}
+            </p>
+          )}
+
+          {!galleryLoading && !galleryError && gallery?.length === 0 && (
+            <p className={styles.hint}>No gallery pictures are available right now.</p>
+          )}
+
+          {gallery != null && gallery.length > 0 && (
+            <>
+              <div className={styles.grid}>
+                {gallery.map((image) => {
+                  const active = image.url === currentAvatarUrl;
+                  return (
+                    <button
+                      key={image.key}
+                      type="button"
+                      data-active={active}
+                      className={`${styles.swatch} ${styles.swatchAvatar}`}
+                      aria-label={image.key}
+                      aria-pressed={active}
+                      disabled={busy}
+                      onClick={() => void onSelectGalleryImage(image.key)}
+                    >
+                      <img src={image.url} alt="" loading="lazy" />
+                    </button>
+                  );
+                })}
+              </div>
+              <p className={styles.hint}>Gallery pictures are saved to your account right away.</p>
             </>
           )}
         </div>

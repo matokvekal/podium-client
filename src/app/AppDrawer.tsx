@@ -171,7 +171,7 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             onClick={onClose}
           >
             <MapIcon aria-hidden="true" />
-            Find Tracks
+            Explore Tracks
             <span className="drawer__nav-tag">New</span>
           </NavLink>
           {status === "signed-in" && (

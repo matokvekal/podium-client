@@ -39,6 +39,7 @@ import type { EventSummary } from "../lib/local-db";
 import {
   applyTrackGalleryCriteria,
   buildTrackGalleryQuery,
+  type NearMePosition,
   type TrackGalleryCriteria,
   type TrackGallerySort,
 } from "../lib/track-gallery-filter";
@@ -94,6 +95,10 @@ export function useTrackGallery(
   search: string,
   criteria: TrackGalleryCriteria,
   sort: TrackGallerySort,
+  /** "Near Me" (app/TrackGalleryBrowser.tsx) — null unless the rider has it on. Passed as a
+   *  fresh object each render like `criteria`; fetchPage keys off its primitive fields (not
+   *  object identity) so a new-but-equal object never triggers a redundant refetch. */
+  near: NearMePosition | null = null,
 ): UseTrackGalleryResult {
   const { status } = useAuth();
   // Read through a ref inside fetchPage so a sign-in does not change that callback's identity
@@ -160,6 +165,7 @@ export function useTrackGallery(
     loadMyRides(status === "signed-in");
   }, [source, status, loadMyRides]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: near's PRIMITIVE fields are listed on purpose, not the object itself — TrackGalleryBrowser passes a fresh `near` object every render, and depending on its identity would refetch on every render rather than only when the position/radius actually changes.
   const fetchPage = useCallback(
     async (offset: number, thisRequest: number) => {
       // NO `bucket` FILTER, on purpose. Every other list in this app asks for "upcoming",
@@ -172,7 +178,7 @@ export function useTrackGallery(
       // narrowing (the list is paged, so filtering the 24 loaded rows client-side would be
       // wrong). buildTrackGalleryQuery always sends `sort` (default "newest" = created_at DESC,
       // the stable paging key) and omits any filter left at its default.
-      const params = buildTrackGalleryQuery(criteria, sort, debouncedSearch);
+      const params = buildTrackGalleryQuery(criteria, sort, debouncedSearch, near);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
 
@@ -201,7 +207,7 @@ export function useTrackGallery(
         return [...prev, ...page.data.filter((e) => !seen.has(e.id))];
       });
     },
-    [debouncedSearch, criteria, sort],
+    [debouncedSearch, criteria, sort, near?.lat, near?.lon, near?.radiusKm],
   );
 
   // First page, and a fresh one whenever the search text changes. Only the public list pages;

@@ -48,12 +48,13 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  X
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { EmptyRidesState } from "../app/EmptyRidesState";
 import { EventCard } from "../app/EventCard";
+import { ExploreTracksIntro } from "../app/ExploreTracksIntro";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useRideChatUnread } from "../app/RideChatButton";
 import { useAuth } from "../auth/AuthContext";
@@ -65,6 +66,10 @@ import {
   orderedCountries,
   searchCountries,
 } from "../lib/countries";
+import {
+  dismissExploreTracksIntro,
+  isExploreTracksIntroDismissed,
+} from "../lib/explore-tracks-intro";
 import {
   activeFilterCount,
   applyFindRidesCriteria,
@@ -99,7 +104,7 @@ const SORT_CYCLE: SortKey[] = ["date", "name", "area"];
 const SORT_LABEL: Record<SortKey, string> = {
   date: "Date",
   name: "Name",
-  area: "Area"
+  area: "Area",
 };
 
 // Home row: most recent My Rides only, before "See All" takes over.
@@ -155,17 +160,15 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [createdEvent?.createdEventId]);
   const newEventId =
-    createdEvent?.createdEventId && !newHighlightExpired
-      ? createdEvent.createdEventId
-      : null;
+    createdEvent?.createdEventId && !newHighlightExpired ? createdEvent.createdEventId : null;
 
   // "the event we came from need glow shadow under for 10 seconds to know where we came from"
   // — whichever card was clicked into (EventCard.tsx/EventTile.tsx record it) lights up again
   // for 10s once this page remounts from a back navigation. Read once via a lazy initializer,
   // not an effect, so it's already known on the very first render — an effect would paint one
   // frame without the glow first.
-  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(
-    () => consumeOpenedEventId()
+  const [returnHighlightId, setReturnHighlightId] = useState<string | null>(() =>
+    consumeOpenedEventId(),
   );
   useEffect(() => {
     if (!returnHighlightId) return;
@@ -173,9 +176,7 @@ export function EventsListPage() {
     return () => clearTimeout(timer);
   }, [returnHighlightId]);
 
-  const [activeTab, setActiveTab] = useState<EventTab>(
-    authed ? "myRides" : "findRides"
-  );
+  const [activeTab, setActiveTab] = useState<EventTab>(authed ? "myRides" : "findRides");
   // A guest (or a session that just expired) can't be on My Rides / Created — Find Rides is
   // public. And "Created" only exists in Organizer mode.
   useEffect(() => {
@@ -208,6 +209,26 @@ export function EventsListPage() {
   // paint for a second before the filter below could catch them. Hold the list back until
   // both are known; a guest owns nothing, so nothing to wait for there.
   const ownershipKnown = status === "signed-out" || (authed && myRidesSettled);
+
+  // Explore Tracks intro (see app/ExploreTracksIntro.tsx) — a one-time nudge for a genuinely
+  // new/ride-less visitor. `introDismissed` starts from whatever this rider/device already has
+  // stored, and re-syncs once `profile` resolves (it starts out unknown on a fresh load).
+  const [introDismissed, setIntroDismissed] = useState(() =>
+    isExploreTracksIntroDismissed(profile?.id ?? null),
+  );
+  useEffect(() => {
+    setIntroDismissed(isExploreTracksIntroDismissed(profile?.id ?? null));
+  }, [profile?.id]);
+  // Permanent the moment this rider is FIRST observed to have any ride — same storage as an
+  // explicit "Don't show again", so deleting their only ride later never brings it back.
+  useEffect(() => {
+    if (!authed || !myRidesSettled || rawMyRides.length === 0 || profile == null) return;
+    if (!isExploreTracksIntroDismissed(profile.id)) dismissExploreTracksIntro(profile.id);
+    setIntroDismissed(true);
+  }, [authed, myRidesSettled, rawMyRides.length, profile]);
+  // Signed-in: wait for ownership to actually be known, so a rider with rides never sees a
+  // flash of the intro before myRidesSettled resolves. Signed-out has nothing to wait for.
+  const showExploreTracksIntro = !introDismissed && (!authed || ownershipKnown);
   const pendingInvites = useMemo(() => {
     if (!ownershipKnown) return [];
     const owned = new Set(createdRides.map((ride) => ride.id));
@@ -295,9 +316,7 @@ export function EventsListPage() {
   const [myFilters, setMyFilters] = useState<MyRidesFilter[]>(DEFAULT_MY_RIDES_FILTERS);
   function toggleMyFilter(value: MyRidesFilter) {
     setMyFilters((current) =>
-      current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value],
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     );
   }
 
@@ -306,8 +325,7 @@ export function EventsListPage() {
   // live → upcoming → past; the chip selection only decides which of those blocks appear.
   const homeList = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
-    const show = (bucket: MyRidesFilter) =>
-      myFilters.length === 0 || myFilters.includes(bucket);
+    const show = (bucket: MyRidesFilter) => myFilters.length === 0 || myFilters.includes(bucket);
     const ordered = [
       ...(show("current") ? live : []),
       ...(show("upcoming") ? upcoming : []),
@@ -325,8 +343,7 @@ export function EventsListPage() {
       if (favoritesOnly && !event.favorite) return false;
       if (!q) return true;
       return (
-        event.name.toLowerCase().includes(q) ||
-        (event.location ?? "").toLowerCase().includes(q)
+        event.name.toLowerCase().includes(q) || (event.location ?? "").toLowerCase().includes(q)
       );
     });
     // Date sort direction depends on the bucket — "rides are list top to bottom, the top is the
@@ -338,8 +355,7 @@ export function EventsListPage() {
     // regardless of bucket.
     function comparator(bucket: "live" | "upcoming" | "past") {
       if (sortBy === "name") {
-        return (a: EventSummary, b: EventSummary) =>
-          a.name.localeCompare(b.name);
+        return (a: EventSummary, b: EventSummary) => a.name.localeCompare(b.name);
       }
       if (sortBy === "area") {
         return (a: EventSummary, b: EventSummary) =>
@@ -347,22 +363,16 @@ export function EventsListPage() {
           timestamp(b.startsAt) - timestamp(a.startsAt);
       }
       return bucket === "upcoming"
-        ? (a: EventSummary, b: EventSummary) =>
-            timestamp(a.startsAt) - timestamp(b.startsAt)
-        : (a: EventSummary, b: EventSummary) =>
-            timestamp(b.startsAt) - timestamp(a.startsAt);
+        ? (a: EventSummary, b: EventSummary) => timestamp(a.startsAt) - timestamp(b.startsAt)
+        : (a: EventSummary, b: EventSummary) => timestamp(b.startsAt) - timestamp(a.startsAt);
     }
     return {
-      live: matches
-        .filter((e) => figmaStatus(e.status) === "live")
-        .sort(comparator("live")),
+      live: matches.filter((e) => figmaStatus(e.status) === "live").sort(comparator("live")),
       upcoming: matches
         .filter((e) => figmaStatus(e.status) === "upcoming")
         .sort(comparator("upcoming")),
-      past: matches
-        .filter((e) => figmaStatus(e.status) === "finished")
-        .sort(comparator("past")),
-      total: matches.length
+      past: matches.filter((e) => figmaStatus(e.status) === "finished").sort(comparator("past")),
+      total: matches.length,
     };
   }, [myRides, q, favoritesOnly, sortBy]);
 
@@ -370,8 +380,7 @@ export function EventsListPage() {
   // bucket chips as the home view and shares their state — tapping "filter" and finding no
   // filters was the bug. Empty selection means "show everything", exactly as on the home row.
   const seeAllByBucket = useMemo(() => {
-    const show = (bucket: MyRidesFilter) =>
-      myFilters.length === 0 || myFilters.includes(bucket);
+    const show = (bucket: MyRidesFilter) => myFilters.length === 0 || myFilters.includes(bucket);
     const live = show("current") ? filteredMyRidesByBucket.live : [];
     const upcoming = show("upcoming") ? filteredMyRidesByBucket.upcoming : [];
     const past = show("past") ? filteredMyRidesByBucket.past : [];
@@ -519,10 +528,7 @@ export function EventsListPage() {
 
   // Full set (incl. created events) — so Find Rides never lists something already on this
   // rider's plate, even one they own but aren't in Rider-mode "My Rides".
-  const myRideIds = useMemo(
-    () => new Set(rawMyRides.map((event) => event.id)),
-    [rawMyRides]
-  );
+  const myRideIds = useMemo(() => new Set(rawMyRides.map((event) => event.id)), [rawMyRides]);
 
   const visibleFindRides = useMemo(() => {
     const base = otherRides.filter(
@@ -533,6 +539,13 @@ export function EventsListPage() {
 
   return (
     <div className="stack">
+      {showExploreTracksIntro && (
+        <ExploreTracksIntro
+          userId={profile?.id ?? null}
+          onDismiss={() => setIntroDismissed(true)}
+        />
+      )}
+
       {createdEvent?.createdEventId && !createdBannerDismissed && (
         <div className="banner banner--success" role="status">
           <span className="row" style={{ gap: 8 }}>
@@ -599,11 +612,7 @@ export function EventsListPage() {
         <section className="stack">
           {showAll ? (
             <div className={styles.toolbarTop}>
-              <button
-                type="button"
-                className={styles.backBtn}
-                onClick={() => setShowAll(false)}
-              >
+              <button type="button" className={styles.backBtn} onClick={() => setShowAll(false)}>
                 ← My Rides
               </button>
               {/* The back button sits exactly where the "My Rides" heading was, so on a phone
@@ -624,9 +633,7 @@ export function EventsListPage() {
             <div className="section-header">
               <div className="section-title-row">
                 <h2>My Rides</h2>
-                {myRides.length > 0 && (
-                  <span className="section-count">{myRides.length}</span>
-                )}
+                {myRides.length > 0 && <span className="section-count">{myRides.length}</span>}
               </div>
               <div className={styles.toolbarLeft}>
                 {myRides.length > 0 && (
@@ -697,26 +704,17 @@ export function EventsListPage() {
                     type="button"
                     className={styles.iconBtn}
                     onClick={() =>
-                      setSortBy(
-                        SORT_CYCLE[
-                          (SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length
-                        ]
-                      )
+                      setSortBy(SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length])
                     }
                     title="Sort by date / name / status"
                   >
-                    <ArrowUpDown
-                      className={styles.iconGlyph}
-                      aria-hidden="true"
-                    />
+                    <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
                     <span>{SORT_LABEL[sortBy]}</span>
                   </button>
                   <button
                     type="button"
                     className={
-                      favoritesOnly
-                        ? `${styles.iconBtn} ${styles.heartActive}`
-                        : styles.iconBtn
+                      favoritesOnly ? `${styles.iconBtn} ${styles.heartActive}` : styles.iconBtn
                     }
                     onClick={() => setFavoritesOnly((v) => !v)}
                     aria-label="Show favorites only"
@@ -1017,11 +1015,7 @@ export function EventsListPage() {
                   <X width={12} height={12} aria-hidden="true" />
                 </button>
               )}
-              <button
-                type="button"
-                className={styles.clearFiltersBtn}
-                onClick={clearFindFilters}
-              >
+              <button type="button" className={styles.clearFiltersBtn} onClick={clearFindFilters}>
                 Clear filters
               </button>
             </div>
@@ -1086,11 +1080,7 @@ export function EventsListPage() {
             <div className={styles.sheetHeader}>
               <h2 style={{ margin: 0 }}>Filter</h2>
               <div className="row">
-                <button
-                  type="button"
-                  className="button button--quiet"
-                  onClick={clearFindFilters}
-                >
+                <button type="button" className="button button--quiet" onClick={clearFindFilters}>
                   Clear
                 </button>
                 <button
@@ -1185,11 +1175,7 @@ export function EventsListPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="button"
-                onClick={() => setFindFilterOpen(false)}
-              >
+              <button type="button" className="button" onClick={() => setFindFilterOpen(false)}>
                 Show {visibleFindRides.length} ride{visibleFindRides.length === 1 ? "" : "s"}
               </button>
             </div>

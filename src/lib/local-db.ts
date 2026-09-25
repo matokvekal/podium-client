@@ -232,6 +232,13 @@ export interface EventSummary {
    */
   expectedParticipants?: number | null;
   /**
+   * Great-circle distance (km) from a "Near Me" search's device position to this track's
+   * start point (server: routes.start_lat/start_lon). Only present on a GET /events/public
+   * response that sent nearLat/nearLon; null/absent otherwise, and null for a track with no
+   * recorded start point — same "not answered" treatment as downloads/likes.
+   */
+  distanceFromMeKm?: number | null;
+  /**
    * The organizer's choice of a built-in ride cover photo — a key into lib/ride-images.ts
    * (server: events.ride_image_key, sql/051-events-ride-image.sql). On the SUMMARY so a card
    * can show it with no per-card detail call. `null`/absent = no built-in image chosen; the

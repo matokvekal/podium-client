@@ -1504,223 +1504,240 @@ export function EventDetailPage() {
           </div>
         </div>
 
-        {/* --- chip row: surface / visibility / approval ------------------------------------
-            The reference design's three chips. Status is NOT repeated here — the hero already
-            carries it, and the mock's chip row doesn't show it. Difficulty moved into the stat
-            strip above, where the mock puts it.
+        {/* --- chip row: surface / visibility / approval, with the safety checklist pinned to
+            the right of the same row (asked for directly — riders read it as one status line:
+            what this ride is, and whether the reader is ready for it). ---------------------- */}
+        <div className={styles.chipSafetyRow}>
+          <div className={styles.chipRow}>
+            {/* The reference design's three chips. Status is NOT repeated here — the hero
+                already carries it, and the mock's chip row doesn't show it. Difficulty moved
+                into the stat strip above, where the mock puts it.
 
-            "Approval Required" is shown to everyone now, not just the owner: requiresApproval
-            is real data on this response, and whether joining needs approval is exactly what a
-            rider deciding to tap "I'M IN" needs to know. --------------------------------- */}
-        <div className={styles.chipRow}>
-          {activityType && ActivityIcon && (
-            <span className={styles.chip} data-surface={activityType}>
-              <ActivityIcon width={13} height={13} aria-hidden="true" />
-              {SURFACE_TYPE_LABEL[activityType]}
+                "Approval Required" is shown to everyone now, not just the owner:
+                requiresApproval is real data on this response, and whether joining needs
+                approval is exactly what a rider deciding to tap "I'M IN" needs to know. */}
+            {activityType && ActivityIcon && (
+              <span className={styles.chip} data-surface={activityType}>
+                <ActivityIcon width={13} height={13} aria-hidden="true" />
+                {SURFACE_TYPE_LABEL[activityType]}
+              </span>
+            )}
+            <span className={styles.chip} data-kind={event.visibility}>
+              {event.visibility === "private" ? "Private" : "Public"}
             </span>
-          )}
-          <span className={styles.chip} data-kind={event.visibility}>
-            {event.visibility === "private" ? "Private" : "Public"}
-          </span>
-          {event.isAccessible && (
-            <span
-              className={styles.chip}
-              data-kind="accessible"
-              title="The organizer marked this ride suitable for riders who need assistance"
-            >
-              <Accessibility width={13} height={13} aria-hidden="true" />
-              Accessible
-            </span>
-          )}
-          {/* Shown only when the organizer ticked it — see the same chip on EventCard for why
-              there is no negative form of this badge. */}
-          {event.hasSupportVehicle && (
-            <span
-              className={styles.chip}
-              data-kind="support"
-              title="The organizer states a support vehicle follows this ride"
-            >
-              <Truck width={13} height={13} aria-hidden="true" />
-              Support vehicle
-            </span>
-          )}
-          {restStopsShown != null && (
-            <span className={styles.chip} data-kind="rest" title="Planned rest / regroup stops">
-              <Coffee width={13} height={13} aria-hidden="true" />
-              {restStopsShown === 0
-                ? "No rest stops"
-                : `${restStopsShown} rest ${restStopsShown === 1 ? "stop" : "stops"}`}
-            </span>
-          )}
-          {event.requiresApproval && (
-            <span
-              className={styles.chip}
-              data-kind="approval"
-              title="Riders who join must be approved before they're in"
-            >
-              Approval Required
-            </span>
-          )}
-          {displayStatus === "cancelled" && (
-            <span className={styles.chip} data-kind="cancelled">
-              Cancelled
-            </span>
-          )}
-          {event.isPaused && (
-            <span
-              className={styles.chip}
-              data-kind="paused"
-              title="The organizer has paused live tracking"
-            >
-              Paused
-            </span>
-          )}
-          {eventFull && (
-            <span
-              className={styles.chip}
-              data-kind="full"
-              title="This event has reached its participant limit"
-            >
-              Event Full
-            </span>
-          )}
-        </div>
-
-        {/* Safety checklist — a quiet link, same list the create form opens. A rider (never the
-            creator, never a rejected sign-up) gets a personal status and can tick items off —
-            but only before the ride is over: it's pre-ride kit prep, so once the ride has
-            finished or been cancelled there is nothing left to prepare for, and the rider goes
-            back to the plain read-only link like everyone else. */}
-        <SafetyChecklistLink
-          trackFor={
-            event.myParticipant != null &&
-            event.myParticipant.registrationStatus !== "rejected" &&
-            !event.isOwner &&
-            profile?.id != null &&
-            eventId &&
-            displayStatus !== "finished" &&
-            displayStatus !== "cancelled"
-              ? { userId: profile.id, rideId: eventId }
-              : null
-          }
-        />
-
-        {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
-            live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
-            in Rider mode the owner gets the rider LIVE entry below instead. ---------------- */}
-        {showOrganizerUi && (
-          <div className={styles.ownerActions}>
-            {confirming ? (
-              <div className={styles.confirmBar}>
-                <span className={styles.confirmMessage}>
-                  {confirming === "live"
-                    ? "Go live now? Riders will see the ride as started."
-                    : "Finish this event now? This can't be undone."}
-                </span>
-                <div className={styles.confirmActions}>
-                  <button
-                    type="button"
-                    className={styles.confirmCancelBtn}
-                    disabled={busy}
-                    onClick={() => setConfirming(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.confirmOkBtn}
-                    data-tone={confirming === "finish" ? "danger" : undefined}
-                    disabled={busy}
-                    onClick={() => changeStatus(confirming === "live" ? "live" : "finished")}
-                  >
-                    {busy ? "…" : confirming === "live" ? "Go live" : "Finish event"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {canEditNow && (
-                  <Link className={styles.editBtn} to={`/events/${event.id}/edit`}>
-                    <Pencil width={16} height={16} aria-hidden="true" />
-                    Edit
-                  </Link>
-                )}
-                {displayStatus === "live" ? (
-                  <>
-                    <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
-                      LIVE
-                    </Link>
-                    <button
-                      type="button"
-                      className={styles.stopBtn}
-                      disabled={busy}
-                      onClick={() => setConfirming("finish")}
-                    >
-                      Finish
-                    </button>
-                  </>
-                ) : (
-                  next && (
-                    <button
-                      type="button"
-                      className={styles.startBtn}
-                      disabled={busy}
-                      onClick={() =>
-                        next.status === "live" ? setConfirming("live") : changeStatus(next.status)
-                      }
-                    >
-                      {next.label}
-                    </button>
-                  )
-                )}
-              </>
+            {event.isAccessible && (
+              <span
+                className={styles.chip}
+                data-kind="accessible"
+                title="The organizer marked this ride suitable for riders who need assistance"
+              >
+                <Accessibility width={13} height={13} aria-hidden="true" />
+                Accessible
+              </span>
+            )}
+            {/* Shown only when the organizer ticked it — see the same chip on EventCard for why
+                there is no negative form of this badge. */}
+            {event.hasSupportVehicle && (
+              <span
+                className={styles.chip}
+                data-kind="support"
+                title="The organizer states a support vehicle follows this ride"
+              >
+                <Truck width={13} height={13} aria-hidden="true" />
+                Support vehicle
+              </span>
+            )}
+            {restStopsShown != null && (
+              <span className={styles.chip} data-kind="rest" title="Planned rest / regroup stops">
+                <Coffee width={13} height={13} aria-hidden="true" />
+                {restStopsShown === 0
+                  ? "No rest stops"
+                  : `${restStopsShown} rest ${restStopsShown === 1 ? "stop" : "stops"}`}
+              </span>
+            )}
+            {event.requiresApproval && (
+              <span
+                className={styles.chip}
+                data-kind="approval"
+                title="Riders who join must be approved before they're in"
+              >
+                Approval Required
+              </span>
+            )}
+            {displayStatus === "cancelled" && (
+              <span className={styles.chip} data-kind="cancelled">
+                Cancelled
+              </span>
+            )}
+            {event.isPaused && (
+              <span
+                className={styles.chip}
+                data-kind="paused"
+                title="The organizer has paused live tracking"
+              >
+                Paused
+              </span>
+            )}
+            {eventFull && (
+              <span
+                className={styles.chip}
+                data-kind="full"
+                title="This event has reached its participant limit"
+              >
+                Event Full
+              </span>
             )}
           </div>
-        )}
 
-        {/* Riders get the same LIVE button in the same slot as the organizer — asked for
-            directly ("if ride start the riders/client also have to see LIVE button and see
-            similar page live as we see for the creator"). It goes to the very same
-            /events/live/:eventId page the owner's button does (LiveEventPage.tsx already
-            serves both, with the owner-only extras kept inside it), so there is no separate
-            second-class rider view to keep in sync. The full live map is never embedded here
-            for anyone. */}
-        {displayStatus === "live" && !showOrganizerUi && canSeeLive && (
-          <div className={styles.ownerActions}>
-            <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
-              LIVE
-            </Link>
+          {/* Safety checklist — a quiet link, same list the create form opens. A rider (never
+              the creator, never a rejected sign-up) gets a personal status and can tick items
+              off — but only before the ride is over: it's pre-ride kit prep, so once the ride
+              has finished or been cancelled there is nothing left to prepare for, and the
+              rider goes back to the plain read-only link like everyone else. Its own status
+              pill is still the same red/amber/green mood as always — see
+              SafetyChecklistLink.tsx — just parked here instead of on its own line. */}
+          <SafetyChecklistLink
+            trackFor={
+              event.myParticipant != null &&
+              event.myParticipant.registrationStatus !== "rejected" &&
+              !event.isOwner &&
+              profile?.id != null &&
+              eventId &&
+              displayStatus !== "finished" &&
+              displayStatus !== "cancelled"
+                ? { userId: profile.id, rideId: eventId }
+                : null
+            }
+          />
+        </div>
+
+        {/* --- info strip -------------------------------------------------------------------
+            The mock's four-cell strip: Start · Area · Meeting Point · Participants. Moved up
+            here (asked for directly — riders kept asking "where is the meeting point" even
+            with the drive-there button up in the hero) instead of waiting behind the route
+            fetch below: every field it reads (event.startsAt/location/area/participantCount)
+            already came down with the event itself, nothing here needs `results`.
+
+            FINISH is not rendered. The mock shows "~ 09:15 AM", which is the start plus an
+            estimated duration — and no duration exists anywhere (see the stat strip above). An
+            estimated finish on a group ride is the kind of number people plan pickups around,
+            so it is absent rather than guessed.
+
+            PARTICIPANTS is the bare joined count for EVERY viewer, organizer included — "7",
+            never "7 / 300". No denominator is shown here at all: not the organizer's account
+            cap (user_limits.participants_per_event, which the server still enforces on join),
+            and not their expected turnout (events.expected_participants). The cap belongs on
+            the account/plan screens, not on the ride.
+
+            Each cell renders only with a real value, and the strip disappears when none of
+            them do. ------------------------------------------------------------------------ */}
+        {(event.startsAt || event.location || event.area || event.participantCount != null) && (
+          <div className={styles.infoStrip}>
+            {event.startsAt && (
+              <div className={styles.infoCell}>
+                <span className={styles.infoCellHead}>
+                  <CalendarDays width={13} height={13} aria-hidden="true" />
+                  Start
+                </span>
+                <span className={styles.infoCellValue}>{formatLocalDateTime(event.startsAt)}</span>
+              </div>
+            )}
+            {event.area && (
+              <div className={styles.infoCell}>
+                <span className={styles.infoCellHead}>
+                  <MapPinned width={13} height={13} aria-hidden="true" />
+                  Area
+                </span>
+                <span className={styles.infoCellValue}>{event.area}</span>
+              </div>
+            )}
+            {(event.location || event.meetingPoint) && (
+              <div className={styles.infoCell}>
+                <span className={styles.infoCellHead}>
+                  <MapPin width={13} height={13} aria-hidden="true" />
+                  Meeting Point
+                </span>
+                {/* `location` is now the meeting-point's own description too — the Edit Ride
+                    picker writes both together (see EventCreatePage.tsx's "Change meeting
+                    point"). The generic fallback only shows if the organizer set a custom pin
+                    but left the description blank; it never papers over a real one. Bigger than
+                    the strip's other values (asked for directly) — this is the one line riders
+                    keep hunting for. */}
+                <span className={`${styles.infoCellValue} ${styles.meetingPointValue}`}>
+                  {event.location || (event.meetingPoint ? "Custom meeting point" : null)}
+                </span>
+                {(wazeHref || googleMapsHref) && (
+                  <span className={styles.infoCellLinks}>
+                    {wazeHref && (
+                      <a
+                        href={wazeHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.navLink}
+                        aria-label="Navigate with Waze"
+                      >
+                        <Navigation width={12} height={12} aria-hidden="true" />
+                        Waze
+                      </a>
+                    )}
+                    {googleMapsHref && (
+                      <a
+                        href={googleMapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.navLink}
+                        aria-label="Navigate with Google Maps"
+                      >
+                        <MapPin width={12} height={12} aria-hidden="true" />
+                        Maps
+                      </a>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={styles.infoCell}>
+              <span className={styles.infoCellHead}>
+                <Users width={13} height={13} aria-hidden="true" />
+                Participants
+              </span>
+              {/* "at ride page we will see participants only and not how many from total
+                  places" — so the count stands alone for the organizer too. maxParticipants is
+                  still read above for the full/join gating; it is just never printed. */}
+              <span className={styles.infoCellValue}>{`${participantCount} participants`}</span>
+            </div>
           </div>
         )}
 
-        {/* Only kept for the paused case now, where it explains why the markers on that map
-            are standing still. The "live now" version of this card was redundant next to the
-            button above. */}
-        {displayStatus === "live" && !showOrganizerUi && canSeeLive && event.isPaused && (
-          <LiveTracking eventId={event.id} isPaused={event.isPaused} />
-        )}
-
-        {/* --- organizer -------------------------------------------------------------------
-            The reference design gives the organizer their own card. It renders only when there
-            is a real organizer to name: event.owner.name from the server, or the club/team the
-            organizer typed on the create form. An event with neither shows no card at all —
-            there used to be a third fallback that invented a club name from the event id, and
-            a made-up organization on a real ride is indistinguishable from the truth to the
-            rider reading it.
-
-            The mock has a chevron suggesting the row opens something. There is no organizer
-            profile anywhere in this app, so it is not drawn: an affordance that goes nowhere is
-            worse than none. ---------------------------------------------------------------- */}
-        {organizer && (
-          <div className={styles.organizerCard}>
-            <Avatar className={styles.organizerAvatar} name={organizer} {...organizerAvatarProps} />
-            <div className={styles.organizerText}>
-              <span className={styles.organizerLabel}>Organized by</span>
-              <span className={styles.organizerName}>
-                {organizer}
-                <span className={styles.organizerBadge}>Organizer</span>
+        {/* --- conditions -------------------------------------------------------------------
+            Real weather only (lib/weather.ts, Open-Meteo). Two badges used to sit beside it —
+            "Air: Good" and "Roads clear" — both invented from a hash of the event id because no
+            provider exists for either. A fabricated air-quality or traffic reading on a real
+            ride is a safety claim this app cannot back up, and a rider cannot tell it apart from
+            a measurement. Removed rather than replaced with a placeholder; when a real provider
+            is wired up, add them back reading it. The card only appears when there is something
+            real to show. `forecast` is its own state (not `results`), so this never waits on
+            the route fetch below. --------------------------------------------------------- */}
+        {forecast && (
+          <div className="card stack">
+            <p className={styles.infoLabel}>Conditions</p>
+            <p
+              className="muted row"
+              style={{ margin: 0, gap: "6px", flexWrap: "wrap" }}
+              title={forecast.label}
+            >
+              <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
+                {forecast.emoji}
               </span>
-            </div>
+              {forecast.source === "historical" ? "Recorded" : "Forecast"}: {forecast.label} ·{" "}
+              {forecast.tempMinC}°–{forecast.tempMaxC}°C
+              {forecast.cloudCoverPct != null && ` · ${forecast.cloudCoverPct}% cloud`}
+              {forecast.windSpeedKmh != null && ` · ${forecast.windSpeedKmh} km/h wind`}
+              {forecast.precipitationChancePct != null &&
+                ` · ${forecast.precipitationChancePct}% rain`}
+              {!!forecast.precipitationMm && ` (${forecast.precipitationMm} mm)`}
+              {!!forecast.snowfallCm && ` · ${forecast.snowfallCm} cm snow`}
+            </p>
           </div>
         )}
 
@@ -1744,37 +1761,6 @@ export function EventDetailPage() {
 
         {results && (
           <>
-            {/* --- conditions -------------------------------------------------------------
-                Real weather only (lib/weather.ts, Open-Meteo). Two badges used to sit beside
-                it — "Air: Good" and "Roads clear" — both invented from a hash of the event id
-                because no provider exists for either. A fabricated air-quality or traffic
-                reading on a real ride is a safety claim this app cannot back up, and a rider
-                cannot tell it apart from a measurement. Removed rather than replaced with a
-                placeholder; when a real provider is wired up, add them back reading it.
-                The card only appears when there is something real to show. */}
-            {forecast && (
-              <div className="card stack">
-                <p className={styles.infoLabel}>Conditions</p>
-                <p
-                  className="muted row"
-                  style={{ margin: 0, gap: "6px", flexWrap: "wrap" }}
-                  title={forecast.label}
-                >
-                  <span aria-hidden="true" style={{ fontSize: "1.1em" }}>
-                    {forecast.emoji}
-                  </span>
-                  {forecast.source === "historical" ? "Recorded" : "Forecast"}: {forecast.label} ·{" "}
-                  {forecast.tempMinC}°–{forecast.tempMaxC}°C
-                  {forecast.cloudCoverPct != null && ` · ${forecast.cloudCoverPct}% cloud`}
-                  {forecast.windSpeedKmh != null && ` · ${forecast.windSpeedKmh} km/h wind`}
-                  {forecast.precipitationChancePct != null &&
-                    ` · ${forecast.precipitationChancePct}% rain`}
-                  {!!forecast.precipitationMm && ` (${forecast.precipitationMm} mm)`}
-                  {!!forecast.snowfallCm && ` · ${forecast.snowfallCm} cm snow`}
-                </p>
-              </div>
-            )}
-
             {/* --- route preview ------------------------------------------------------------
                 The mock puts the route's distance and elevation in this card's header beside
                 the title, and an ELEVATION PROFILE chart under the map. The chart is not built:
@@ -1890,98 +1876,101 @@ export function EventDetailPage() {
               activityType={activityType}
             />
 
-            {/* --- info strip -------------------------------------------------------------
-                The mock's four-cell strip: Start · Meeting Point · Finish · Participants.
-
-                FINISH is not rendered. The mock shows "~ 09:15 AM", which is the start plus an
-                estimated duration — and no duration exists anywhere (see the stat strip above).
-                An estimated finish on a group ride is the kind of number people plan pickups
-                around, so it is absent rather than guessed.
-
-                PARTICIPANTS is the bare joined count for EVERY viewer, organizer included —
-                "7", never "7 / 300". No denominator is shown here at all: not the organizer's
-                account cap (user_limits.participants_per_event, which the server still enforces
-                on join), and not their expected turnout (events.expected_participants). The cap
-                belongs on the account/plan screens, not on the ride.
-
-                Each cell renders only with a real value, and the strip disappears when none of
-                them do. ------------------------------------------------------------------ */}
-            {(event.startsAt || event.location || event.area || event.participantCount != null) && (
-              <div className={styles.infoStrip}>
-                {event.startsAt && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <CalendarDays width={13} height={13} aria-hidden="true" />
-                      Start
+            {/* --- owner actions: Edit + Start/LIVE/Finish — the rest (Participants/Groups/Cancel)
+                live in the "more" sheet opened from the hero's gear icon. Organizer mode only —
+                in Rider mode the owner gets the rider LIVE entry below instead. ---------------- */}
+            {showOrganizerUi && (
+              <div className={styles.ownerActions}>
+                {confirming ? (
+                  <div className={styles.confirmBar}>
+                    <span className={styles.confirmMessage}>
+                      {confirming === "live"
+                        ? "Go live now? Riders will see the ride as started."
+                        : "Finish this event now? This can't be undone."}
                     </span>
-                    <span className={styles.infoCellValue}>
-                      {formatLocalDateTime(event.startsAt)}
-                    </span>
+                    <div className={styles.confirmActions}>
+                      <button
+                        type="button"
+                        className={styles.confirmCancelBtn}
+                        disabled={busy}
+                        onClick={() => setConfirming(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.confirmOkBtn}
+                        data-tone={confirming === "finish" ? "danger" : undefined}
+                        disabled={busy}
+                        onClick={() => changeStatus(confirming === "live" ? "live" : "finished")}
+                      >
+                        {busy ? "…" : confirming === "live" ? "Go live" : "Finish event"}
+                      </button>
+                    </div>
                   </div>
-                )}
-                {event.area && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <MapPinned width={13} height={13} aria-hidden="true" />
-                      Area
-                    </span>
-                    <span className={styles.infoCellValue}>{event.area}</span>
-                  </div>
-                )}
-                {(event.location || event.meetingPoint) && (
-                  <div className={styles.infoCell}>
-                    <span className={styles.infoCellHead}>
-                      <MapPin width={13} height={13} aria-hidden="true" />
-                      Meeting Point
-                    </span>
-                    {/* `location` is now the meeting-point's own description too — the Edit Ride
-                        picker writes both together (see EventCreatePage.tsx's "Change meeting
-                        point"). The generic fallback only shows if the organizer set a custom
-                        pin but left the description blank; it never papers over a real one. */}
-                    <span className={styles.infoCellValue}>
-                      {event.location || (event.meetingPoint ? "Custom meeting point" : null)}
-                    </span>
-                    {(wazeHref || googleMapsHref) && (
-                      <span className={styles.infoCellLinks}>
-                        {wazeHref && (
-                          <a
-                            href={wazeHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.navLink}
-                            aria-label="Navigate with Waze"
-                          >
-                            <Navigation width={12} height={12} aria-hidden="true" />
-                            Waze
-                          </a>
-                        )}
-                        {googleMapsHref && (
-                          <a
-                            href={googleMapsHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.navLink}
-                            aria-label="Navigate with Google Maps"
-                          >
-                            <MapPin width={12} height={12} aria-hidden="true" />
-                            Maps
-                          </a>
-                        )}
-                      </span>
+                ) : (
+                  <>
+                    {canEditNow && (
+                      <Link className={styles.editBtn} to={`/events/${event.id}/edit`}>
+                        <Pencil width={16} height={16} aria-hidden="true" />
+                        Edit
+                      </Link>
                     )}
-                  </div>
+                    {displayStatus === "live" ? (
+                      <>
+                        <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
+                          LIVE
+                        </Link>
+                        <button
+                          type="button"
+                          className={styles.stopBtn}
+                          disabled={busy}
+                          onClick={() => setConfirming("finish")}
+                        >
+                          Finish
+                        </button>
+                      </>
+                    ) : (
+                      next && (
+                        <button
+                          type="button"
+                          className={styles.startBtn}
+                          disabled={busy}
+                          onClick={() =>
+                            next.status === "live"
+                              ? setConfirming("live")
+                              : changeStatus(next.status)
+                          }
+                        >
+                          {next.label}
+                        </button>
+                      )
+                    )}
+                  </>
                 )}
-                <div className={styles.infoCell}>
-                  <span className={styles.infoCellHead}>
-                    <Users width={13} height={13} aria-hidden="true" />
-                    Participants
-                  </span>
-                  {/* "at ride page we will see participants only and not how many from total
-                      places" — so the count stands alone for the organizer too. maxParticipants
-                      is still read above for the full/join gating; it is just never printed. */}
-                  <span className={styles.infoCellValue}>{`${participantCount} participants`}</span>
-                </div>
               </div>
+            )}
+
+            {/* Riders get the same LIVE button in the same slot as the organizer — asked for
+                directly ("if ride start the riders/client also have to see LIVE button and see
+                similar page live as we see for the creator"). It goes to the very same
+                /events/live/:eventId page the owner's button does (LiveEventPage.tsx already
+                serves both, with the owner-only extras kept inside it), so there is no separate
+                second-class rider view to keep in sync. The full live map is never embedded here
+                for anyone. */}
+            {displayStatus === "live" && !showOrganizerUi && canSeeLive && (
+              <div className={styles.ownerActions}>
+                <Link className={styles.startBtn} to={`/events/live/${event.id}`}>
+                  LIVE
+                </Link>
+              </div>
+            )}
+
+            {/* Only kept for the paused case now, where it explains why the markers on that map
+                are standing still. The "live now" version of this card was redundant next to the
+                button above. */}
+            {displayStatus === "live" && !showOrganizerUi && canSeeLive && event.isPaused && (
+              <LiveTracking eventId={event.id} isPaused={event.isPaused} />
             )}
 
             {/* "if riders are published we will see them" — the organizer's own "Riders list
@@ -2179,6 +2168,41 @@ export function EventDetailPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* --- organizer -------------------------------------------------------------------
+            The reference design gives the organizer their own card. It renders only when there
+            is a real organizer to name: event.owner.name from the server, or the club/team the
+            organizer typed on the create form. An event with neither shows no card at all —
+            there used to be a third fallback that invented a club name from the event id, and
+            a made-up organization on a real ride is indistinguishable from the truth to the
+            rider reading it.
+
+            The mock has a chevron suggesting the row opens something. There is no organizer
+            profile anywhere in this app, so it is not drawn: an affordance that goes nowhere is
+            worse than none.
+
+            Moved to the very end of the page (asked for directly), with the ride chat button
+            parked beside it again — same button, same rideId, as the one still up in the hero;
+            a second entry point costs nothing and this is where a rider's eye lands once
+            they've read everything else about the ride and are ready to talk to someone about
+            it. --------------------------------------------------------------------------- */}
+        {organizer && (
+          <div className={styles.organizerCard}>
+            <Avatar className={styles.organizerAvatar} name={organizer} {...organizerAvatarProps} />
+            <div className={styles.organizerText}>
+              <span className={styles.organizerLabel}>Organized by</span>
+              <span className={styles.organizerName}>
+                {organizer}
+                <span className={styles.organizerBadge}>Organizer</span>
+              </span>
+            </div>
+            {canChat && (
+              <div className={styles.organizerChat}>
+                <RideChatButton rideId={event.id} />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Bottom-bar CTA takes over the rider join flow below — this reserves its height so

@@ -128,6 +128,13 @@ interface AuthContextValue {
   signInWithGoogle(idToken: string): Promise<void>;
   verifySmsCode(challengeId: number, code: string): Promise<void>;
   updateProfile(input: Partial<Omit<Profile, "id" | "role" | "requiresProfile">>): Promise<void>;
+  /**
+   * Adopt a Profile some OTHER endpoint already returned — e.g. PUT /users/me/avatar's response
+   * to a gallery pick (lib/profile-images.ts). Skips a redundant GET /users/me: the server
+   * already sent back the full, current profile, so this just caches and re-renders from it,
+   * the same two lines updateProfile itself ends with.
+   */
+  applyProfile(profile: Profile): void;
   signOut(): Promise<void>;
 }
 
@@ -236,6 +243,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const applyProfile = useCallback((updated: Profile) => {
+    saveProfile(updated);
+    setProfile(updated);
+  }, []);
+
   // Country: the server is the source of truth now (sql/030-country.sql). Once /users/me
   // carries the field, keep countryStore in step with it — and if the server has no country
   // for this rider yet, push one up FOR them (their old on-device pick, else the browser
@@ -301,9 +313,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       verifySmsCode,
       updateProfile,
+      applyProfile,
       signOut,
     }),
-    [status, profile, signInWithGoogle, verifySmsCode, updateProfile, signOut],
+    [status, profile, signInWithGoogle, verifySmsCode, updateProfile, applyProfile, signOut],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

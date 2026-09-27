@@ -1,10 +1,11 @@
-/* "Safety checklist" — a quiet inline link under the ride's chip row, not a button-styled
+/* "Safety checklist" — a quiet inline link beside the ride's chip row, not a button-styled
    control. Only the label is underlined; the rider's status pill sits beside it. */
 .link {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
-  margin: var(--space-3) 0 0;
+  margin: 0;
   padding: 0;
   border: none;
   background: none;

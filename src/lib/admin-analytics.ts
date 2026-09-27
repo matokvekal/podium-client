@@ -27,6 +27,24 @@ export interface CountryRow {
   rides: number;
 }
 
+/** One day of PAGE_VIEW traffic. `bots`/`humanPageViews` are an informational split of
+ *  `pageViews` — never subtracted from it (bot detection is a heuristic, not a certainty). */
+export interface TrafficDailyRow {
+  date: string;
+  pageViews: number;
+  uniqueVisitors: number;
+  loggedIn: number;
+  anonymous: number;
+  bots: number;
+  humanPageViews: number;
+}
+
+export interface TopPageRow {
+  path: string;
+  views: number;
+  uniqueVisitors: number;
+}
+
 export interface AnalyticsResponse {
   generatedAt: string;
   rangeDays: number | null;
@@ -48,6 +66,11 @@ export interface AnalyticsResponse {
   };
   daily: DailyRow[];
   countries: CountryRow[];
+  traffic: {
+    today: TrafficDailyRow | null;
+    daily: TrafficDailyRow[];
+    topPages: TopPageRow[];
+  };
 }
 
 /**
@@ -68,6 +91,11 @@ export function formatDisplayDate(isoDate: string): string {
  * response can never render an oldest-first timeline. Does not mutate the input.
  */
 export function sortDailyNewestFirst(rows: readonly DailyRow[]): DailyRow[] {
+  return [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/** Same rule as sortDailyNewestFirst, for the traffic table. */
+export function sortTrafficNewestFirst(rows: readonly TrafficDailyRow[]): TrafficDailyRow[] {
   return [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 

@@ -20,6 +20,7 @@ import {
   formatDisplayDate,
   RANGE_OPTIONS,
   sortDailyNewestFirst,
+  sortTrafficNewestFirst,
 } from "../lib/admin-analytics";
 import { ApiError, apiRequest } from "../lib/api-client";
 import styles from "./AdminAnalyticsPage.module.css";
@@ -116,6 +117,8 @@ export function AdminAnalyticsPage() {
 
 function Dashboard({ data, rangeKey }: { data: AnalyticsResponse; rangeKey: AnalyticsRangeKey }) {
   const daily = sortDailyNewestFirst(data.daily);
+  const traffic = sortTrafficNewestFirst(data.traffic.daily);
+  const topPages = data.traffic.topPages;
   const rangeLabel =
     RANGE_OPTIONS.find((o) => o.key === rangeKey)?.label.toLowerCase() ?? "range";
 
@@ -163,6 +166,102 @@ function Dashboard({ data, rangeKey }: { data: AnalyticsResponse; rangeKey: Anal
                     <td>{row.newUsers || <span className={styles.zero}>0</span>}</td>
                     <td>{row.newRides || <span className={styles.zero}>0</span>}</td>
                     <td>{row.newParticipants || <span className={styles.zero}>0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className={styles.block}>
+        <h2 className={styles.blockTitle}>
+          Site traffic{" "}
+          <span className={styles.blockNote}>
+            · PAGE_VIEW events, last {rangeLabel}, newest first — bots are an estimate, not
+            subtracted
+          </span>
+        </h2>
+        {data.traffic.today && (
+          <div className={styles.cards} aria-label="Today">
+            <div className={styles.card}>
+              <div className={styles.cardValue}>{formatCount(data.traffic.today.pageViews)}</div>
+              <div className={styles.cardLabel}>Page views today</div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardValue}>
+                {formatCount(data.traffic.today.uniqueVisitors)}
+              </div>
+              <div className={styles.cardLabel}>Unique visitors today</div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardValue}>{formatCount(data.traffic.today.loggedIn)}</div>
+              <div className={styles.cardLabel}>Logged in</div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardValue}>{formatCount(data.traffic.today.anonymous)}</div>
+              <div className={styles.cardLabel}>Anonymous</div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardValue}>{formatCount(data.traffic.today.bots)}</div>
+              <div className={styles.cardLabel}>Bots (est.)</div>
+            </div>
+          </div>
+        )}
+        {traffic.length === 0 ? (
+          <p className={styles.empty}>No traffic recorded in this range.</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thDate}>Date</th>
+                  <th>Views</th>
+                  <th>Visitors</th>
+                  <th>Logged in</th>
+                  <th>Anonymous</th>
+                  <th>Bots</th>
+                </tr>
+              </thead>
+              <tbody>
+                {traffic.map((row) => (
+                  <tr key={row.date}>
+                    <td className={styles.tdDate}>{formatDisplayDate(row.date)}</td>
+                    <td>{row.pageViews || <span className={styles.zero}>0</span>}</td>
+                    <td>{row.uniqueVisitors || <span className={styles.zero}>0</span>}</td>
+                    <td>{row.loggedIn || <span className={styles.zero}>0</span>}</td>
+                    <td>{row.anonymous || <span className={styles.zero}>0</span>}</td>
+                    <td>{row.bots || <span className={styles.zero}>0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className={styles.block}>
+        <h2 className={styles.blockTitle}>
+          Top pages <span className={styles.blockNote}>· last {rangeLabel}</span>
+        </h2>
+        {topPages.length === 0 ? (
+          <p className={styles.empty}>No traffic recorded in this range.</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thDate}>Path</th>
+                  <th>Views</th>
+                  <th>Visitors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPages.map((row) => (
+                  <tr key={row.path}>
+                    <td className={styles.tdDate}>{row.path}</td>
+                    <td>{row.views}</td>
+                    <td>{row.uniqueVisitors}</td>
                   </tr>
                 ))}
               </tbody>

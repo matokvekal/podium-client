@@ -7,6 +7,8 @@ import {
   formatCount,
   formatDisplayDate,
   sortDailyNewestFirst,
+  sortTrafficNewestFirst,
+  type TrafficDailyRow,
 } from "./admin-analytics";
 
 describe("formatDisplayDate", () => {
@@ -41,6 +43,25 @@ describe("sortDailyNewestFirst", () => {
 
   it("an already-sorted or empty list is fine", () => {
     expect(sortDailyNewestFirst([])).toEqual([]);
+  });
+});
+
+describe("sortTrafficNewestFirst", () => {
+  const row = (date: string): TrafficDailyRow => ({
+    date,
+    pageViews: 1,
+    uniqueVisitors: 1,
+    loggedIn: 0,
+    anonymous: 1,
+    bots: 0,
+    humanPageViews: 1,
+  });
+  const rows = [row("2026-09-05"), row("2026-09-07"), row("2026-09-06")];
+
+  it("orders newest first and does not mutate the input", () => {
+    const sorted = sortTrafficNewestFirst(rows);
+    expect(sorted.map((r) => r.date)).toEqual(["2026-09-07", "2026-09-06", "2026-09-05"]);
+    expect(rows[0].date).toBe("2026-09-05");
   });
 });
 

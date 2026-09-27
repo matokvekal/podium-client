@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { FastResume } from "./app/FastResume";
+import { LiveLocationProvider } from "./app/LiveLocationProvider";
 import { RequireStatisticsPreview } from "./app/statisticsPreview";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
@@ -21,15 +22,15 @@ import { JoinPage } from "./pages/JoinPage";
 import { LiveEventPage } from "./pages/LiveEventPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
+import { RideChatPage } from "./pages/RideChatPage";
 import { SharedRidesPage } from "./pages/SharedRidesPage";
+import { SharedTrackPage } from "./pages/SharedTrackPage";
 import { StatisticsAchievementsPage } from "./pages/StatisticsAchievementsPage";
 import { StatisticsLeaderboardPage } from "./pages/StatisticsLeaderboardPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
-import { RideChatPage } from "./pages/RideChatPage";
-import { SharedTrackPage } from "./pages/SharedTrackPage";
 import { TracksPage } from "./pages/TracksPage";
 import { useUserModeStore } from "./store/userModeStore";
 
@@ -117,6 +118,9 @@ export function App() {
           that route current as the rider moves. Disabled by one flag — see
           lib/fast-resume.ts's FAST_RESUME_ENABLED. */}
       <FastResume />
+      {/* Renders nothing. The one live-location watcher for the whole app — see its own doc
+          comment for why tracking must not be owned by a single page. */}
+      <LiveLocationProvider />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 

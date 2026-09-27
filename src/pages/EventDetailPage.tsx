@@ -69,9 +69,9 @@ import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
 import { ElevationProfile } from "../app/ElevationProfile";
-import { WindStrip } from "../app/WindStrip";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
+import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
 import { RideDescription } from "../app/RideDescription";
 import { RideStopsSection } from "../app/RideStopsSection";
 import { RouteWeatherSection } from "../app/RouteWeatherSection";
@@ -79,12 +79,11 @@ import { SafetyChecklistLink } from "../app/SafetyChecklistLink";
 import { useOwnerAvatar } from "../app/useOwnerAvatar";
 import { useOwnerCover } from "../app/useOwnerCover";
 import { useRideStops } from "../app/useRideStops";
-
+import { WindStrip } from "../app/WindStrip";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { arrivalLabel, isAutoArrival } from "../lib/arrival";
 import { config } from "../lib/config";
-
 import { useConnectivityStore } from "../lib/connectivity";
 import { inviteGreeting } from "../lib/invite-greeting";
 import { dayGroupOrder, shareLinkPath } from "../lib/link-group";
@@ -101,6 +100,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
+import { canOpenRideChat } from "../lib/ride-chat";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { getRideImage } from "../lib/ride-images";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
@@ -112,6 +112,13 @@ import {
   terrainDescriptionFor,
   terrainLabelFor,
 } from "../lib/terrain-grade";
+import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
+import {
+  buildGpxFile,
+  downloadGpxFile,
+  downloadOriginalGpx,
+  gpxFilenameFor,
+} from "../lib/track-gpx";
 import {
   asRouteDifficulty,
   asTrailSeason,
@@ -121,20 +128,12 @@ import {
   TRAIL_SHADE_LABEL,
   trailMetadataApplies,
 } from "../lib/trail-metadata";
-import { formatLocalClockParts, formatLocalDateTime } from "../lib/time";
-import {
-  buildGpxFile,
-  downloadGpxFile,
-  downloadOriginalGpx,
-  gpxFilenameFor,
-} from "../lib/track-gpx";
 import { type DayForecast, getForecastForDate } from "../lib/weather";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
+import { reportRideConfirmation } from "../store/liveLocationStore";
 import { useResultsStore } from "../store/resultsStore";
-import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
-import { canOpenRideChat } from "../lib/ride-chat";
 import styles from "./EventDetailPage.module.css";
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
@@ -142,7 +141,6 @@ import styles from "./EventDetailPage.module.css";
 // formatLocalDateTime hit (lib/time.ts's own doc comment).
 const heroMonthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const heroDayFormat = new Intl.DateTimeFormat(undefined, { day: "2-digit" });
-
 
 /**
  * A low, smooth-roofed sedan in the same 24px outline style as the lucide icons around it (lucide's
@@ -726,6 +724,10 @@ export function EventDetailPage() {
     try {
       const found = await apiRequest<EventDetail>(`/events/${eventId}`);
       setEvent((previous) => mergeParticipantStatus(previous, found));
+      // Tell the live-location tracker what a REAL server response says about this ride — never
+      // from the cache paints above, which is the whole fix for a rider whose location silently
+      // stopped transmitting despite being genuinely registered (see LiveLocationProvider.tsx).
+      reportRideConfirmation(eventId, found.status, found.effectiveStatus, found.myParticipant);
       // Keep Zustand and the cache in step with the server response, not just this component
       // — the same single write path every status transition uses.
       useEventsStore.getState().upsertRide(found);
@@ -769,6 +771,7 @@ export function EventDetailPage() {
         const found = await apiRequest<EventDetail>(`/events/${id}`);
         if (cancelled) return;
         setEvent((previous) => mergeParticipantStatus(previous, found));
+        reportRideConfirmation(id, found.status, found.effectiveStatus, found.myParticipant);
         useEventsStore.getState().upsertRide(found);
         void putCachedEventDetail(id, viewerId, found);
       } catch {
@@ -1801,7 +1804,10 @@ export function EventDetailPage() {
                       const route = results.route;
                       if (!route) return;
                       const rebuilt = () =>
-                        downloadGpxFile(gpxFilenameFor(event.name), buildGpxFile(route, event.name));
+                        downloadGpxFile(
+                          gpxFilenameFor(event.name),
+                          buildGpxFile(route, event.name),
+                        );
                       // A track that was imported keeps its ORIGINAL file (sql/042): hand out
                       // those exact bytes. Anything without one — every ordinary ride — falls
                       // back to the GPX rebuilt from the line on screen, as it always has.

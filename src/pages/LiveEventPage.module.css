@@ -121,6 +121,32 @@
   border-radius: 999px;
 }
 
+/* Compact live-location tell — four quiet states, never louder than the Live/Paused pill it
+   sits beside. Colour carries "is this good or does it need attention", the text carries the
+   rest; nothing here is only-colour. */
+.locationStatusChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  font-weight: var(--weight-medium);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.locationStatusChip[data-tone="sharing"] {
+  background: rgba(40, 160, 100, 0.35);
+}
+
+.locationStatusChip[data-tone="denied"],
+.locationStatusChip[data-tone="unsupported"] {
+  background: rgba(180, 60, 60, 0.55);
+}
+
 /* --- glance strip ------------------------------------------------------------------- */
 
 .glance {
@@ -195,6 +221,25 @@
   background: rgba(15, 20, 30, 0.9);
   color: #fff;
   font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Not navigation, just a nudge — sits where geoError does (the two never show together: this
+   only fires while actively sharing, geoError only for denied/unsupported). No pulse/animation
+   by default, in keeping with prefers-reduced-motion — the wording alone is the alert here;
+   vibration/speech are separate, one-shot side effects (app/useOffRouteWarning.ts). */
+.offRouteBanner {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 18;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(190, 90, 20, 0.95);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: var(--weight-bold);
   text-align: center;
 }
 

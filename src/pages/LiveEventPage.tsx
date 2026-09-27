@@ -18,8 +18,13 @@
  *     visible behind it.
  *
  * Location sharing:
- *   - a PARTICIPATING creator auto-starts the existing broadcast on entry (permission asked
- *     once, via the existing flow) — unless they manually stopped it this session;
+ *   - owned by app/LiveLocationProvider.tsx, ONE watcher for the whole app, not this page — see
+ *     that file for why. This page only reads its status/selfPosition (app/useLiveLocation.ts)
+ *     and offers the manual Share/Stop control; tracking can already be running when this page
+ *     mounts (started while the rider was on the event detail page) and keeps running if they
+ *     leave for another screen;
+ *   - a PARTICIPATING creator auto-starts on any page confirming the ride is live and they are
+ *     registered — unless they manually stopped it this session;
  *   - a NON-participating creator (organiser only, no myParticipant row) never broadcasts and
  *     is never asked for GPS; their map centres on the route instead.
  *   Transmission reuses app/useLocationBroadcast.ts → the frozen POST
@@ -28,7 +33,8 @@
  *
  * Route progress (creator): the creator's own GPS is projected onto the route polyline
  * (lib/geo.ts nearestPointOnRoute) and the travelled portion is drawn darker over the lighter
- * base line — never a straight line from the start.
+ * base line — never a straight line from the start. The same projection distance also drives
+ * the off-route warning (app/useOffRouteWarning.ts) — not navigation, just "you have drifted".
  */
 
 import {
@@ -57,9 +63,10 @@ import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { initialOf, placeholderColorVar } from "../app/event-visuals";
 import type { RecenterCommand } from "../app/LiveRidersMap";
-import { useRideStops } from "../app/useRideStops";
-import { useLocationBroadcast } from "../app/useLocationBroadcast";
+import { useLiveLocation } from "../app/useLiveLocation";
 import { useMyIdentity } from "../app/useMyIdentity";
+import { useOffRouteWarning } from "../app/useOffRouteWarning";
+import { useRideStops } from "../app/useRideStops";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
@@ -77,12 +84,12 @@ import {
   putCachedLiveRiders,
   viewerKey,
 } from "../lib/local-db";
-import { isLocationManuallyStopped } from "../lib/location-broadcast";
 import { rideElapsedMs } from "../lib/ride-elapsed";
 import { formatAge } from "../lib/time";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { resolveUserAvatar, type UserVisualAsset } from "../lib/user-identity";
 import { type EventGroup, useEventGroupsStore } from "../store/eventGroupsStore";
+import { reportRideConfirmation } from "../store/liveLocationStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./LiveEventPage.module.css";
 
@@ -263,6 +270,9 @@ export function LiveEventPage() {
         if (cancelled) return;
         setEvent(found);
         setPaused(found.isPaused);
+        // Never from the cache paints above — see LiveLocationProvider.tsx for why only a
+        // confirmed server response may claim or withdraw the active-ride tracking slot.
+        reportRideConfirmation(eventId, found.status, found.effectiveStatus, found.myParticipant);
       } catch (err) {
         if (cancelled) return;
         if (cachedDetail || cached) return;
@@ -318,15 +328,14 @@ export function LiveEventPage() {
   const isParticipant = event?.myParticipant?.id != null;
 
   // --- location transmission --------------------------------------------------------------
+  // Owned by app/LiveLocationProvider.tsx (mounted once at the app root), not this page — this
+  // is a read/write HANDLE onto that single watcher, not a second instance of it. Tracking may
+  // already be running by the time this page mounts (started while the rider was still on the
+  // event detail page), and keeps running if they leave this page for another screen.
   const effectiveStatus = event ? (event.effectiveStatus ?? event.status) : null;
   const eventIsLive = effectiveStatus === "live";
   const eventIsFinished = effectiveStatus === "finished" || effectiveStatus === "cancelled";
-  const broadcast = useLocationBroadcast({
-    eventId,
-    participantId: event?.myParticipant?.id ?? null,
-    eventIsLive,
-    eventIsFinished,
-  });
+  const broadcast = useLiveLocation();
   const selfPosition = broadcast.selfPosition;
   const sharing = broadcast.status === "sharing" || broadcast.status === "requesting";
   const canShare = isParticipant && eventIsLive && !eventIsFinished;
@@ -337,18 +346,11 @@ export function LiveEventPage() {
         ? "This device does not support location sharing."
         : null;
 
-  // Auto-start the EXISTING broadcast on entering LIVE — participating creator only, live and
-  // not finished, not manually stopped this session. The hook's start() surfaces the
-  // permission prompt once via the existing flow; a "denied" result stops here (status leaves
-  // "off"), so this never loops.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: broadcast.start is a stable useCallback
-  useEffect(() => {
-    if (!eventId || !isParticipant) return;
-    if (!eventIsLive || eventIsFinished) return;
-    if (broadcast.status !== "off") return;
-    if (isLocationManuallyStopped(eventId)) return;
-    broadcast.start();
-  }, [eventId, isParticipant, eventIsLive, eventIsFinished, broadcast.status]);
+  const offRoute = useOffRouteWarning({
+    enabled: sharing && eventIsLive && !eventIsFinished,
+    selfPosition,
+    routePoints: results?.route?.points ?? [],
+  });
 
   // A finished ride left open in the background can go stale — re-pull the event on return to
   // the foreground so the transmission conditions stay honest.
@@ -581,6 +583,23 @@ export function LiveEventPage() {
           </span>
           <span className={styles.topTitle}>{event.name}</span>
         </div>
+        {/* Compact "is my location actually going out" tell — the Share/Stop control below
+            already reflects the same status in its own label, but that one is easy to miss
+            mid-ride; this sits where the rider's eye already goes first, next to Live/Paused. */}
+        {canShare && (
+          <span className={styles.locationStatusChip} data-tone={broadcast.status} role="status">
+            <Navigation aria-hidden="true" width={12} height={12} />
+            {broadcast.status === "sharing"
+              ? "Live location active"
+              : broadcast.status === "requesting"
+                ? "Waiting for location…"
+                : broadcast.status === "denied"
+                  ? "Location blocked"
+                  : broadcast.status === "unsupported"
+                    ? "Location unavailable"
+                    : "Location off"}
+          </span>
+        )}
         {!connected && (
           <span className={styles.offlineChip} role="status">
             <WifiOff aria-hidden="true" width={13} height={13} />
@@ -615,6 +634,14 @@ export function LiveEventPage() {
       )}
 
       {geoError && <div className={styles.geoError}>{geoError}</div>}
+
+      {/* Not navigation — just "you have drifted from the route", raised only after a
+          sustained deviation (app/useOffRouteWarning.ts), never from one noisy GPS sample. */}
+      {offRoute.isWarning && (
+        <div className={styles.offRouteBanner} role="status">
+          You are off route
+        </div>
+      )}
 
       {/* --- the control stack (few, large, one tap) -------------------------------- */}
       <div className={styles.controls}>

@@ -9,6 +9,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { FastResume } from "./app/FastResume";
 import { LiveLocationProvider } from "./app/LiveLocationProvider";
+import { PageViewTracker } from "./app/PageViewTracker";
 import { RequireStatisticsPreview } from "./app/statisticsPreview";
 import { useAuth } from "./auth/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
@@ -118,6 +119,9 @@ export function App() {
           that route current as the rider moves. Disabled by one flag — see
           lib/fast-resume.ts's FAST_RESUME_ENABLED. */}
       <FastResume />
+      {/* Renders nothing. Fires a best-effort PAGE_VIEW on every real route change — see
+          app/PageViewTracker.tsx. */}
+      <PageViewTracker />
       {/* Renders nothing. The one live-location watcher for the whole app — see its own doc
           comment for why tracking must not be owned by a single page. */}
       <LiveLocationProvider />

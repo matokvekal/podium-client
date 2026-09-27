@@ -985,6 +985,16 @@
 
 /* --- chip row ---------------------------------------------------------------------------- */
 
+/* Holds the chip row and the safety checklist link on one line — the checklist pinned to the
+   far end, wrapping onto its own line first on a narrow phone rather than squeezing the chips. */
+.chipSafetyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .chipRow {
   --chip-road: #2563eb;
   --chip-mtb: #15803d;
@@ -1169,9 +1179,16 @@
 
 .organizerText {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+/* Pushed to the card's far end by .organizerText's flex: 1 above. */
+.organizerChat {
+  display: flex;
+  flex-shrink: 0;
 }
 
 .organizerLabel {
@@ -1278,6 +1295,13 @@
   font-weight: var(--weight-medium);
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+/* The one line riders kept asking for even with a drive-there button in the hero — bigger than
+   its neighbours in the strip so it reads first. */
+.meetingPointValue {
+  font-size: 1.05rem;
+  font-weight: var(--weight-bold);
 }
 
 .infoCellLinks {

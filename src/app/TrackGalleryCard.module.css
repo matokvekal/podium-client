@@ -135,14 +135,20 @@
   height: 12px;
 }
 
+/* Guarded the same way tokens.css guards its own dark palette (see EventCard.module.css for
+   the same three-state pattern): OS dark preference applies only while no manual theme is set,
+   and the explicit toggle (color-theme.ts) always wins. Without the `:not([data-color-theme])`
+   guard this rule fired on OS dark preference alone, so a rider who set the app to light mode
+   on a system whose browser prefers dark still got a near-black pill here while every other
+   surface on the card stayed light. */
 @media (prefers-color-scheme: dark) {
-  .trailFact {
+  :root:not([data-color-theme]) .trailFact {
     background: rgb(22 27 34 / 0.9);
   }
+}
 
-  .trailFactDifficulty {
-    background: var(--accent-strong);
-  }
+:root[data-color-theme="dark"] .trailFact {
+  background: rgb(22 27 34 / 0.9);
 }
 
 /* Fades in over the underlay rather than replacing it, so the route never appears to jump

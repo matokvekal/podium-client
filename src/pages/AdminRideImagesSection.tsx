@@ -19,6 +19,7 @@ import {
   uploadRideImage,
 } from "../lib/admin-ride-images";
 import { ApiError } from "../lib/api-client";
+import { resolveApiAssetUrl } from "../lib/ride-images-dynamic";
 import { useRideImagesStore } from "../store/rideImagesStore";
 import styles from "./AdminAnalyticsPage.module.css";
 import sectionStyles from "./AdminRideImagesSection.module.css";
@@ -186,7 +187,11 @@ export function AdminRideImagesSection() {
               {state.images.map((image) => (
                 <tr key={image.key}>
                   <td>
-                    <img src={image.url} alt="" className={sectionStyles.thumb} />
+                    <img
+                      src={resolveApiAssetUrl(image.url)}
+                      alt=""
+                      className={sectionStyles.thumb}
+                    />
                   </td>
                   <td className={styles.tdDate}>
                     <code>{image.key}</code>

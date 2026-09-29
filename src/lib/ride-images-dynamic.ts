@@ -14,13 +14,30 @@
 // (ensureLoaded is idempotent) so no call site has to remember to.
 
 import { useEffect } from "react";
+import { config } from "./config";
 import { type RideImageDto, useRideImagesStore } from "../store/rideImagesStore";
-import { getRideImage as getStaticRideImage, type RideImage, type RideImageCategory, selectableRideImages as staticSelectableRideImages } from "./ride-images";
+import {
+  getRideImage as getStaticRideImage,
+  type RideImage,
+  type RideImageCategory,
+  selectableRideImages as staticSelectableRideImages,
+} from "./ride-images";
+
+/**
+ * The server returns an uploaded cover as a path on the API origin ("/api/v1/ride-image-files/…").
+ * When the app is served from the same origin as the API (production: VITE_API_URL=/api/v1) that
+ * path works as is; when the API is on another origin (local dev) it needs that origin in front.
+ * Built-in covers ("/ride-images/…") and full URLs are left alone.
+ */
+export function resolveApiAssetUrl(url: string, apiUrl: string = config.apiUrl): string {
+  if (!url.startsWith("/api/") || !/^https?:\/\//i.test(apiUrl)) return url;
+  return new URL(url, apiUrl).href;
+}
 
 function toRideImage(dto: RideImageDto): RideImage {
   return {
     key: dto.key,
-    src: dto.url,
+    src: resolveApiAssetUrl(dto.url),
     category: (dto.category as RideImageCategory) ?? "generic",
     label: dto.label,
     selectable: dto.selectable,

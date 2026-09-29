@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { RideImageDto } from "../store/rideImagesStore";
-import { resolveRideImage, selectableFrom } from "./ride-images-dynamic";
+import { resolveApiAssetUrl, resolveRideImage, selectableFrom } from "./ride-images-dynamic";
 
 const catalog: RideImageDto[] = [
   {
@@ -37,5 +37,26 @@ describe("ride image catalog on the client", () => {
     const image = resolveRideImage(catalog, "tikva1");
     expect(image?.key).toBe("tikva1");
     expect(image?.src).toBe("http://api/x/f2.webp?v=2");
+  });
+});
+
+describe("resolveApiAssetUrl", () => {
+  it("leaves the path alone when the API shares the site's origin (production)", () => {
+    expect(resolveApiAssetUrl("/api/v1/ride-image-files/a.webp?v=2", "/api/v1")).toBe(
+      "/api/v1/ride-image-files/a.webp?v=2",
+    );
+  });
+  it("puts the API origin in front when the API is elsewhere (dev)", () => {
+    expect(
+      resolveApiAssetUrl("/api/v1/ride-image-files/a.webp", "http://localhost:5000/api/v1"),
+    ).toBe("http://localhost:5000/api/v1/ride-image-files/a.webp");
+  });
+  it("never touches built-in covers or absolute URLs", () => {
+    expect(resolveApiAssetUrl("/ride-images/tikva1.webp", "http://localhost:5000/api/v1")).toBe(
+      "/ride-images/tikva1.webp",
+    );
+    expect(resolveApiAssetUrl("https://x/y.webp", "http://localhost:5000/api/v1")).toBe(
+      "https://x/y.webp",
+    );
   });
 });

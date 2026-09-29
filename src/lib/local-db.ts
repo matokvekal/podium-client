@@ -232,13 +232,6 @@ export interface EventSummary {
    */
   expectedParticipants?: number | null;
   /**
-   * PROMOTE (server sql/053): shown as a normal card but closed to riders until the System Admin
-   * opens it. Absent/false on every ordinary event. See lib/promote.ts.
-   */
-  promoteOnly?: boolean;
-  /** Present on a LIST row ONLY for a promoteOnly event (its locked card shows it). */
-  description?: string | null;
-  /**
    * Great-circle distance (km) from a "Near Me" search's device position to this track's
    * start point (server: routes.start_lat/start_lon). Only present on a GET /events/public
    * response that sent nearLat/nearLon; null/absent otherwise, and null for a track with no

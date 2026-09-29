@@ -509,27 +509,3 @@
   height: 13px;
   flex-shrink: 0;
 }
-
-/* PROMOTE (locked card): same card, no navigation — so no pointer, no hover lift. */
-.card[data-locked] {
-  cursor: default;
-}
-.card[data-locked]:hover {
-  transform: none;
-}
-.chip[data-kind="coming-soon"] {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.promoteDescription {
-  margin: 6px 0 0;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
-.promoteDescription a {
-  color: inherit;
-  text-decoration: underline;
-  font-weight: 600;
-}

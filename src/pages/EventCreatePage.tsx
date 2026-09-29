@@ -184,7 +184,7 @@ import {
   joinDuration,
   splitDuration,
 } from "../lib/ride-duration";
-import { selectableFrom, useRideImages } from "../lib/ride-images-dynamic";
+import { selectableRideImages } from "../lib/ride-images";
 import { LEVEL_ICON, LEVEL_LABEL, LEVELS, type RiderLevel } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import type { TrackHandoff } from "../lib/track-handoff";
@@ -262,8 +262,6 @@ interface ExistingEvent {
   restStops?: number | null;
   isAccessible?: boolean;
   hasSupportVehicle?: boolean;
-  /** PROMOTE (sql/053) — only meaningful to the System Admin. */
-  promoteOnly?: boolean;
   /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
    *  which is the default a new ride gets. */
   autoCheckIn?: boolean;
@@ -500,9 +498,6 @@ export function EventCreatePage() {
   // boolean the organizer sets, false by default, and false means "none promised" — never a
   // maybe. Riders plan long and remote rides around this, so it is only ever what the organizer
   // actually ticked.
-  // PROMOTE: keep the event visible as a card but locked for riders. The control only exists for
-  // the System Admin (profile.canManagePromote); nobody else ever sends the field.
-  const [promoteOnly, setPromoteOnly] = useState(false);
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false,
   );
@@ -582,10 +577,6 @@ export function EventCreatePage() {
   // stays null unless the organizer taps one in the gallery. Edit: hydrated from the loaded
   // event below and re-sent on every save, same as every other simple field on this page.
   const [rideImageKey, setRideImageKey] = useState<string | null>(null);
-  // The live, server-fetched ride-image catalog (GET /api/v1/ride-images) — a System Admin's
-  // upload or disable shows up here with no rebuild. Falls back to the compiled static list
-  // (lib/ride-images.ts) until the fetch resolves — see lib/ride-images-dynamic.ts.
-  const rideImages = useRideImages();
   // "Am I also riding?" — asked for directly ("i need to be asked also if i am also ridewr and
   // what is my nick name"). Create-only (see the field's `!isEditing` guard below): re-asking
   // on every edit save risked adding a duplicate roster row each time.
@@ -804,7 +795,6 @@ export function EventCreatePage() {
         if (found.restStops != null) setRestStops(found.restStops);
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
-        setPromoteOnly(found.promoteOnly ?? false);
         setAutoCheckIn(found.autoCheckIn ?? true);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
@@ -1491,7 +1481,6 @@ export function EventCreatePage() {
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
             hasSupportVehicle,
-            ...(profile?.canManagePromote ? { promoteOnly } : {}),
             // Auto check-in (sql/040). Always sent, so switching it off on an edit really does.
             autoCheckIn,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
@@ -1573,7 +1562,6 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
-          ...(profile?.canManagePromote ? { promoteOnly } : {}),
           // Auto check-in (sql/040) — sent on create too, so an organizer who switched it off
           // is never silently given the server default (on).
           autoCheckIn,
@@ -2791,25 +2779,6 @@ export function EventCreatePage() {
                     Support vehicle
                   </span>
                 </label>
-                {/* PROMOTE — System Admin only. The event is built and saved exactly like any
-                    other; this just keeps it a locked card until it is switched off again. */}
-                {profile?.canManagePromote && (
-                  <label className={styles.switchRow}>
-                    <input
-                      type="checkbox"
-                      className={styles.switchInput}
-                      checked={promoteOnly}
-                      onChange={(e) => setPromoteOnly(e.target.checked)}
-                    />
-                    <span className={styles.switchTrack}>
-                      <span className={styles.switchThumb} />
-                    </span>
-                    <span className={styles.switchState}>{promoteOnly ? "On" : "Off"}</span>
-                    <span className={styles.switchLabel}>
-                      PROMOTE — show event but keep it locked
-                    </span>
-                  </label>
-                )}
                 {/* Auto check-in (sql/040) — riders who open the app near the start, around the
                     start time, are marked "arrived" automatically, in their own colour so the
                     organizer can tell it from a tick they made themselves. On by default. The hint
@@ -2875,7 +2844,7 @@ export function EventCreatePage() {
                 >
                   <span className={styles.rideImageNone}>No image</span>
                 </button>
-                {selectableFrom(rideImages).map((image) => (
+                {selectableRideImages().map((image) => (
                   <button
                     key={image.key}
                     type="button"

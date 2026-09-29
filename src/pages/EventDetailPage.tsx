@@ -102,7 +102,7 @@ import {
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { canOpenRideChat } from "../lib/ride-chat";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
-import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
+import { getRideImage } from "../lib/ride-images";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import {
@@ -736,15 +736,9 @@ export function EventDetailPage() {
     } catch (err) {
       // Cached data is on screen — a failed refresh must never blank it out. The global
       // OFFLINE banner (app/OfflineBanner.tsx) is what tells the rider it is last-synced.
-      // PROMOTE: a locked ride must not stay on screen from a cached copy of its card.
-      const promoteLocked =
-        err instanceof ApiError && err.status === 403 && err.message.includes("PROMOTE_LOCKED");
-      if (promoteLocked) setEvent(null);
-      if ((cachedDetail || cached) && !promoteLocked) return;
+      if (cachedDetail || cached) return;
       setError(
-        promoteLocked
-          ? "This event is not open yet."
-          : err instanceof ApiError && err.status === 403
+        err instanceof ApiError && err.status === 403
           ? "This event is private."
           : err instanceof ApiError && err.status === 404
             ? "Event not found."
@@ -1188,10 +1182,9 @@ export function EventDetailPage() {
   const organizerAvatarProps = organizerIsRealOwner
     ? { ...ownerAvatarProps, seed: ownerAvatarProps.seed ?? organizer }
     : { avatarUrl: null, identity: null, localSelection: null, seed: organizer };
-  const rideImages = useRideImages();
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
     ...ownerCoverOptions,
-    builtInRideImageUrl: resolveRideImage(rideImages, event.rideImageKey)?.src ?? null,
+    builtInRideImageUrl: getRideImage(event.rideImageKey)?.src ?? null,
   });
   const riderCount = realRiderCount;
   // Start-list capacity. event.participantCount is the authoritative "joined" count (approved +

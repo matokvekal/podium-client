@@ -109,8 +109,6 @@ export interface Profile {
    * that file) once Statistics is ready for every rider.
    */
   canSeeStatistics?: boolean;
-  /** PROMOTE switch visibility — true for the System Admin only (UI gate; the server enforces). */
-  canManagePromote?: boolean;
 }
 
 interface AuthResponse {

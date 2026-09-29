@@ -23,7 +23,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
 import { organizerDisplay } from "../lib/promote";
-import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
+import { resolveRideImage, useRideImagePending, useRideImages } from "../lib/ride-images-dynamic";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
@@ -96,9 +96,11 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   const climbM = event.elevationGain ?? extras.climbM ?? event.climbM ?? null;
   const ownerCoverOptions = useOwnerCover(event.ownerId, event.ownerCover);
   const rideImages = useRideImages();
+  const rideCoverPending = useRideImagePending(event.rideImageKey);
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
     ...ownerCoverOptions,
     builtInRideImageUrl: resolveRideImage(rideImages, event.rideImageKey)?.src ?? null,
+    coverPending: rideCoverPending,
   });
 
   function handleEdit(e: MouseEvent) {

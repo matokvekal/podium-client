@@ -126,6 +126,9 @@ export interface EventCoverOptions {
   /** No darkening layer at all, for the big ride-page hero where the picture is the point (that
    *  page darkens only behind its own text instead). Cards keep the default. */
   noScrim?: boolean;
+  /** The ride names a cover image whose URL is not known yet (catalog still loading). Render
+   *  the neutral placeholder colour instead of any picture so nothing flashes and is replaced. */
+  coverPending?: boolean;
 }
 
 export function eventCoverBackground(
@@ -144,6 +147,9 @@ export function eventCoverBackground(
     legacyEventCoverDataUrl: coverImageDataUrl,
     builtInRideImageUrl: options?.builtInRideImageUrl,
   });
+  if (options?.coverPending && resolved.origin !== "legacy-event") {
+    return placeholderColorVar(seed);
+  }
   // Nothing in the chain answered — fall back to this event's own built-in scene, as today.
   const url = (resolved.url ?? generatedCoverUrl(seed)).replaceAll('"', "%22");
   // Everything gets the same darkening scrim so overlaid text stays readable whichever is

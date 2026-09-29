@@ -246,13 +246,21 @@
   width: fit-content;
   max-width: 100%;
   padding: 4px 12px 4px 6px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(15, 20, 30, 0.6);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  min-width: 0;
   gap: 8px;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* A wrapped name makes the pill taller, so it stops being a full capsule. */
+.organizerRowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 /* "1 of 2 rides that day · Switch ride" — sits over the hero image with the organizer row,

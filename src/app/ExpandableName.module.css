@@ -1,0 +1,44 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* Lets the name shrink inside a flex row instead of pushing past the viewport. */
+  min-width: 0;
+  max-width: 100%;
+}
+
+.text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  /* Long URLs / unbroken strings break rather than widen the card. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: start;
+}
+
+.text[data-expanded="true"] {
+  display: block;
+  overflow: visible;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  margin: calc(var(--space-2) * -1) 0;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}

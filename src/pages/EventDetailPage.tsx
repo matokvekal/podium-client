@@ -69,10 +69,11 @@ import { distanceIconFor } from "../app/ActivityIcons";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
 import { ElevationProfile } from "../app/ElevationProfile";
+import { ExpandableName } from "../app/ExpandableName";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
-import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
 import { PromoteMessage } from "../app/PromoteMessage";
+import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
 import { RideDescription } from "../app/RideDescription";
 import { RideStopsSection } from "../app/RideStopsSection";
 import { RouteWeatherSection } from "../app/RouteWeatherSection";
@@ -85,7 +86,6 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { arrivalLabel, isAutoArrival } from "../lib/arrival";
 import { config } from "../lib/config";
-import { organizerDisplay } from "../lib/promote";
 import { useConnectivityStore } from "../lib/connectivity";
 import { inviteGreeting } from "../lib/invite-greeting";
 import { dayGroupOrder, shareLinkPath } from "../lib/link-group";
@@ -102,6 +102,7 @@ import {
   viewerKey,
 } from "../lib/local-db";
 import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
+import { organizerDisplay } from "../lib/promote";
 import { canOpenRideChat } from "../lib/ride-chat";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
@@ -1379,7 +1380,10 @@ export function EventDetailPage() {
           {organizer && (
             <div className={styles.organizerRow}>
               <Avatar className={styles.avatar} name={organizer} {...organizerAvatarProps} />
-              Organized by {organizer}
+              <span className={styles.organizerRowText}>
+                <span>Organized by</span>
+                <ExpandableName text={organizer} toggle={false} />
+              </span>
             </div>
           )}
           {/* One of several rides the organizer runs that day (server: sql/037).
@@ -2214,7 +2218,7 @@ export function EventDetailPage() {
             <div className={styles.organizerText}>
               <span className={styles.organizerLabel}>Organized by</span>
               <span className={styles.organizerName}>
-                {organizer}
+                <ExpandableName text={organizer} lines={3} />
                 <span className={styles.organizerBadge}>Organizer</span>
               </span>
             </div>

@@ -6,7 +6,7 @@
 // hidden when the owner switched chat off (server sql/056) — even if a stale unread summary for
 // that ride is still in the store.
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -69,5 +69,36 @@ describe("EventCard chat icon", () => {
     cleanup();
     card({ promoteOnly: true, chatEnabled: false });
     expect(screen.queryByRole("button", { name: /Ride chat/ })).toBeNull();
+  });
+});
+
+describe("EventCard Share (PROMOTE only)", () => {
+  it("PROMOTE ride shows Share whether chat is on or off", () => {
+    card({ promoteOnly: true, chatEnabled: true });
+    expect(screen.getByRole("button", { name: "Share this event" })).toBeTruthy();
+    cleanup();
+    card({ promoteOnly: true, chatEnabled: false });
+    expect(screen.getByRole("button", { name: "Share this event" })).toBeTruthy();
+  });
+
+  it("ordinary ride is unchanged: no Share on the card", () => {
+    card();
+    expect(screen.queryByRole("button", { name: "Share this event" })).toBeNull();
+  });
+
+  it("finished PROMOTE ride has no Share", () => {
+    card({ promoteOnly: true, status: "finished" });
+    expect(screen.queryByRole("button", { name: "Share this event" })).toBeNull();
+  });
+
+  it("tapping Share opens the sheet and cancels the card link (no navigation)", async () => {
+    card({ promoteOnly: true });
+    // fireEvent returns false when a handler called preventDefault — which is what stops the
+    // surrounding <Link> from navigating into the event.
+    const notPrevented = fireEvent.click(screen.getByRole("button", { name: "Share this event" }));
+    expect(notPrevented).toBe(false);
+    expect((await screen.findAllByText(/QR|link/i, {}, { timeout: 3000 })).length).toBeGreaterThan(
+      0,
+    );
   });
 });

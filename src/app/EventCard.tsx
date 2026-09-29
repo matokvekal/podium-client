@@ -42,9 +42,10 @@ import {
   Timer,
   Truck,
   UsersRound,
+  Share2,
 } from "lucide-react";
 import type { MouseEvent } from "react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
 import { wazeUrl } from "../lib/nav-links";
@@ -82,6 +83,11 @@ import { useOwnerCover } from "./useOwnerCover";
  */
 const NOT_YET = "soon";
 
+// Only loaded when a PROMOTE card's Share is tapped — same lazy import EventDetailPage uses.
+const ShareEventSheet = lazy(() =>
+  import("./ShareEventSheet").then((m) => ({ default: m.ShareEventSheet })),
+);
+
 const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 
@@ -96,14 +102,16 @@ function dateParts(iso: string | null): { month: string; day: string; weekday: s
   };
 }
 
-export function EventCard({
+function EventCardLink({
   event,
   isNew,
   justOpened,
+  onShare,
 }: {
   event: EventSummary;
   isNew?: boolean;
   justOpened?: boolean;
+  onShare: () => void;
 }) {
   const status = figmaStatus(event.status);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
@@ -186,6 +194,17 @@ export function EventCard({
   // for someone else's ride therefore shows none.
   const hasChat =
     useRideChatStore((s) => s.summaries[event.id] != null) && isRideChatEnabled(event);
+
+  // PROMOTE only changes how a rider registers, never whether the ride can be shared. Scoped to
+  // PROMOTE rides on purpose: ordinary cards keep their existing actions. A finished/cancelled
+  // ride has no joinable code, so it gets no Share (same rule as the Event Details page).
+  const canShare = event.promoteOnly === true && status !== "finished";
+
+  function handleShare(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onShare();
+  }
 
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
@@ -299,6 +318,17 @@ export function EventCard({
 
         {/* Chat stacked on top of the heart, at the card's side. */}
         <div className={styles.sideActions}>
+          {canShare && (
+            <button
+              type="button"
+              className={styles.heartBtn}
+              onClick={handleShare}
+              aria-label="Share this event"
+              title="Share — code, QR, link"
+            >
+              <Share2 width={18} height={18} aria-hidden="true" />
+            </button>
+          )}
           {hasChat && <RideChatButton rideId={event.id} />}
           <button
             type="button"
@@ -438,5 +468,31 @@ export function EventCard({
         )}
       </div>
     </Link>
+  );
+}
+
+export function EventCard(props: {
+  event: EventSummary;
+  isNew?: boolean;
+  justOpened?: boolean;
+}) {
+  const { event } = props;
+  const [shareOpen, setShareOpen] = useState(false);
+  return (
+    <>
+      <EventCardLink {...props} onShare={() => setShareOpen(true)} />
+      {/* A sibling of the card link, not a child: a tap inside the sheet must not reach it. */}
+      {shareOpen && (
+        <Suspense fallback={null}>
+          <ShareEventSheet
+            eventName={event.name}
+            eventCode={event.code}
+            startsAt={event.startsAt}
+            location={event.location}
+            onClose={() => setShareOpen(false)}
+          />
+        </Suspense>
+      )}
+    </>
   );
 }

@@ -262,15 +262,21 @@
 }
 
 .organizerRow {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 2px;
+  min-width: 0;
+  max-width: 100%;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.82);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* Label above the name; the name wraps (2 lines, then clamps) and never widens the tile. */
+.organizerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .organizerAvatar {

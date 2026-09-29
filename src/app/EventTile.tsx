@@ -31,6 +31,7 @@ import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { distanceIconFor } from "./ActivityIcons";
 import { Avatar } from "./Avatar";
 import styles from "./EventTile.module.css";
+import { ExpandableName } from "./ExpandableName";
 import {
   eventCoverBackground,
   FIGMA_TAG_LABEL,
@@ -194,7 +195,10 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
                 seed={organizerAvatarProps.seed ?? event.id}
                 className={styles.organizerAvatar}
               />
-              Organized by {organizer}
+              <span className={styles.organizerText}>
+                <span>Organized by</span>
+                <ExpandableName text={organizer} toggle={false} />
+              </span>
             </div>
           </div>
         )}

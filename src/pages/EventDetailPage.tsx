@@ -44,6 +44,7 @@
 import {
   Accessibility,
   CalendarDays,
+  CalendarPlus,
   CheckCircle2,
   ChevronRight,
   Circle,
@@ -85,6 +86,7 @@ import { WindStrip } from "../app/WindStrip";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { arrivalLabel, isAutoArrival } from "../lib/arrival";
+import { canAddToCalendar, downloadEventIcs } from "../lib/calendar-ics";
 import { config } from "../lib/config";
 import { useConnectivityStore } from "../lib/connectivity";
 import { inviteGreeting } from "../lib/invite-greeting";
@@ -1665,6 +1667,27 @@ export function EventDetailPage() {
                   Start
                 </span>
                 <span className={styles.infoCellValue}>{formatLocalDateTime(event.startsAt)}</span>
+                {canAddToCalendar(event) && (
+                  <span className={styles.infoCellLinks}>
+                    <button
+                      type="button"
+                      className={`${styles.navLink} ${styles.calendarBtn}`}
+                      onClick={() =>
+                        downloadEventIcs({
+                          id: event.id,
+                          name: event.name,
+                          startsAt: event.startsAt,
+                          endsAt: event.endsAt,
+                          location: event.location,
+                          url: `${config.shareBaseUrl}/events/${event.id}`,
+                        })
+                      }
+                    >
+                      <CalendarPlus width={12} height={12} aria-hidden="true" />
+                      Add to Calendar
+                    </button>
+                  </span>
+                )}
               </div>
             )}
             {event.area && (

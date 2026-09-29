@@ -105,7 +105,7 @@ import { googleMapsUrl, wazeUrl } from "../lib/nav-links";
 import { organizerDisplay } from "../lib/promote";
 import { canOpenRideChat } from "../lib/ride-chat";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
-import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
+import { resolveRideImage, useRideImagePending, useRideImages } from "../lib/ride-images-dynamic";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import {
@@ -382,6 +382,8 @@ export function EventDetailPage() {
   const rideImages = useRideImages();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
+  // Cover still unresolved (catalog loading, key not in the compiled list): placeholder, not the default.
+  const rideCoverPending = useRideImagePending(event?.rideImageKey);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1200,6 +1202,7 @@ export function EventDetailPage() {
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
     ...ownerCoverOptions,
     builtInRideImageUrl: resolveRideImage(rideImages, event.rideImageKey)?.src ?? null,
+    coverPending: rideCoverPending,
     noScrim: true, // ride page hero: picture shown as is; only the text gets a dark backing
   });
   const riderCount = realRiderCount;

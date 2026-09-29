@@ -58,6 +58,21 @@ export function resolveRideImage(
   return found ? toRideImage(found) : null;
 }
 
+/**
+ * True while an event's cover is genuinely unknown: it names a ride image, the catalog has not
+ * arrived (and has not failed), and the compiled list cannot answer either — an admin-uploaded
+ * key is never in the compiled list. Callers must render a neutral placeholder then, not the
+ * default cover, or the default flashes before the real picture replaces it.
+ */
+export function isRideImagePending(
+  catalog: readonly RideImageDto[] | null,
+  key: string | null | undefined,
+  failed: boolean,
+): boolean {
+  if (!key || catalog !== null || failed) return false;
+  return getStaticRideImage(key) === null;
+}
+
 /** What the Create/Edit Ride picker grid offers. */
 export function selectableFrom(catalog: readonly RideImageDto[] | null): RideImage[] {
   if (catalog === null) return staticSelectableRideImages();
@@ -74,4 +89,11 @@ export function useRideImages(): readonly RideImageDto[] | null {
     void useRideImagesStore.getState().ensureLoaded();
   }, []);
   return images;
+}
+
+/** True while this ride's cover is still being resolved — see isRideImagePending. */
+export function useRideImagePending(key: string | null | undefined): boolean {
+  const images = useRideImagesStore((s) => s.images);
+  const failed = useRideImagesStore((s) => s.error !== null);
+  return isRideImagePending(images, key, failed);
 }

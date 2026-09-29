@@ -9,11 +9,12 @@
  * assume the analytics fetch is the only proof of that.
  */
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   type AdminRideImage,
-  deleteRideImage,
+  archiveRideImage,
   fetchAdminRideImages,
+  replaceRideImage,
   setRideImageSelectable,
   uploadRideImage,
 } from "../lib/admin-ride-images";
@@ -34,6 +35,10 @@ export function AdminRideImagesSection() {
   const [state, setState] = useState<LoadState>({ phase: "loading" });
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // One hidden file input serves every row's Replace button. Declared here, with the other
+  // hooks, ahead of the early returns below (Rules of Hooks — see the 2026-09-29 React #310 fix).
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [replaceTarget, setReplaceTarget] = useState<AdminRideImage | null>(null);
 
   const load = useCallback(async () => {
     setState({ phase: "loading" });
@@ -75,16 +80,43 @@ export function AdminRideImagesSection() {
     }
   }
 
-  async function handleDelete(image: AdminRideImage) {
+  async function handleArchive(image: AdminRideImage) {
+    if (
+      !window.confirm(
+        `Delete "${image.label}"? It will no longer be offered to organizers. Rides that already use it keep showing it.`,
+      )
+    ) {
+      return;
+    }
     setActionError(null);
     setBusyKey(image.key);
     try {
-      await deleteRideImage(image.key);
+      await archiveRideImage(image.key);
       await afterChange();
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : `Could not delete "${image.label}".`,
-      );
+      setActionError(err instanceof ApiError ? err.message : `Could not delete "${image.label}".`);
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  function startReplace(image: AdminRideImage) {
+    setReplaceTarget(image);
+    replaceInputRef.current?.click();
+  }
+
+  async function handleReplaceChosen(file: File | undefined) {
+    const image = replaceTarget;
+    if (replaceInputRef.current) replaceInputRef.current.value = "";
+    setReplaceTarget(null);
+    if (!file || !image) return;
+    setActionError(null);
+    setBusyKey(image.key);
+    try {
+      await replaceRideImage(image.key, file);
+      await afterChange();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : `Could not replace "${image.label}".`);
     } finally {
       setBusyKey(null);
     }
@@ -126,6 +158,14 @@ export function AdminRideImagesSection() {
 
       {actionError && <p className={sectionStyles.actionError}>{actionError}</p>}
 
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(e) => void handleReplaceChosen(e.target.files?.[0])}
+      />
+
       {state.images.length === 0 ? (
         <p className={styles.empty}>No ride images.</p>
       ) : (
@@ -165,16 +205,22 @@ export function AdminRideImagesSection() {
                       >
                         {image.selectable ? "Disable" : "Enable"}
                       </button>
-                      {image.source === "upload" && (
-                        <button
-                          type="button"
-                          className="button button--small button--danger"
-                          disabled={busyKey === image.key}
-                          onClick={() => void handleDelete(image)}
-                        >
-                          Delete
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="button button--small button--quiet"
+                        disabled={busyKey === image.key}
+                        onClick={() => startReplace(image)}
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--small button--danger"
+                        disabled={busyKey === image.key}
+                        onClick={() => void handleArchive(image)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>

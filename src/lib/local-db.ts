@@ -239,6 +239,9 @@ export interface EventSummary {
   /** Text shown instead of Join on a PROMOTE event (server sql/055); null/absent = the default
    *  message. Sent even while PROMOTE is off so the edit form can prefill it. */
   promoteRegistrationMessage?: string | null;
+  /** Whether the ride has a chat (server sql/056). Absent/true = it does, exactly as before; false
+   *  = the owner switched it off: no chat button, badge, polling or page. See lib/ride-chat.ts. */
+  chatEnabled?: boolean;
   /** Present on a LIST row ONLY for a promoteOnly event (its locked card shows it). */
   description?: string | null;
   /**

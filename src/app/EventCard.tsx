@@ -63,6 +63,7 @@ import { formatLocalTime } from "../lib/time";
 import { getEventExtras, useEventExtrasStore } from "../store/eventExtrasStore";
 import { useEventsStore } from "../store/eventsStore";
 import { distanceIconFor } from "./ActivityIcons";
+import { isRideChatEnabled } from "../lib/ride-chat";
 import { useRideChatStore } from "../store/rideChatStore";
 import styles from "./EventCard.module.css";
 import { RideChatButton } from "./RideChatButton";
@@ -181,7 +182,8 @@ export function EventCard({
   // The ride chat icon appears only on a ride this rider can chat in — the rides the list's one
   // unread request (useRideChatUnread in EventsListPage) got an answer for. A Find Rides card
   // for someone else's ride therefore shows none.
-  const hasChat = useRideChatStore((s) => s.summaries[event.id] != null);
+  const hasChat =
+    useRideChatStore((s) => s.summaries[event.id] != null) && isRideChatEnabled(event);
 
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();

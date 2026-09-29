@@ -45,7 +45,7 @@ import { detectTextDirection } from "../lib/text-direction";
 import { useRideChatStore } from "../store/rideChatStore";
 import styles from "./RideChatPage.module.css";
 
-type LoadState = "loading" | "ready" | "no-access" | "not-found" | "error";
+type LoadState = "loading" | "ready" | "no-access" | "disabled" | "not-found" | "error";
 
 /** What to tell the rider when a send fails. The typed text always stays in the box. */
 export function sendErrorText(err: unknown, limits: RideChatLimits): string {
@@ -88,9 +88,11 @@ export function RideChatPage() {
   // The ride's name for the header. Best effort — the chat works without it.
   useEffect(() => {
     let cancelled = false;
-    apiRequest<{ name?: string }>(`/events/${eventId}`)
+    apiRequest<{ name?: string; chatEnabled?: boolean }>(`/events/${eventId}`)
       .then((ride) => {
         if (!cancelled && ride?.name) setRideName(ride.name);
+        // The owner switched this ride's chat off: stop here (no polling, no sending).
+        if (!cancelled && ride?.chatEnabled === false) setState("disabled");
       })
       .catch(() => undefined);
     return () => {
@@ -112,7 +114,9 @@ export function RideChatPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 403) setState("no-access");
+        if (err instanceof ApiError && err.message.includes("RIDE_CHAT_DISABLED"))
+          setState("disabled");
+        else if (err instanceof ApiError && err.status === 403) setState("no-access");
         else if (err instanceof ApiError && err.status === 404) setState("not-found");
         else setState("error");
       });
@@ -242,6 +246,12 @@ export function RideChatPage() {
           >
             Retry
           </button>
+        </p>
+      )}
+
+      {state === "disabled" && (
+        <p className={`banner ${styles.centered}`} role="alert">
+          Chat is turned off for this ride. <Link to={`/events/${eventId}`}>Open the ride</Link>
         </p>
       )}
 

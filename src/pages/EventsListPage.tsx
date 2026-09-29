@@ -57,6 +57,7 @@ import { EventCard } from "../app/EventCard";
 import { ExploreTracksIntro } from "../app/ExploreTracksIntro";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useRideChatUnread } from "../app/RideChatButton";
+import { chatRideIds } from "../lib/ride-chat";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
 import {
@@ -262,7 +263,7 @@ export function EventsListPage() {
   // messages: only counts.
   useRideChatUnread(
     useMemo(
-      () => (authed ? [...myRides, ...createdRides].map((ride) => ride.id) : []),
+      () => (authed ? chatRideIds([...myRides, ...createdRides]) : []),
       [authed, myRides, createdRides],
     ),
     authed,

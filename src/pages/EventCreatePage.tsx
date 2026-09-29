@@ -119,6 +119,7 @@ import {
   ImagePlus,
   LifeBuoy,
   LocateFixed,
+  MessageCircle,
   Lock,
   MapPin,
   Mountain,
@@ -268,6 +269,8 @@ interface ExistingEvent {
   promoteOnly?: boolean;
   /** PROMOTE registration text (sql/055); null/absent = the default message. */
   promoteRegistrationMessage?: string | null;
+  /** Chat on/off (sql/056); absent = on. */
+  chatEnabled?: boolean;
   /** The Organizer display name (events.organizer_group); null/absent = the creator's own name. */
   organizerGroup?: string | null;
   /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
@@ -521,6 +524,8 @@ export function EventCreatePage() {
   // from the last ride the way the switches above are: it is the safe, useful default, and an
   // organizer who wants it off says so per ride. The radius and time window are server config.
   const [autoCheckIn, setAutoCheckIn] = useState(true);
+  // "Enable Chat" (sql/056). On by default, and for every existing ride. Independent of PROMOTE.
+  const [chatEnabled, setChatEnabled] = useState(true);
   // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
   // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
   // the real cap is this account's plan limit, which the server enforces and which the plan
@@ -823,6 +828,7 @@ export function EventCreatePage() {
           setOrganizerGroupInput(found.organizerGroup);
         }
         setAutoCheckIn(found.autoCheckIn ?? true);
+        setChatEnabled(found.chatEnabled !== false);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
@@ -1514,6 +1520,9 @@ export function EventCreatePage() {
             organizerGroup: organizerForRequest(organizerValue, creatorName),
             // Auto check-in (sql/040). Always sent, so switching it off on an edit really does.
             autoCheckIn,
+            // Chat on/off (sql/056). Always sent, so switching it off - or back on - on an edit
+            // really does; the messages are never touched either way.
+            chatEnabled,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
             expectedParticipants: expectedParticipantsValue,
@@ -1599,6 +1608,9 @@ export function EventCreatePage() {
           // Auto check-in (sql/040) — sent on create too, so an organizer who switched it off
           // is never silently given the server default (on).
           autoCheckIn,
+          // Chat on/off (sql/056) - sent explicitly so an organizer who switched it off is never
+          // given the default.
+          chatEnabled,
           // Expected riders (sql/028) — null when the organizer left the field blank.
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
@@ -2888,6 +2900,31 @@ export function EventCreatePage() {
                   {autoCheckIn
                     ? `Riders are marked as arrived (Auto) when they open the app within ${config.autoCheckInRadiusM} m of the start point, up to ${config.autoCheckInWindowMin} min before or after the start time. Needs a track and a start time. You can still tick riders by hand.`
                     : "Off — you tick riders as arrived yourself."}
+                </p>
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={chatEnabled}
+                    onChange={(e) => setChatEnabled(e.target.checked)}
+                  />
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${chatEnabled ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {chatEnabled ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <MessageCircle aria-hidden="true" />
+                    Enable Chat
+                  </span>
+                </label>
+                <p className={styles.hint}>
+                  {chatEnabled
+                    ? "Riders on this ride and you can chat. Independent of PROMOTE."
+                    : "Off — no chat button or messages for this ride. Earlier messages are kept if you turn it back on."}
                 </p>
               </fieldset>
             </div>

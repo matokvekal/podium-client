@@ -18,6 +18,7 @@ export interface RideImageDto {
   label: string;
   category: string;
   selectable: boolean;
+  version?: number;
 }
 
 interface RideImagesState {

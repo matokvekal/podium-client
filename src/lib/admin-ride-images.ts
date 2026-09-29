@@ -17,6 +17,8 @@ export interface AdminRideImage {
   category: string;
   selectable: boolean;
   source: "static" | "upload";
+  /** Bumped by every Replace; the server already appends it to `url` (?v=). */
+  version?: number;
   createdAt: string;
 }
 
@@ -24,17 +26,16 @@ export function fetchAdminRideImages(): Promise<AdminRideImage[]> {
   return apiRequest<AdminRideImage[]>("/admin/ride-images");
 }
 
-export function setRideImageSelectable(
-  key: string,
-  selectable: boolean,
-): Promise<AdminRideImage> {
+export function setRideImageSelectable(key: string, selectable: boolean): Promise<AdminRideImage> {
   return apiRequest<AdminRideImage>(`/admin/ride-images/${encodeURIComponent(key)}`, {
     method: "PATCH",
     body: { selectable },
   });
 }
 
-export function deleteRideImage(key: string): Promise<void> {
+/** "Delete" is an ARCHIVE on the server: the image leaves the list and the picker, but every
+ *  ride that already uses the key keeps showing it. */
+export function archiveRideImage(key: string): Promise<void> {
   return apiRequest<void>(`/admin/ride-images/${encodeURIComponent(key)}`, { method: "DELETE" });
 }
 
@@ -43,6 +44,34 @@ const ALLOWED_UPLOAD_TYPES: Record<string, true> = {
   "image/png": true,
   "image/webp": true,
 };
+
+/** Raw-bytes POST shared by upload and replace — same headers, same error shape. */
+async function postImageBytes(path: string, file: File): Promise<AdminRideImage> {
+  if (!ALLOWED_UPLOAD_TYPES[file.type]) {
+    throw new ApiError(415, "Choose a JPEG, PNG or WebP image");
+  }
+  const token = getAccessToken();
+  const response = await fetch(`${config.apiUrl}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type,
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: file,
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    throw new ApiError(response.status, body.message ?? body.error ?? "Upload failed");
+  }
+  const body = (await response.json()) as { data: AdminRideImage };
+  return body.data;
+}
+
+/** Replace the picture behind an existing key. The key (and every ride using it) is unchanged. */
+export function replaceRideImage(key: string, file: File): Promise<AdminRideImage> {
+  return postImageBytes(`/admin/ride-images/${encodeURIComponent(key)}/replace`, file);
+}
 
 /**
  * Raw-bytes upload, mirroring how send() in api-client.ts builds its headers — apiRequest always

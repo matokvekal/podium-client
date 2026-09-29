@@ -9,6 +9,7 @@
 import { getAccessToken } from "./auth-storage";
 import { ApiError, apiRequest } from "./api-client";
 import { config } from "./config";
+import { shrinkImageForUpload } from "./shrink-image-for-upload";
 
 export interface AdminRideImage {
   key: string;
@@ -46,10 +47,12 @@ const ALLOWED_UPLOAD_TYPES: Record<string, true> = {
 };
 
 /** Raw-bytes POST shared by upload and replace — same headers, same error shape. */
-async function postImageBytes(path: string, file: File): Promise<AdminRideImage> {
-  if (!ALLOWED_UPLOAD_TYPES[file.type]) {
+async function postImageBytes(path: string, original: File): Promise<AdminRideImage> {
+  if (!ALLOWED_UPLOAD_TYPES[original.type]) {
     throw new ApiError(415, "Choose a JPEG, PNG or WebP image");
   }
+  // Too big for the server's 2 MB cap? Scale it down first (never crops; the server does that).
+  const file = await shrinkImageForUpload(original);
   const token = getAccessToken();
   const response = await fetch(`${config.apiUrl}${path}`, {
     method: "POST",
@@ -87,21 +90,5 @@ export async function uploadRideImage(
   }
 
   const params = new URLSearchParams({ label: options.label, category: options.category });
-  const token = getAccessToken();
-  const response = await fetch(`${config.apiUrl}/admin/ride-images?${params.toString()}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": file.type,
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: file,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
-    throw new ApiError(response.status, body.message ?? body.error ?? "Upload failed");
-  }
-  const body = (await response.json()) as { data: AdminRideImage };
-  return body.data;
+  return postImageBytes(`/admin/ride-images?${params.toString()}`, file);
 }

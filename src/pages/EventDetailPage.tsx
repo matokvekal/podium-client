@@ -371,6 +371,12 @@ export function EventDetailPage() {
   // Bumps once when the server goes from unreachable to reachable, re-running the loads below.
   const reconnectNonce = useConnectivityStore((s) => s.reconnectNonce);
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
+  // Called unconditionally, here, before this component's several early returns below
+  // (loading/error/not-found) — a hook placed after those would be skipped on some renders and
+  // called on others, which is exactly React error #310 (2026-09-29 incident: this was
+  // originally placed much further down, past those returns, and crashed the whole page for
+  // every rider once the event finished loading).
+  const rideImages = useRideImages();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1188,7 +1194,6 @@ export function EventDetailPage() {
   const organizerAvatarProps = organizerIsRealOwner
     ? { ...ownerAvatarProps, seed: ownerAvatarProps.seed ?? organizer }
     : { avatarUrl: null, identity: null, localSelection: null, seed: organizer };
-  const rideImages = useRideImages();
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
     ...ownerCoverOptions,
     builtInRideImageUrl: resolveRideImage(rideImages, event.rideImageKey)?.src ?? null,

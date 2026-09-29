@@ -72,6 +72,7 @@ import { ElevationProfile } from "../app/ElevationProfile";
 import { eventCoverBackground, FIGMA_TAG_LABEL, figmaStatus } from "../app/event-visuals";
 import { LiveTracking } from "../app/LiveTracking";
 import { RideChatButton, useRideChatUnread } from "../app/RideChatButton";
+import { PromoteMessage } from "../app/PromoteMessage";
 import { RideDescription } from "../app/RideDescription";
 import { RideStopsSection } from "../app/RideStopsSection";
 import { RouteWeatherSection } from "../app/RouteWeatherSection";
@@ -84,6 +85,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { arrivalLabel, isAutoArrival } from "../lib/arrival";
 import { config } from "../lib/config";
+import { organizerDisplay } from "../lib/promote";
 import { useConnectivityStore } from "../lib/connectivity";
 import { inviteGreeting } from "../lib/invite-greeting";
 import { dayGroupOrder, shareLinkPath } from "../lib/link-group";
@@ -1181,8 +1183,14 @@ export function EventDetailPage() {
   // event.owner is the real thing — see EventDetail.owner. A club/team name the organizer
   // typed on the create form still wins as the DISPLAY name (it is what they chose to ride
   // under), but the avatar only ever comes from a real account, never from a club string.
-  const organizerIsRealOwner = !extras.organizerGroup && !!event.owner?.name;
-  const organizer = extras.organizerGroup ?? event.owner?.name ?? null;
+  // The server-saved Organizer display name (event.organizerGroup) wins on every device; the
+  // device-local team/club name is the older fallback. Display only - ownership is event.ownerId.
+  const { name: organizer, custom: organizerIsCustom } = organizerDisplay(
+    event.organizerGroup,
+    extras.organizerGroup,
+    event.owner?.name,
+  );
+  const organizerIsRealOwner = !organizerIsCustom && !!organizer;
   // A real account gets the full identity chain (chosen pick incl. this device's local one for
   // the owner themselves); a club/team string is not an account, so it shows only its initial.
   const organizerAvatarProps = organizerIsRealOwner
@@ -2271,8 +2279,11 @@ export function EventDetailPage() {
           ) : event.promoteOnly && !event.myParticipant ? (
             // PROMOTE: registration is handled by the organizers, not El Nino. The server refuses
             // the join too (PROMOTE_REGISTRATION), so this is not the only line of defence.
-            <span className={styles.ctaStatus} dir="rtl">
-              להרשמה יש לפנות למארגנים
+            <span className={`${styles.ctaStatus} ${styles.promoteStatus}`}>
+              <PromoteMessage
+                message={event.promoteRegistrationMessage}
+                linkClassName={styles.promoteLink}
+              />
             </span>
           ) : !profile ? (
             <Link className={styles.ctaBtn} to="/login" state={{ from: `/events/${event.id}` }}>

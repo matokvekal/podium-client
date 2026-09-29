@@ -236,6 +236,9 @@ export interface EventSummary {
    * opens it. Absent/false on every ordinary event. See lib/promote.ts.
    */
   promoteOnly?: boolean;
+  /** Text shown instead of Join on a PROMOTE event (server sql/055); null/absent = the default
+   *  message. Sent even while PROMOTE is off so the edit form can prefill it. */
+  promoteRegistrationMessage?: string | null;
   /** Present on a LIST row ONLY for a promoteOnly event (its locked card shows it). */
   description?: string | null;
   /**

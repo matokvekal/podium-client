@@ -1350,3 +1350,16 @@
   width: 17px;
   height: 17px;
 }
+
+/* PROMOTE registration text: may be several lines with links, so not a one-line pill. */
+.promoteStatus {
+  padding: 10px 16px;
+  border-radius: 16px;
+  text-align: center;
+  font-weight: var(--weight-medium, 500);
+}
+
+.promoteLink {
+  color: inherit;
+  text-decoration: underline;
+}

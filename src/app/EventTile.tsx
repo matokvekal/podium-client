@@ -22,6 +22,7 @@ import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
+import { organizerDisplay } from "../lib/promote";
 import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
@@ -77,11 +78,15 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   // no owner name from the server, the "Organized by" caption is simply not shown. It used to
   // say "Independent ride", which states something about the ride instead of admitting the
   // field is unknown.
-  const organizer = extras.organizerGroup ?? event.ownerName ?? null;
+  const { name: organizer, custom: organizerIsCustom } = organizerDisplay(
+    event.organizerGroup,
+    extras.organizerGroup,
+    event.ownerName,
+  );
   // A real account gets the full identity chain (including this device's local pick when the
   // viewer is the owner); a club/team name is not an account and shows only its initial.
   const ownerAvatarProps = useOwnerAvatar(event.ownerId, event.ownerAvatarUrl, event.ownerAvatar);
-  const organizerAvatarProps = extras.organizerGroup
+  const organizerAvatarProps = organizerIsCustom
     ? { avatarUrl: null, identity: null, localSelection: null, seed: organizer }
     : ownerAvatarProps;
   // Server list value first (GET /events sends distanceKm / elevationGain now), the device-

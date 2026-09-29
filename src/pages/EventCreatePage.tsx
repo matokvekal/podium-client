@@ -155,6 +155,8 @@ import {
   BUILT_IN_RIDE_IMAGES_ENABLED,
   USER_RIDE_IMAGE_UPLOAD_VISIBLE,
 } from "../config/ride-image-flags";
+import { useMyIdentity } from "../app/useMyIdentity";
+import { DEFAULT_PROMOTE_MESSAGE, organizerForRequest, promoteMessageOf } from "../lib/promote";
 import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 import { COUNTRIES, flagEmoji, orderedCountries } from "../lib/countries";
@@ -264,6 +266,10 @@ interface ExistingEvent {
   hasSupportVehicle?: boolean;
   /** PROMOTE (sql/053) — only meaningful to the System Admin. */
   promoteOnly?: boolean;
+  /** PROMOTE registration text (sql/055); null/absent = the default message. */
+  promoteRegistrationMessage?: string | null;
+  /** The Organizer display name (events.organizer_group); null/absent = the creator's own name. */
+  organizerGroup?: string | null;
   /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
    *  which is the default a new ride gets. */
   autoCheckIn?: boolean;
@@ -503,6 +509,9 @@ export function EventCreatePage() {
   // PROMOTE: keep the event visible as a card but locked for riders. The control only exists for
   // the System Admin (profile.canManagePromote); nobody else ever sends the field.
   const [promoteOnly, setPromoteOnly] = useState(false);
+  // "Registration Information" - what a PROMOTE event shows instead of Join. Kept in the form
+  // (and saved) whether or not PROMOTE is on, so switching PROMOTE off and on again loses nothing.
+  const [promoteMessage, setPromoteMessage] = useState(DEFAULT_PROMOTE_MESSAGE);
   const [hasSupportVehicle, setHasSupportVehicle] = useState(
     !isEditing ? (lastDefaults?.hasSupportVehicle ?? false) : false,
   );
@@ -524,9 +533,11 @@ export function EventCreatePage() {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [teamId, setTeamId] = useState<string>(initialTeamId);
   const [newTeamName, setNewTeamName] = useState("");
-  const [organizerGroup, setOrganizerGroupInput] = useState(
-    !initialTeamId ? (lastDefaults?.organizerGroup ?? "") : "",
-  );
+  // The Organizer display name. null = untouched, so the field shows (and saves as) the creator's
+  // own name; see organizerForRequest. Display only: the owner is always the signed-in creator.
+  const { displayName: creatorName } = useMyIdentity();
+  const [organizerGroup, setOrganizerGroupInput] = useState<string | null>(null);
+  const organizerValue = organizerGroup ?? creatorName;
   const [requiresApproval, setRequiresApproval] = useState(lastDefaults?.requiresApproval ?? false);
   const [ridersListVisible, setRidersListVisible] = useState(
     lastDefaults?.ridersListVisible ?? true,
@@ -721,6 +732,7 @@ export function EventCreatePage() {
       let serverHasLevel = false;
       let serverHasActivity = false;
       let serverHasElevation = false;
+      let serverHasOrganizer = false;
       const cached = await getCachedEvent(eventId);
       if (cached && !cancelled) {
         setName(cached.name);
@@ -805,6 +817,11 @@ export function EventCreatePage() {
         setIsAccessible(found.isAccessible ?? false);
         setHasSupportVehicle(found.hasSupportVehicle ?? false);
         setPromoteOnly(found.promoteOnly ?? false);
+        setPromoteMessage(promoteMessageOf(found.promoteRegistrationMessage));
+        if (found.organizerGroup?.trim()) {
+          serverHasOrganizer = true;
+          setOrganizerGroupInput(found.organizerGroup);
+        }
         setAutoCheckIn(found.autoCheckIn ?? true);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
@@ -839,7 +856,7 @@ export function EventCreatePage() {
         if (!serverHasActivity && existingExtras.activityType)
           setActivityType(existingExtras.activityType);
         if (existingExtras.teamId) setTeamId(existingExtras.teamId);
-        else if (existingExtras.organizerGroup)
+        else if (existingExtras.organizerGroup && !serverHasOrganizer)
           setOrganizerGroupInput(existingExtras.organizerGroup);
         // Same rule as the server values above: prefilled, not hand-typed, so an explicit
         // track action can still replace or clear them.
@@ -1072,7 +1089,7 @@ export function EventCreatePage() {
     if (level === null && sourceExtras?.level) setLevel(sourceExtras.level);
     if (!teamId && sourceExtras?.teamId) {
       setTeamId(sourceExtras.teamId);
-    } else if (!teamId && !organizerGroup.trim() && sourceExtras?.organizerGroup) {
+    } else if (!teamId && organizerGroup === null && sourceExtras?.organizerGroup) {
       setOrganizerGroupInput(sourceExtras.organizerGroup);
     }
 
@@ -1373,8 +1390,8 @@ export function EventCreatePage() {
     } else if (teamId && teams[teamId]) {
       setEventTeam(id, teamId, teams[teamId].name);
       addEventToTeam(teamId, id);
-    } else if (organizerGroup.trim()) {
-      setOrganizerGroup(id, organizerGroup);
+    } else if (organizerForRequest(organizerValue, creatorName)) {
+      setOrganizerGroup(id, organizerValue);
     }
   }
 
@@ -1491,7 +1508,10 @@ export function EventCreatePage() {
             // Support / sag vehicle (sql/024). Always sent, so unticking it on an edit turns
             // the badge back off rather than leaving the old claim standing.
             hasSupportVehicle,
-            ...(profile?.canManagePromote ? { promoteOnly } : {}),
+            ...(profile?.canManagePromote ? { promoteOnly, promoteRegistrationMessage: promoteMessage } : {}),
+            // The Organizer display name (events.organizer_group). null = the creator's own name.
+            // Never touches ownership.
+            organizerGroup: organizerForRequest(organizerValue, creatorName),
             // Auto check-in (sql/040). Always sent, so switching it off on an edit really does.
             autoCheckIn,
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
@@ -1573,7 +1593,9 @@ export function EventCreatePage() {
           isAccessible,
           // Support / sag vehicle (sql/024), on the create request itself for the same reason.
           hasSupportVehicle,
-          ...(profile?.canManagePromote ? { promoteOnly } : {}),
+          ...(profile?.canManagePromote ? { promoteOnly, promoteRegistrationMessage: promoteMessage } : {}),
+          // The Organizer display name; null = the creator's own name. Display only.
+          organizerGroup: organizerForRequest(organizerValue, creatorName),
           // Auto check-in (sql/040) — sent on create too, so an organizer who switched it off
           // is never silently given the server default (on).
           autoCheckIn,
@@ -1614,7 +1636,7 @@ export function EventCreatePage() {
         activityType,
         level,
         teamId: teamId === NEW_TEAM_OPTION ? "" : teamId,
-        organizerGroup,
+        organizerGroup: "",
         visibility,
         requiresApproval,
         ridersListVisible,
@@ -2084,15 +2106,25 @@ export function EventCreatePage() {
                       </button>
                     </>
                   )}
-                  {!teamId && (
-                    <input
-                      className={`${styles.input} ${styles.teamRowInput}`}
-                      value={organizerGroup}
-                      onChange={(e) => setOrganizerGroupInput(e.target.value)}
-                      placeholder="Or just a name, e.g. Galilee Cycling Club"
-                    />
-                  )}
                 </div>
+              </div>
+
+              {/* Organizer - what riders see as "Organized by". Defaults to the creator's own
+                  name; replace it to run the ride under a club or municipality. Display only:
+                  the ride stays owned by (and editable only by) the account that created it. */}
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="organizer">
+                  <Users aria-hidden="true" />
+                  Organizer
+                </label>
+                <input
+                  id="organizer"
+                  className={styles.input}
+                  value={organizerValue}
+                  maxLength={200}
+                  onChange={(e) => setOrganizerGroupInput(e.target.value)}
+                  placeholder={creatorName}
+                />
               </div>
 
               {/* "Am I also riding?" — asked for directly. Create-only: re-asking on every edit
@@ -2809,6 +2841,22 @@ export function EventCreatePage() {
                       PROMOTE — show event but keep it locked
                     </span>
                   </label>
+                )}
+                {profile?.canManagePromote && promoteOnly && (
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="promote-message">
+                      Registration Information
+                    </label>
+                    <textarea
+                      id="promote-message"
+                      className={styles.input}
+                      rows={4}
+                      maxLength={1000}
+                      value={promoteMessage}
+                      onChange={(e) => setPromoteMessage(e.target.value)}
+                      placeholder={DEFAULT_PROMOTE_MESSAGE}
+                    />
+                  </div>
                 )}
                 {/* Auto check-in (sql/040) — riders who open the app near the start, around the
                     start time, are marked "arrived" automatically, in their own colour so the

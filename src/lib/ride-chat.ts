@@ -116,6 +116,17 @@ export function buildUnreadQuery(rideIds: string[], lastRead: Record<string, num
     .join(",");
 }
 
+/** Does this ride have a chat at all? true for every ride that says nothing (existing rides). */
+export function isRideChatEnabled(ride: { chatEnabled?: boolean | null }): boolean {
+  return ride.chatEnabled !== false;
+}
+
+/** The ids worth asking the unread endpoint about: rides whose chat is switched off are left out,
+ *  so they cost no request and can never show a badge. */
+export function chatRideIds(rides: { id: string; chatEnabled?: boolean | null }[]): string[] {
+  return rides.filter(isRideChatEnabled).map((ride) => ride.id);
+}
+
 /**
  * May this viewer open the ride's chat? The server's own answer ("event:chat" in the detail's
  * `capabilities`) when it sent one; otherwise the same rule from the detail's own fields —
@@ -123,10 +134,12 @@ export function buildUnreadQuery(rideIds: string[], lastRead: Record<string, num
  * so this only decides whether the icon is drawn.
  */
 export function canOpenRideChat(detail: {
+  chatEnabled?: boolean;
   capabilities?: string[];
   isOwner?: boolean;
   myParticipant?: { registrationStatus: string } | null;
 }): boolean {
+  if (detail.chatEnabled === false) return false;
   if (detail.capabilities) return detail.capabilities.includes("event:chat");
   if (detail.isOwner) return true;
   const status = detail.myParticipant?.registrationStatus;

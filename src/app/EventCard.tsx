@@ -43,12 +43,10 @@ import {
   Truck,
   UsersRound,
 } from "lucide-react";
-import type { ElementType, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
-import { isPromoteLocked } from "../lib/promote";
 import { wazeUrl } from "../lib/nav-links";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
@@ -67,7 +65,6 @@ import { useEventsStore } from "../store/eventsStore";
 import { distanceIconFor } from "./ActivityIcons";
 import { useRideChatStore } from "../store/rideChatStore";
 import styles from "./EventCard.module.css";
-import { PromoteDescription } from "./PromoteDescription";
 import { RideChatButton } from "./RideChatButton";
 import {
   eventCoverBackground,
@@ -108,9 +105,6 @@ export function EventCard({
   justOpened?: boolean;
 }) {
   const status = figmaStatus(event.status);
-  // PROMOTE: a locked card is the same card, but it does not navigate anywhere (see below).
-  const locked = isPromoteLocked(event, useAuth().profile);
-  const CardRoot: ElementType = locked ? "div" : Link;
   const extrasByEvent = useEventExtrasStore((s) => s.byEvent);
   const extras = getEventExtras(extrasByEvent, event.id);
 
@@ -204,13 +198,12 @@ export function EventCard({
   }
 
   return (
-    <CardRoot
-      {...(locked
-        ? { "data-locked": "true" }
-        : { to: `/events/${event.id}`, onClick: () => recordOpenedEvent(event.id) })}
+    <Link
+      to={`/events/${event.id}`}
       className={styles.card}
       data-status={status}
       data-new={isNew || justOpened || undefined}
+      onClick={() => recordOpenedEvent(event.id)}
     >
       <div className={styles.head}>
         {/* The date block. Rendered only for a ride that actually has a start date — an
@@ -251,11 +244,6 @@ export function EventCard({
                 rides are connected, instead of the organizer having to open each one to find
                 out. Deliberately just a marker: WHICH rides it is connected to is the ride
                 page's business (EventDetail.linkedRides), and a list card has no use for it. */}
-            {locked && (
-              <span className={styles.chip} data-kind="coming-soon">
-                COMING SOON
-              </span>
-            )}
             {event.linkGroupId && (
               <span
                 className={styles.chip}
@@ -306,32 +294,29 @@ export function EventCard({
         </div>
 
         {/* Chat stacked on top of the heart, at the card's side. */}
-        {!locked && (
-          <div className={styles.sideActions}>
-            {hasChat && <RideChatButton rideId={event.id} />}
-            <button
-              type="button"
-              className={styles.heartBtn}
-              data-on={favorite}
-              onClick={handleFavorite}
-              aria-pressed={favorite}
-              aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
-            >
-              <Heart
-                width={18}
-                height={18}
-                aria-hidden="true"
-                fill={favorite ? "currentColor" : "none"}
-              />
-            </button>
-          </div>
-        )}
+        <div className={styles.sideActions}>
+          {hasChat && <RideChatButton rideId={event.id} />}
+          <button
+            type="button"
+            className={styles.heartBtn}
+            data-on={favorite}
+            onClick={handleFavorite}
+            aria-pressed={favorite}
+            aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
+          >
+            <Heart
+              width={18}
+              height={18}
+              aria-hidden="true"
+              fill={favorite ? "currentColor" : "none"}
+            />
+          </button>
+        </div>
       </div>
 
       {/* The name gets the card's full width under the date and image — beside them a long
           Hebrew name ("טרומן מודיעין לטרון") broke into three-letter fragments. */}
       <span className={styles.title}>{event.name}</span>
-      {locked && event.description ? <PromoteDescription text={event.description} /> : null}
 
       {/* Four tiles normally; five when the ride has a terrain grade, and then the grid drops
           to three columns so it wraps cleanly as 3 + 2 (Distance/Elevation/Est.Time, then
@@ -448,6 +433,6 @@ export function EventCard({
           </span>
         )}
       </div>
-    </CardRoot>
+    </Link>
   );
 }

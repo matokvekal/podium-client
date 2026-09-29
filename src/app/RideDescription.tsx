@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { splitDescriptionLinks } from "../lib/promote";
 import { detectTextDirection } from "../lib/text-direction";
 import styles from "./RideDescription.module.css";
 
@@ -62,7 +63,23 @@ export function RideDescription({ text }: { text: string }) {
         dir={direction}
         ref={textRef}
       >
-        {text}
+        {/* http/https URLs become links (React nodes only — never raw HTML). */}
+        {splitDescriptionLinks(text).map((part, index) =>
+          part.kind === "link" ? (
+            <a
+              // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional and static
+              key={index}
+              href={part.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.link}
+            >
+              {part.text}
+            </a>
+          ) : (
+            part.text
+          ),
+        )}
       </p>
       {(clipped || expanded) && (
         <button

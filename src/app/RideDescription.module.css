@@ -76,3 +76,10 @@
 .toggle:hover {
   text-decoration: underline;
 }
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

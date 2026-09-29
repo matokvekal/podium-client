@@ -742,15 +742,9 @@ export function EventDetailPage() {
     } catch (err) {
       // Cached data is on screen — a failed refresh must never blank it out. The global
       // OFFLINE banner (app/OfflineBanner.tsx) is what tells the rider it is last-synced.
-      // PROMOTE: a locked ride must not stay on screen from a cached copy of its card.
-      const promoteLocked =
-        err instanceof ApiError && err.status === 403 && err.message.includes("PROMOTE_LOCKED");
-      if (promoteLocked) setEvent(null);
-      if ((cachedDetail || cached) && !promoteLocked) return;
+      if (cachedDetail || cached) return;
       setError(
-        promoteLocked
-          ? "This event is not open yet."
-          : err instanceof ApiError && err.status === 403
+        err instanceof ApiError && err.status === 403
           ? "This event is private."
           : err instanceof ApiError && err.status === 404
             ? "Event not found."
@@ -2273,6 +2267,12 @@ export function EventDetailPage() {
                 </button>
               </div>
             </div>
+          ) : event.promoteOnly && !event.myParticipant ? (
+            // PROMOTE: registration is handled by the organizers, not El Nino. The server refuses
+            // the join too (PROMOTE_REGISTRATION), so this is not the only line of defence.
+            <span className={styles.ctaStatus} dir="rtl">
+              להרשמה יש לפנות למארגנים
+            </span>
           ) : !profile ? (
             <Link className={styles.ctaBtn} to="/login" state={{ from: `/events/${event.id}` }}>
               Sign in to join

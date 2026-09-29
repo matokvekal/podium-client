@@ -1,21 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPromoteLocked, splitDescriptionLinks } from "./promote";
-
-describe("isPromoteLocked", () => {
-  const promoted = { promoteOnly: true, ownerId: 5 };
-  it("never locks a normal event", () => {
-    expect(isPromoteLocked({ promoteOnly: false, ownerId: 5 }, null)).toBe(false);
-    expect(isPromoteLocked({ ownerId: 5 }, { id: 9 })).toBe(false);
-  });
-  it("locks guests and normal users on a promoted event", () => {
-    expect(isPromoteLocked(promoted, null)).toBe(true);
-    expect(isPromoteLocked(promoted, { id: 9 })).toBe(true);
-  });
-  it("never locks the System Admin or the owner", () => {
-    expect(isPromoteLocked(promoted, { id: 9, canManagePromote: true })).toBe(false);
-    expect(isPromoteLocked(promoted, { id: 5 })).toBe(false);
-  });
-});
+import { splitDescriptionLinks } from "./promote";
 
 describe("splitDescriptionLinks", () => {
   it("turns an https URL into a link part and keeps the rest as text", () => {

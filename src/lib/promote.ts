@@ -1,21 +1,6 @@
-// PROMOTE (server sql/053): an ordinary event shown as a normal card but closed to riders until
-// the System Admin opens it. Everything the client needs to know about that lives here.
-
-import type { EventSummary } from "./local-db";
-
-/**
- * Locked for THIS viewer? The System Admin and the event's owner are never locked. UI only —
- * the server refuses join / detail / participants for everyone else regardless of what this says.
- */
-export function isPromoteLocked(
-  event: Pick<EventSummary, "promoteOnly" | "ownerId">,
-  profile: { id: number; canManagePromote?: boolean } | null | undefined,
-): boolean {
-  if (!event.promoteOnly) return false;
-  if (profile?.canManagePromote) return false;
-  if (profile != null && event.ownerId === profile.id) return false;
-  return true;
-}
+// PROMOTE (server sql/053): a normal, fully viewable event whose registration is handled by the
+// organizers, not El Nino. The only client logic it needs is turning URLs in the description into
+// links.
 
 export type DescriptionPart =
   | { kind: "text"; text: string }

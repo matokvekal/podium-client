@@ -24,6 +24,7 @@ import {
 } from "../lib/admin-analytics";
 import { ApiError, apiRequest } from "../lib/api-client";
 import styles from "./AdminAnalyticsPage.module.css";
+import { AdminRideImagesSection } from "./AdminRideImagesSection";
 
 type LoadState =
   | { phase: "loading" }
@@ -111,6 +112,10 @@ export function AdminAnalyticsPage() {
       )}
 
       {state.phase === "ok" && <Dashboard data={state.data} rangeKey={range} />}
+
+      {/* Independent of the analytics load above — its own fetch, its own 403 handling, same
+          requireAdminAnalytics gate server-side. Not a new admin page or role. */}
+      <AdminRideImagesSection />
     </div>
   );
 }

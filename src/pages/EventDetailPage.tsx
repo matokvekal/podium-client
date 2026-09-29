@@ -1191,7 +1191,7 @@ export function EventDetailPage() {
   const coverBackground = eventCoverBackground(event.id, extras.coverImageDataUrl, {
     ...ownerCoverOptions,
     builtInRideImageUrl: resolveRideImage(rideImages, event.rideImageKey)?.src ?? null,
-    lightScrim: true, // ride page hero: half the darkening so the picture can be seen
+    noScrim: true, // ride page hero: picture shown as is; only the text gets a dark backing
   });
   const riderCount = realRiderCount;
   // Start-list capacity. event.participantCount is the authoritative "joined" count (approved +

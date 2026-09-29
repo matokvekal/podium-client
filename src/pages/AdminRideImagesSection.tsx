@@ -116,7 +116,7 @@ export function AdminRideImagesSection() {
       await replaceRideImage(image.key, file);
       await afterChange();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : `Could not replace "${image.label}".`);
+      setActionError(err instanceof Error ? err.message : `Could not replace "${image.label}".`);
     } finally {
       setBusyKey(null);
     }
@@ -275,7 +275,7 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
     <form className={sectionStyles.uploadForm} onSubmit={(e) => void handleSubmit(e)}>
       <div className={sectionStyles.uploadRow}>
         <label htmlFor={fileId} className={sectionStyles.fieldLabel}>
-          Image (JPEG/PNG/WebP, up to 2 MB)
+          Image (JPEG/PNG/WebP, up to 4 MB — shrunk to 250 KB automatically)
         </label>
         <input
           id={fileId}

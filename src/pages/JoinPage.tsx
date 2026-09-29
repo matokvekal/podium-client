@@ -308,7 +308,9 @@ export function JoinPage() {
       setError(
         err instanceof ApiError && err.status === 400
           ? "This event needs a bib number."
-          : "Could not join right now. Try again.",
+          : err instanceof ApiError && err.message.includes("PROMOTE_REGISTRATION")
+            ? "להרשמה יש לפנות למארגנים"
+            : "Could not join right now. Try again.",
       );
     } finally {
       setBusy(false);

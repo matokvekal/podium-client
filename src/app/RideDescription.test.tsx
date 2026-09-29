@@ -113,3 +113,23 @@ describe("RideDescription", () => {
     expect(screen.getByRole("button", { name: "Read more" }).tagName).toBe("BUTTON");
   });
 });
+
+describe("links in the description (PROMOTE registration URLs)", () => {
+  it("renders an http(s) URL as a clickable external link", () => {
+    render(<RideDescription text="Register: https://example.com/register" />);
+    const link = screen.getByRole("link", { name: "https://example.com/register" });
+    expect(link.getAttribute("href")).toBe("https://example.com/register");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("never turns javascript: text or markup into a link or element", () => {
+    const { container } = render(
+      <RideDescription
+        text={'javascript:alert(1) <img src=x onerror=alert(1)> <a href="x">y</a>'}
+      />,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+  });
+});

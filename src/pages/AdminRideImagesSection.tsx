@@ -40,6 +40,17 @@ export function AdminRideImagesSection() {
   // hooks, ahead of the early returns below (Rules of Hooks — see the 2026-09-29 React #310 fix).
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [replaceTarget, setReplaceTarget] = useState<AdminRideImage | null>(null);
+  // The picture currently shown large (click a thumbnail). Also above the early returns.
+  const [enlarged, setEnlarged] = useState<AdminRideImage | null>(null);
+
+  useEffect(() => {
+    if (!enlarged) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEnlarged(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [enlarged]);
 
   const load = useCallback(async () => {
     setState({ phase: "loading" });
@@ -167,6 +178,37 @@ export function AdminRideImagesSection() {
         onChange={(e) => void handleReplaceChosen(e.target.files?.[0])}
       />
 
+      {enlarged && (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: Escape closes it (effect above); the backdrop click is a pointer convenience
+        <div
+          className={sectionStyles.lightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label={enlarged.label}
+          onClick={(e) => {
+            // Close on a click on the dark backdrop, not on the picture or the caption.
+            if (e.target === e.currentTarget) setEnlarged(null);
+          }}
+        >
+          <button
+            type="button"
+            className={sectionStyles.lightboxClose}
+            aria-label="Close"
+            onClick={() => setEnlarged(null)}
+          >
+            ×
+          </button>
+          <img
+            src={resolveApiAssetUrl(enlarged.url)}
+            alt={enlarged.label}
+            className={sectionStyles.lightboxImage}
+          />
+          <p className={sectionStyles.lightboxCaption}>
+            {enlarged.label} · <code>{enlarged.key}</code>
+          </p>
+        </div>
+      )}
+
       {state.images.length === 0 ? (
         <p className={styles.empty}>No ride images.</p>
       ) : (
@@ -187,11 +229,18 @@ export function AdminRideImagesSection() {
               {state.images.map((image) => (
                 <tr key={image.key}>
                   <td>
-                    <img
-                      src={resolveApiAssetUrl(image.url)}
-                      alt=""
-                      className={sectionStyles.thumb}
-                    />
+                    <button
+                      type="button"
+                      className={sectionStyles.thumbButton}
+                      aria-label={`View ${image.label} large`}
+                      onClick={() => setEnlarged(image)}
+                    >
+                      <img
+                        src={resolveApiAssetUrl(image.url)}
+                        alt=""
+                        className={sectionStyles.thumb}
+                      />
+                    </button>
                   </td>
                   <td className={styles.tdDate}>
                     <code>{image.key}</code>

@@ -123,6 +123,9 @@ export interface EventCoverOptions {
    *  via lib/ride-images.ts's getRideImage(event.rideImageKey)?.src. Null for every ride until
    *  one is chosen, and safely null again for an unrecognized/retired key. */
   builtInRideImageUrl?: string | null;
+  /** Half-strength darkening, for the big ride-page hero where the picture is the point. Cards
+   *  keep the default. */
+  lightScrim?: boolean;
 }
 
 export function eventCoverBackground(
@@ -147,7 +150,9 @@ export function eventCoverBackground(
   // showing, and a solid base colour underneath so a cover that fails to load (a rotted upload
   // URL, a preset from a newer server) still reads as a deliberate block rather than a hole.
   return (
-    `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), ` +
+    (options?.lightScrim
+      ? `linear-gradient(180deg, rgba(5, 7, 12, 0.09) 0%, rgba(5, 7, 12, 0.26) 100%), `
+      : `linear-gradient(180deg, rgba(5, 7, 12, 0.18) 0%, rgba(5, 7, 12, 0.52) 100%), `) +
     `url("${url}"), ${placeholderColorVar(seed)}`
   );
 }

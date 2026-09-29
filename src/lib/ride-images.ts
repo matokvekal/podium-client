@@ -75,9 +75,10 @@ function rideImage(
 /** Append new entries at the end. Never edit, reorder or remove an existing one — see rule 1
  *  above. Keep in step with elnino-server/src/config/ride-images.ts's RIDE_IMAGE_KEYS. */
 export const RIDE_IMAGES: readonly RideImage[] = [
-  rideImage("sukkot-01", "sukkot", "Sukkot"),
-  rideImage("sukkot-02", "sukkot", "Sukkot"),
-  rideImage("sukkot-03", "sukkot", "Sukkot"),
+  rideImage("sukkot-01", "sukkot", "Sukkot", false),
+  rideImage("sukkot-02", "sukkot", "Sukkot", false),
+  rideImage("sukkot-03", "sukkot", "Sukkot", false),
+  rideImage("tikva1", "generic", "Tikva"),
 ];
 
 const BY_KEY = new Map(RIDE_IMAGES.map((img) => [img.key, img]));

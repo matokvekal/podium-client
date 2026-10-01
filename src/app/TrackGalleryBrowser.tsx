@@ -157,6 +157,7 @@ export function TrackGalleryBrowser({
   const [sortOpen, setSortOpen] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +256,15 @@ export function TrackGalleryBrowser({
       setNearMe({ status: "denied" });
     }
   }
+
+  // Grow the search box with its text (capped in CSS), and shrink it back when cleared.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure whenever the text changes
+  useEffect(() => {
+    const el = searchRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [search]);
 
   const near =
     nearMe.status === "on" ? { lat: nearMe.lat, lon: nearMe.lon, radiusKm: nearMe.radiusKm } : null;
@@ -476,11 +486,45 @@ export function TrackGalleryBrowser({
         )}
       </div>
 
-      {/* Near Me — only meaningful for the server-searched "all" tracks (see the effect above).
-          One-shot device fix, requested only on tap; the page works exactly as before if it is
-          denied, unavailable, or unsupported. */}
-      {source === "all" && (
-        <div className={styles.nearMeRow}>
+      {/* Search + Near Me share one row. The search box is a textarea that grows with its text
+          so a rider can describe a ride in a sentence or two rather than squeezing a keyword
+          into a narrow toolbar field; Enter submits nothing (the search is live), so it just
+          leaves the box. Near Me is only meaningful for the server-searched "all" tracks (see
+          the effect above): a one-shot device fix, requested only on tap, and the page works
+          exactly as before if it is denied, unavailable, or unsupported. */}
+      <div className={styles.nearMeRow}>
+        <div className={styles.searchWrap}>
+          <Search className={styles.searchIcon} aria-hidden="true" />
+          <textarea
+            ref={searchRef}
+            className={styles.search}
+            rows={1}
+            placeholder="Search or describe a ride…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+            aria-label="Search tracks"
+          />
+          {search && (
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => {
+                setSearch("");
+                searchRef.current?.focus();
+              }}
+              aria-label="Clear search"
+            >
+              <X width={16} height={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        {source === "all" && (
           <button
             type="button"
             className={nearMe.status === "on" ? "button" : "button button--quiet"}
@@ -494,18 +538,18 @@ export function TrackGalleryBrowser({
               <span className={styles.nearMeRadius}>within {nearMe.radiusKm} km</span>
             )}
           </button>
-          {nearMe.status === "denied" && (
-            <span className={styles.nearMeHint}>
-              Couldn't use your location — Find Tracks still works as normal.
-            </span>
-          )}
-          {nearMe.status === "unsupported" && (
-            <span className={styles.nearMeHint}>
-              Location isn't available on this device — Find Tracks still works as normal.
-            </span>
-          )}
-        </div>
-      )}
+        )}
+        {source === "all" && nearMe.status === "denied" && (
+          <span className={styles.nearMeHint}>
+            Couldn't use your location — Find Tracks still works as normal.
+          </span>
+        )}
+        {source === "all" && nearMe.status === "unsupported" && (
+          <span className={styles.nearMeHint}>
+            Location isn't available on this device — Find Tracks still works as normal.
+          </span>
+        )}
+      </div>
 
       {/* Sticky on the page so the filters stay reachable however far a rider has scrolled — on
           a phone, scrolling back to the top to change one chip is what makes a long list
@@ -531,16 +575,7 @@ export function TrackGalleryBrowser({
             My
           </button>
         </div>
-        <div className={sheet.searchWrap}>
-          <Search className={sheet.searchIcon} aria-hidden="true" />
-          <input
-            className={sheet.search}
-            placeholder="Search tracks…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search tracks"
-          />
-        </div>
+        <div className={styles.toolbarSpacer} />
         {/* Saved is a toolbar toggle rather than a row in the filter panel: it is the one filter
             a rider flips constantly ("just show me my shortlist"), and burying it two taps deep
             is what makes a saved list go unused. Hidden when signed out, where it could only

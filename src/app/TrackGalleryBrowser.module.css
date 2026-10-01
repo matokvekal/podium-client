@@ -194,9 +194,77 @@
 .nearMeRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   padding-block-end: var(--space-3);
+}
+
+/* The search box takes the rest of the row; on a narrow phone the Near Me button wraps under it
+   rather than squeezing it back down to a few characters. */
+.searchWrap {
+  position: relative;
+  flex: 1 1 18rem;
+  min-width: 0;
+  display: flex;
+}
+
+.searchIcon {
+  position: absolute;
+  top: calc((var(--tap-target) - 16px) / 2);
+  left: var(--space-3);
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  min-height: var(--tap-target);
+  /* Roughly four lines, then it scrolls — enough for "a shaded 40 km gravel loop near…". */
+  max-height: 7.5em;
+  padding: calc((var(--tap-target) - 1.4em) / 2) calc(var(--space-3) * 2 + 16px);
+  font: inherit;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: none;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.searchClear {
+  position: absolute;
+  top: calc((var(--tap-target) - 32px) / 2);
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.searchClear:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* Keeps Saved / Filter / Sort pushed to the end of the toolbar now the search left it. */
+.toolbarSpacer {
+  flex: 1 1 0;
 }
 
 .nearMeRadius {

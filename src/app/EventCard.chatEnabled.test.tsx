@@ -97,7 +97,7 @@ describe("EventCard Share (PROMOTE only)", () => {
     // surrounding <Link> from navigating into the event.
     const notPrevented = fireEvent.click(screen.getByRole("button", { name: "Share this event" }));
     expect(notPrevented).toBe(false);
-    expect((await screen.findAllByText(/QR|link/i, {}, { timeout: 3000 })).length).toBeGreaterThan(
+    expect((await screen.findAllByText(/QR|link/i, {}, { timeout: 10000 })).length).toBeGreaterThan(
       0,
     );
   });

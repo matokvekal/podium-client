@@ -91,9 +91,9 @@
 
 /* --- controls --- */
 
-/* ONE ROW, ALWAYS — asked for directly. Everything here is a fixed-width control except the
-   search box, which absorbs whatever is left, so the toolbar never wraps to a second line even
-   on a narrow phone. That is what keeps the grid itself as tall as possible. */
+/* ONE ROW, ALWAYS — asked for directly. Every control here is fixed-width and a spacer absorbs
+   whatever is left (the search box moved to its own row beside Near Me), so the toolbar never
+   wraps to a second line even on a narrow phone. That keeps the grid itself as tall as possible. */
 .controls {
   display: flex;
   flex: none;
@@ -115,16 +115,6 @@
 .sourceToggle > button {
   min-height: var(--tap-target);
   padding: 0 var(--space-3);
-}
-
-/* The only elastic control. Allowed to shrink well below its content width — a cramped search
-   box is better than a wrapped toolbar. */
-.searchWrap {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: center;
 }
 
 /* --- filter / sort trigger buttons --- */
@@ -218,31 +208,6 @@
   cursor: pointer;
   background: none;
   border: none;
-}
-
-.searchIcon {
-  position: absolute;
-  left: var(--space-3);
-  width: 16px;
-  height: 16px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.search {
-  width: 100%;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 16px);
-  font: inherit;
-  color: var(--text);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.search:focus {
-  border-color: var(--accent);
-  outline: none;
 }
 
 /* --- the scrolling grid --- */

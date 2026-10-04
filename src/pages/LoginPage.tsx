@@ -61,6 +61,27 @@ export function LoginPage() {
     }
   });
   const [termsNudge, setTermsNudge] = useState(false);
+  const [acceptedInfoMessages, setAcceptedInfoMessages] = useState(() => {
+    try {
+      return localStorage.getItem("elnino.infoMessagesAccepted") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [acceptedThirdPartySharing, setAcceptedThirdPartySharing] = useState(
+    () => {
+      try {
+        return localStorage.getItem("elnino.thirdPartySharingAccepted") === "1";
+      } catch {
+        return false;
+      }
+    }
+  );
+  const [consentNudge, setConsentNudge] = useState(false);
+
+  const allConsentsAccepted =
+    acceptedTerms && acceptedInfoMessages && acceptedThirdPartySharing;
+
   useEffect(() => {
     try {
       if (acceptedTerms) localStorage.setItem("elnino.termsAccepted", "1");
@@ -70,6 +91,33 @@ export function LoginPage() {
     }
     if (acceptedTerms) setTermsNudge(false);
   }, [acceptedTerms]);
+
+  useEffect(() => {
+    try {
+      if (acceptedInfoMessages)
+        localStorage.setItem("elnino.infoMessagesAccepted", "1");
+      else localStorage.removeItem("elnino.infoMessagesAccepted");
+    } catch {
+      /* storage unavailable — acceptance just isn't remembered */
+    }
+  }, [acceptedInfoMessages]);
+
+  useEffect(() => {
+    try {
+      if (acceptedThirdPartySharing)
+        localStorage.setItem("elnino.thirdPartySharingAccepted", "1");
+      else localStorage.removeItem("elnino.thirdPartySharingAccepted");
+    } catch {
+      /* storage unavailable — acceptance just isn't remembered */
+    }
+  }, [acceptedThirdPartySharing]);
+
+  useEffect(() => {
+    if (allConsentsAccepted) {
+      setTermsNudge(false);
+      setConsentNudge(false);
+    }
+  }, [allConsentsAccepted]);
 
   useEffect(() => {
     apiRequest<AuthConfig>("/auth/config", { anonymous: true })
@@ -82,7 +130,10 @@ export function LoginPage() {
         // far better screen than a dead one. With no client id there is genuinely nothing to
         // offer, so the banner stands.
         if (config.googleClientId) setProviders(["GOOGLE"]);
-        else setError("Could not reach the server. Check your connection and try again.");
+        else
+          setError(
+            "Could not reach the server. Check your connection and try again."
+          );
       });
   }, []);
 
@@ -98,7 +149,7 @@ export function LoginPage() {
     // Google's real button is only mounted once the Terms box is ticked — before that the
     // slot stays empty and a disabled placeholder is shown instead. Clear it again if the
     // rider un-ticks the box.
-    if (!acceptedTerms) {
+    if (!allConsentsAccepted) {
       slot.innerHTML = "";
       return;
     }
@@ -112,7 +163,7 @@ export function LoginPage() {
     }).catch(() => {
       setError("Google sign-in is unavailable right now.");
     });
-  }, [providers, signInWithGoogle, acceptedTerms]);
+  }, [providers, signInWithGoogle, allConsentsAccepted]);
 
   // Where this visitor was headed before being asked to sign in. Everything that routes here
   // sets it the same way: App.tsx's RequireAuth, the event page's "Sign in to join" and its
@@ -146,11 +197,14 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await apiRequest<{ challengeId: number }>("/auth/sms/request", {
-        method: "POST",
-        body: { phone },
-        anonymous: true,
-      });
+      const result = await apiRequest<{ challengeId: number }>(
+        "/auth/sms/request",
+        {
+          method: "POST",
+          body: { phone },
+          anonymous: true
+        }
+      );
       setChallengeId(result.challengeId);
     } catch (err) {
       setError(messageFor(err));
@@ -209,7 +263,8 @@ export function LoginPage() {
           {/* Terms gate — a real, required checkbox (not just fine print), because signing in
               here is also how a new rider registers. No sign-in method is usable until it is
               ticked; once ticked it is remembered on this device (see acceptedTerms above). */}
-          {(providers.includes("GOOGLE") || (smsLoginVisible && providers.includes("SMS"))) && (
+          {(providers.includes("GOOGLE") ||
+            (smsLoginVisible && providers.includes("SMS"))) && (
             <>
               <label className={styles.terms}>
                 <input
@@ -225,11 +280,46 @@ export function LoginPage() {
                   .
                 </span>
               </label>
+              <label className={styles.terms}>
+                <input
+                  type="checkbox"
+                  checked={acceptedInfoMessages}
+                  onChange={(event) =>
+                    setAcceptedInfoMessages(event.target.checked)
+                  }
+                />
+                <span>
+                  I agree to receive app information and service messages (such
+                  as ride updates and account notices).
+                </span>
+              </label>
+              <label className={styles.terms}>
+                <input
+                  type="checkbox"
+                  checked={acceptedThirdPartySharing}
+                  onChange={(event) =>
+                    setAcceptedThirdPartySharing(event.target.checked)
+                  }
+                />
+                <span>
+                  I agree that my ride movement data may be shared with approved
+                  third parties as described in the Terms &amp; Conditions.
+                </span>
+              </label>
               {termsNudge && !acceptedTerms && (
                 <p className={styles.termsNudge} role="alert">
                   Please accept the Terms &amp; Conditions to continue.
                 </p>
               )}
+              {consentNudge &&
+                (acceptedTerms ||
+                  acceptedInfoMessages ||
+                  acceptedThirdPartySharing) &&
+                !allConsentsAccepted && (
+                  <p className={styles.termsNudge} role="alert">
+                    Please accept all required consents to continue.
+                  </p>
+                )}
             </>
           )}
 
@@ -239,13 +329,16 @@ export function LoginPage() {
           {providers.includes("GOOGLE") && (
             <>
               <p className={styles.hint}>Already a member?</p>
-              {acceptedTerms ? (
+              {allConsentsAccepted ? (
                 <div className={styles.googleSlot} ref={googleButtonRef} />
               ) : (
                 <button
                   type="button"
                   className={styles.googlePlaceholder}
-                  onClick={() => setTermsNudge(true)}
+                  onClick={() => {
+                    if (!acceptedTerms) setTermsNudge(true);
+                    setConsentNudge(true);
+                  }}
                 >
                   Continue with Google
                 </button>
@@ -277,14 +370,16 @@ export function LoginPage() {
                   <button
                     className={styles.submit}
                     type="submit"
-                    disabled={busy || !acceptedTerms || phone.length < 8}
+                    disabled={busy || !allConsentsAccepted || phone.length < 8}
                   >
                     Send me a code
                   </button>
                 </form>
               ) : (
                 <form className={styles.phoneForm} onSubmit={submitCode}>
-                  <label htmlFor="code">The 6-digit code we sent to {phone}</label>
+                  <label htmlFor="code">
+                    The 6-digit code we sent to {phone}
+                  </label>
                   <input
                     id="code"
                     name="code"
@@ -299,7 +394,7 @@ export function LoginPage() {
                   <button
                     className={styles.submit}
                     type="submit"
-                    disabled={busy || !acceptedTerms || code.length !== 6}
+                    disabled={busy || !allConsentsAccepted || code.length !== 6}
                   >
                     Sign in
                   </button>
@@ -332,7 +427,13 @@ export function LoginPage() {
 /** The twin-peak mark above the wordmark, drawn inline so it takes its amber from CSS. */
 function PeaksMark() {
   return (
-    <svg className={styles.mark} viewBox="0 0 64 26" fill="none" role="img" aria-label="El Niño">
+    <svg
+      className={styles.mark}
+      viewBox="0 0 64 26"
+      fill="none"
+      role="img"
+      aria-label="El Niño"
+    >
       <path
         d="M4 24 L20 4 L32 19 M28 24 L44 4 L60 24"
         stroke="currentColor"
@@ -350,7 +451,8 @@ function messageFor(err: unknown): string {
     // simply never reached the server (CORS, API down) reports what actually happened.
     if (err.offline) return "You appear to be offline.";
     if (err.status === 401) return "That code is not right. Try again.";
-    if (err.status === 429) return "Too many attempts. Wait a little and try again.";
+    if (err.status === 429)
+      return "Too many attempts. Wait a little and try again.";
     return err.message;
   }
   return "Something went wrong. Try again.";

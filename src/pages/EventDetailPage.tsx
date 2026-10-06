@@ -68,6 +68,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { distanceIconFor } from "../app/ActivityIcons";
+import { OptionalFeatureBoundary } from "../app/OptionalFeatureBoundary";
 import { Avatar } from "../app/Avatar";
 import { CalorieEstimator } from "../app/CalorieEstimator";
 import { ElevationProfile } from "../app/ElevationProfile";
@@ -1893,15 +1894,19 @@ export function EventDetailPage() {
                         )}
                       </button>
                     )}
+                    {/* Optional extra: if the player (or its lazy chunk) fails, it just closes —
+                        the ride page around it never sees the error. */}
                     {videoOpen && routeVideo?.video && (
-                      <Suspense fallback={null}>
-                        <RouteVideoOverlay
-                          routeId={routeVideo.routeId}
-                          title={event.name}
-                          durationS={routeVideo.video.durationS}
-                          onClose={() => setVideoOpen(false)}
-                        />
-                      </Suspense>
+                      <OptionalFeatureBoundary onError={() => setVideoOpen(false)}>
+                        <Suspense fallback={null}>
+                          <RouteVideoOverlay
+                            routeId={routeVideo.routeId}
+                            title={event.name}
+                            durationS={routeVideo.video.durationS}
+                            onClose={() => setVideoOpen(false)}
+                          />
+                        </Suspense>
+                      </OptionalFeatureBoundary>
                     )}
                   </div>
                   {/* Download the route as a GPX so a rider can load it onto a bike computer

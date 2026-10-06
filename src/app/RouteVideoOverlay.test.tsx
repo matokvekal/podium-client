@@ -82,4 +82,20 @@ describe("RouteVideoOverlay", () => {
     await act(async () => {});
     expect(document.querySelector("video")?.getAttribute("src")).toBe("blob:video-3");
   });
+
+  it("a corrupt / unplayable file shows a message instead of a black frame", async () => {
+    await open();
+    const video = document.querySelector("video");
+    if (!video) throw new Error("no video element");
+    fireEvent.error(video);
+    expect(screen.getByRole("alert").textContent).toMatch(/can't be played/);
+    expect(screen.getByRole("button", { name: "Close video" })).toBeTruthy();
+  });
+
+  it("a failed download shows an error, never throws", async () => {
+    fetchRouteVideoUrl.mockRejectedValue(new Error("500"));
+    render(<RouteVideoOverlay routeId={7} title="x" onClose={vi.fn()} />);
+    await act(async () => {});
+    expect(screen.getByRole("alert").textContent).toMatch(/Couldn't load the video/);
+  });
 });

@@ -178,6 +178,10 @@ export function RouteVideoOverlay({
             playsInline
             autoPlay
             preload="auto"
+            // Corrupt / unsupported file: say so in the player instead of a frozen black frame.
+            onError={() =>
+              setState({ kind: "error", message: "This video can't be played on this device." })
+            }
             onVolumeChange={(e) => {
               if (!e.currentTarget.muted) setNeedsSound(false);
             }}

@@ -1252,10 +1252,67 @@
 
 .routeHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  flex-wrap: wrap;
+  /* The left column (title + km/climb + Video) wraps inside itself; GPX keeps its corner. */
+  flex-wrap: nowrap;
   gap: var(--space-2);
+}
+
+.routeHeaderMain {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.routeHeaderTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+}
+
+/* Track flyover video — sits under the distance/climb line, same footprint as the GPX button
+   on the other side, with a filled play disc so it reads as "watch", not "download". */
+.routeVideoBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.routeVideoBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.routeVideoPlay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding-left: 1px; /* optical centre of the triangle */
+  border-radius: 999px;
+  color: #fff;
+  background: var(--accent);
+}
+
+.routeVideoLength {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 
 .routeMeta {
@@ -1273,6 +1330,7 @@
 }
 
 .routeDownloadBtn {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;

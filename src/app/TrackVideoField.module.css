@@ -1,0 +1,125 @@
+/* "Track video" row under the attached track in Create / Manage Ride — TrackVideoField.tsx. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.addBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.addBtn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.addHint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding-left: 1px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--accent);
+}
+
+.text {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.length {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: inline-flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.linkBtn {
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.linkBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.danger {
+  color: var(--status-danger);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--status-danger);
+}

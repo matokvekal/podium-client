@@ -61,6 +61,7 @@ import {
   Ticket,
   Truck,
   Users,
+  Play,
   UsersRound,
   X,
 } from "lucide-react";
@@ -108,6 +109,7 @@ import { organizerDisplay } from "../lib/promote";
 import { canOpenRideChat } from "../lib/ride-chat";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { resolveRideImage, useRideImagePending, useRideImages } from "../lib/ride-images-dynamic";
+import { type EventRouteVideo, fetchEventRouteVideo, formatVideoDuration } from "../lib/route-video";
 import { LEVELS, levelHeadingFor, levelLabelFor } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import {
@@ -140,6 +142,11 @@ import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { reportRideConfirmation } from "../store/liveLocationStore";
 import { useResultsStore } from "../store/resultsStore";
 import styles from "./EventDetailPage.module.css";
+
+// The full-screen track-video player — only downloaded when a rider actually opens a video.
+const RouteVideoOverlay = lazy(() =>
+  import("../app/RouteVideoOverlay").then((m) => ({ default: m.RouteVideoOverlay })),
+);
 
 // For the hero date badge (month/day shown as two separate stacked lines, not one combined
 // string) — kept as two formatters, not one, so there's no risk of the field-order bug
@@ -384,6 +391,10 @@ export function EventDetailPage() {
   const rideImages = useRideImages();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
+  // The ride's track flyover video (lib/route-video.ts) — logged-in riders only, so it is never
+  // fetched for a guest. Null = no video (or not loaded yet); the button simply isn't drawn.
+  const [routeVideo, setRouteVideo] = useState<EventRouteVideo | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
   // Cover still unresolved (catalog loading, key not in the compiled list): placeholder, not the default.
   const rideCoverPending = useRideImagePending(event?.rideImageKey);
   const [loading, setLoading] = useState(true);
@@ -418,6 +429,28 @@ export function EventDetailPage() {
   const previousRegistrationStatusRef = useRef<string | null>(null);
 
   const results = useResultsStore((state) => state.results);
+  const hasRoute = results.route != null;
+
+  // Track video metadata: only for a signed-in rider, only once the ride has a route. A failure
+  // just means no button — the video is an extra, never a reason for the page to complain.
+  useEffect(() => {
+    if (!eventId || profile?.id == null || !hasRoute) {
+      setRouteVideo(null);
+      return;
+    }
+    let cancelled = false;
+    fetchEventRouteVideo(eventId)
+      .then((info) => {
+        if (!cancelled) setRouteVideo(info);
+      })
+      .catch(() => {
+        if (!cancelled) setRouteVideo(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, profile?.id, hasRoute]);
+  const videoLength = formatVideoDuration(routeVideo?.video?.durationS);
   const resultsLoading = useResultsStore((state) => state.loading);
   const resultsError = useResultsStore((state) => state.error);
   const loadResults = useResultsStore((state) => state.loadResults);
@@ -1823,21 +1856,54 @@ export function EventDetailPage() {
             {results.route && (
               <div className="card stack">
                 <div className={styles.routeHeader}>
-                  <p className={styles.infoLabel}>Route Preview</p>
-                  <span className={styles.routeMeta}>
-                    {results.route.distanceKm != null && (
-                      <span className={styles.routeMetaItem}>
-                        <DistanceIcon width={13} height={13} aria-hidden="true" />
-                        {results.route.distanceKm} km
+                  <div className={styles.routeHeaderMain}>
+                    <div className={styles.routeHeaderTitleRow}>
+                      <p className={styles.infoLabel}>Route Preview</p>
+                      <span className={styles.routeMeta}>
+                        {results.route.distanceKm != null && (
+                          <span className={styles.routeMetaItem}>
+                            <DistanceIcon width={13} height={13} aria-hidden="true" />
+                            {results.route.distanceKm} km
+                          </span>
+                        )}
+                        {results.route.elevationM != null && (
+                          <span className={styles.routeMetaItem}>
+                            <Mountain width={13} height={13} aria-hidden="true" />
+                            {results.route.elevationM} m
+                          </span>
+                        )}
                       </span>
+                    </div>
+                    {/* The track's flyover video (lib/route-video.ts): under the distance/climb
+                        line, on the opposite side from GPX. Signed-in riders only — routeVideo is
+                        never fetched for a guest, so a guest never sees the button. */}
+                    {routeVideo?.video && (
+                      <button
+                        type="button"
+                        className={styles.routeVideoBtn}
+                        onClick={() => setVideoOpen(true)}
+                        aria-label={`Play track video${videoLength ? `, ${videoLength}` : ""}`}
+                      >
+                        <span className={styles.routeVideoPlay} aria-hidden="true">
+                          <Play width={11} height={11} fill="currentColor" />
+                        </span>
+                        Video
+                        {videoLength && (
+                          <span className={styles.routeVideoLength}>{videoLength}</span>
+                        )}
+                      </button>
                     )}
-                    {results.route.elevationM != null && (
-                      <span className={styles.routeMetaItem}>
-                        <Mountain width={13} height={13} aria-hidden="true" />
-                        {results.route.elevationM} m
-                      </span>
+                    {videoOpen && routeVideo?.video && (
+                      <Suspense fallback={null}>
+                        <RouteVideoOverlay
+                          routeId={routeVideo.routeId}
+                          title={event.name}
+                          durationS={routeVideo.video.durationS}
+                          onClose={() => setVideoOpen(false)}
+                        />
+                      </Suspense>
                     )}
-                  </span>
+                  </div>
                   {/* Download the route as a GPX so a rider can load it onto a bike computer
                       or nav app, not just look at the in-app map — asked for directly
                       ("download button so they can download the gpx file to phone"). Client-

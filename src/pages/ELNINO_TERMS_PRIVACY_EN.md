@@ -404,9 +404,9 @@ controller of personal information is:
 
 -   \[REGISTERED / BUSINESS ADDRESS - TO BE COMPLETED\]
 
--   \[GENERAL CONTACT EMAIL - TO BE COMPLETED\]
+-   General contact email: tipusharim@gmail.com
 
--   \[PRIVACY CONTACT EMAIL - TO BE COMPLETED\]
+-   Privacy contact email: tipusharim@gmail.com
 
 ## 31. Categories of Information We May Collect
 
@@ -672,8 +672,8 @@ applicable law.
 
 -   Business Address: \[TO BE COMPLETED\]
 
--   General Email: \[TO BE COMPLETED\]
+-   General Email: tipusharim@gmail.com
 
--   Privacy Email: \[TO BE COMPLETED\]
+-   Privacy Email: tipusharim@gmail.com
 
--   Abuse / Content Reports: \[TO BE COMPLETED\]
+-   Abuse / Content Reports: tipusharim@gmail.com

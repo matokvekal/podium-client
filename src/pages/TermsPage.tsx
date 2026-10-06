@@ -1,10 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import termsPrivacyDraft from "./EL_NINO_Terms_Privacy_Draft_for_Legal_Review.md?raw";
+import termsPrivacy from "./ELNINO_TERMS_PRIVACY_EN.md?raw";
 
 /**
  * Terms and privacy page
  *
- * Source of truth is the legal draft markdown file that counsel edits.
+ * Source of truth is the approved terms/privacy markdown file next to this page.
  * We render it as preformatted text to preserve exact wording/line breaks.
  */
 export function TermsPage() {
@@ -32,11 +32,6 @@ export function TermsPage() {
         ← Back
       </button>
 
-      <p className="muted" style={{ margin: 0 }}>
-        Draft legal text loaded from{" "}
-        <code>EL_NINO_Terms_Privacy_Draft_for_Legal_Review.md</code>.
-      </p>
-
       <pre
         style={{
           margin: 0,
@@ -51,7 +46,7 @@ export function TermsPage() {
           fontSize: "0.95rem"
         }}
       >
-        {termsPrivacyDraft}
+        {termsPrivacy}
       </pre>
 
       <p className="muted" style={{ marginTop: "var(--space-3)" }}>

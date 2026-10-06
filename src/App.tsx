@@ -31,7 +31,7 @@ import { StatisticsLeaderboardPage } from "./pages/StatisticsLeaderboardPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
-import { TermsPage } from "./pages/TermsPage";
+import { TermsPage } from "./pages/TermsPageOLD";
 import { TracksPage } from "./pages/TracksPage";
 import { useUserModeStore } from "./store/userModeStore";
 

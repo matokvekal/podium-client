@@ -24,6 +24,7 @@ import { useAuth } from "../auth/AuthContext";
 import type { EventSummary } from "../lib/local-db";
 import { organizerDisplay } from "../lib/promote";
 import { resolveRideImage, useRideImagePending, useRideImages } from "../lib/ride-images-dynamic";
+import { isMyOrganizedRide } from "../lib/ride-managers";
 import { LEVEL_LABEL, LEVELS } from "../lib/rider-level";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL } from "../lib/surface-types";
 import { formatLocalDateTime } from "../lib/time";
@@ -61,8 +62,8 @@ export function EventTile({ event, onToggleFavorite, isNew, justOpened, compact 
   const { profile } = useAuth();
   const navigate = useNavigate();
   const bucket = figmaStatus(event.status);
-  // Same "upcoming, and mine" rule as EventCard.tsx's canEdit.
-  const canEdit = bucket === "upcoming" && profile != null && profile.id === event.ownerId;
+  // "Upcoming, and I organize it" — created it, or its creator made me a manager.
+  const canEdit = bucket === "upcoming" && profile != null && isMyOrganizedRide(event, profile.id);
 
   // Same data + fallbacks EventCard.tsx shows in the See-All list, so a ride reads the same
   // wherever it appears.

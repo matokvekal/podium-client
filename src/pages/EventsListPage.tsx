@@ -83,6 +83,7 @@ import {
   type WhenFilter,
 } from "../lib/find-rides-filter";
 import type { EventSummary } from "../lib/local-db";
+import { isMyOrganizedRide } from "../lib/ride-managers";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import { type PublicBucket, useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
@@ -198,10 +199,10 @@ export function EventsListPage() {
     const joined = new Set(joinedRideIds);
     return rawMyRides.filter((ride) => joined.has(ride.id));
   }, [rawMyRides, joinedRideIds]);
-  // "Created" = events this user owns (Organizer mode only). Same ownerId check the rest of
-  // the app uses for isOwner; an event can be in BOTH lists and that is correct.
+  // "Created" = events this user organizes (Organizer mode only): the ones they created and
+  // the ones a creator made them a manager of. An event can be in BOTH lists and that is correct.
   const createdRides = useMemo(
-    () => rawMyRides.filter((ride) => profile != null && ride.ownerId === profile.id),
+    () => rawMyRides.filter((ride) => profile != null && isMyOrganizedRide(ride, profile.id)),
     [rawMyRides, profile],
   );
   const myRidesSettled = useEventsStore((state) => state.myRidesSettled);

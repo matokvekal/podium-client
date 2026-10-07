@@ -25,6 +25,7 @@ import {
 import { ApiError, apiRequest } from "../lib/api-client";
 import styles from "./AdminAnalyticsPage.module.css";
 import { AdminRideImagesSection } from "./AdminRideImagesSection";
+import { AdminRidesLimitSection } from "./AdminRidesLimitSection";
 
 type LoadState =
   | { phase: "loading" }
@@ -116,6 +117,9 @@ export function AdminAnalyticsPage() {
       {/* Independent of the analytics load above — its own fetch, its own 403 handling, same
           requireAdminAnalytics gate server-side. Not a new admin page or role. */}
       <AdminRideImagesSection />
+
+      {/* Per-ride rider caps (server sql/060) — same gate, own fetch. */}
+      <AdminRidesLimitSection />
     </div>
   );
 }

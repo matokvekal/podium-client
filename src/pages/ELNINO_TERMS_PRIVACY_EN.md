@@ -400,9 +400,9 @@ information reasonably necessary for those purposes.
 The entity responsible for the Service and, where applicable, the
 controller of personal information is:
 
--   \[LEGAL ENTITY / OPERATOR NAME - TO BE COMPLETED\]
+-   Operator / Legal Entity: ELNINO
 
--   \[REGISTERED / BUSINESS ADDRESS - TO BE COMPLETED\]
+-   Business Address: Temporary name without address
 
 -   General contact email: tipusharim@gmail.com
 
@@ -668,9 +668,9 @@ applicable law.
 
 ## 52. Contact
 
--   Operator / Legal Entity: \[TO BE COMPLETED\]
+-   Operator / Legal Entity: ELNINO
 
--   Business Address: \[TO BE COMPLETED\]
+-   Business Address: Temporary name without address
 
 -   General Email: tipusharim@gmail.com
 

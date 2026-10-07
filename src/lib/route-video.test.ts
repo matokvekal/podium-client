@@ -43,7 +43,7 @@ describe("validateRouteVideo", () => {
         type: "video/mp4",
         size: ROUTE_VIDEO_MAX_BYTES + 1_400_000,
       }),
-    ).toBe("Video is 3.3 MB — max 2.0 MB");
+    ).toBe("Video is 4.3 MB — max 3.0 MB");
   });
 
   it("refuses non-videos and empty files", () => {

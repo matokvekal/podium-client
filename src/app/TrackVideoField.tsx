@@ -1,5 +1,5 @@
 // "Track video" row in Create / Manage Ride (lib/route-video.ts). One short flyover video per
-// TRACK, max 2 MB; only the track's owner may change it. Three shapes, chosen by the page:
+// TRACK, max 3 MB; only the track's owner may change it. Three shapes, chosen by the page:
 //
 //   live     — a saved track this rider owns (Manage Ride). Add / Replace / Remove act at once.
 //   pending  — a NEW track uploaded in this form. It has no id until the ride is saved, so the
@@ -162,7 +162,7 @@ function EditableTrackVideo(props: EditableProps) {
             <Clapperboard size={16} aria-hidden="true" />
           )}
           <span>{busy === "upload" ? "Uploading video…" : "Add track video"}</span>
-          <span className={styles.addHint}>MP4 / MOV / WebM · max 2 MB</span>
+          <span className={styles.addHint}>MP4 / MOV / WebM · max 3 MB</span>
         </button>
       )}
       {error && (

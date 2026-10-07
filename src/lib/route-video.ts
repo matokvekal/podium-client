@@ -12,7 +12,7 @@ import { ApiError, apiRequest, apiRequestBlob } from "./api-client";
 import { getAccessToken } from "./auth-storage";
 import { config } from "./config";
 
-export const ROUTE_VIDEO_MAX_BYTES = 2 * 1024 * 1024; // must match the server's config/route-videos.ts
+export const ROUTE_VIDEO_MAX_BYTES = 3 * 1024 * 1024; // must match the server's config/route-videos.ts
 
 /** By MIME type, plus by extension for browsers that leave File.type empty (some Android pickers). */
 const ALLOWED_TYPES: Record<string, string> = {

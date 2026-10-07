@@ -11,10 +11,11 @@ describe("parseRiderLimitInput", () => {
     expect(parseRiderLimitInput("300")).toEqual({ ok: true, value: 300 });
     expect(parseRiderLimitInput("30,000")).toEqual({ ok: true, value: 30_000 });
     expect(parseRiderLimitInput(" 30 000 ")).toEqual({ ok: true, value: 30_000 });
-    expect(parseRiderLimitInput("100000")).toEqual({ ok: true, value: 100_000 });
+    expect(parseRiderLimitInput("200,000")).toEqual({ ok: true, value: 200_000 });
+    expect(parseRiderLimitInput("2147483647")).toEqual({ ok: true, value: 2_147_483_647 });
   });
 
-  it.each(["0", "-5", "2.5", "abc", "100001"])("refuses %s", (raw) => {
+  it.each(["0", "-5", "2.5", "abc", "2147483648"])("refuses %s", (raw) => {
     expect(parseRiderLimitInput(raw).ok).toBe(false);
   });
 });

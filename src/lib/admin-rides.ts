@@ -19,8 +19,9 @@ export interface AdminRide {
   participantCount: number;
 }
 
-/** Mirrors the server's ADMIN_RIDE_MAX_PARTICIPANTS (schemas/adminRides.schemas.ts). */
-export const ADMIN_RIDE_MAX_PARTICIPANTS = 100_000;
+/** The largest value the server's column (Postgres INTEGER) can hold — a technical bound, not a
+ *  business cap. Mirrors PG_INTEGER_MAX in the server's schemas/adminRides.schemas.ts. */
+export const PG_INTEGER_MAX = 2_147_483_647;
 
 export function fetchAdminRides(): Promise<AdminRide[]> {
   return apiRequest<AdminRide[]>("/admin/rides");
@@ -44,7 +45,8 @@ export function effectiveRideLimit(ride: AdminRide): number | null {
 
 /**
  * What the Limit box holds → what to send. Blank means "no override". Anything else must be a
- * whole number from 1 to ADMIN_RIDE_MAX_PARTICIPANTS; commas/spaces are allowed ("30,000").
+ * whole number from 1 up (PG_INTEGER_MAX is only the column's technical limit); commas/spaces
+ * are allowed ("30,000").
  */
 export function parseRiderLimitInput(
   raw: string,
@@ -53,9 +55,8 @@ export function parseRiderLimitInput(
   if (text === "") return { ok: true, value: null };
   if (!/^\d+$/.test(text)) return { ok: false, error: "Enter a whole number" };
   const value = Number(text);
-  if (value < 1 || value > ADMIN_RIDE_MAX_PARTICIPANTS) {
-    return { ok: false, error: `Enter 1 – ${ADMIN_RIDE_MAX_PARTICIPANTS.toLocaleString("en-US")}` };
-  }
+  if (value < 1) return { ok: false, error: "Enter 1 or more" };
+  if (value > PG_INTEGER_MAX) return { ok: false, error: "That number is too large" };
   return { ok: true, value };
 }
 

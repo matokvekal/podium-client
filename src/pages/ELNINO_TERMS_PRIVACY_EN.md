@@ -1,18 +1,6 @@
 EL NIÑO TERMS OF USE AND PRIVACY POLICY
 
-DRAFT FOR LEGAL COUNSEL REVIEW - NOT FOR PUBLICATION
-
 Version: 4 October 2026
-
-Counsel note: This draft is intended to reflect the product model
-described by the operator: El Niño is a technology platform and
-bulletin-board-style service that connects adult cyclists, ride creators
-and ride organizers. Except where expressly stated otherwise, El Niño
-does not organize, lead, supervise, inspect, verify, certify or
-guarantee rides, routes, organizers, riders or third-party information.
-This draft should be reviewed and localized by qualified counsel before
-publication, particularly for jurisdictions in which the service is
-actively marketed.
 
 # PART I - TERMS OF USE
 
@@ -412,13 +400,13 @@ information reasonably necessary for those purposes.
 The entity responsible for the Service and, where applicable, the
 controller of personal information is:
 
--   \[LEGAL ENTITY / OPERATOR NAME - TO BE COMPLETED\]
+-   Operator / Legal Entity: ELNINO
 
--   \[REGISTERED / BUSINESS ADDRESS - TO BE COMPLETED\]
+-   Business Address: Temporary name without address
 
--   \[GENERAL CONTACT EMAIL - TO BE COMPLETED\]
+-   General contact email: tipusharim@gmail.com
 
--   \[PRIVACY CONTACT EMAIL - TO BE COMPLETED\]
+-   Privacy contact email: tipusharim@gmail.com
 
 ## 31. Categories of Information We May Collect
 
@@ -497,9 +485,7 @@ legal obligation, protection of vital interests where applicable, and
 legitimate interests that are not overridden by the individual's rights
 and freedoms.
 
-The precise legal basis may vary by feature and jurisdiction. Counsel
-should confirm and, if appropriate, add a feature-by-feature legal-basis
-table before launch in jurisdictions where this disclosure is required.
+The precise legal basis may vary by feature and jurisdiction.
 
 ## 35. Location Information
 
@@ -559,8 +545,7 @@ application state, last-read indicators and other operational purposes.
 
 If non-essential analytics, advertising or tracking technologies are
 used, El Niño will provide notices and consent or opt-out mechanisms
-where required by applicable law. Counsel should review the actual
-production technology stack before publication.
+where required by applicable law.
 
 ## 40. Service Communications, Email, Push and Marketing
 
@@ -581,11 +566,7 @@ necessary for the purposes for which it is processed, including
 provision of the Service, ride history expected by users, security,
 fraud prevention, dispute resolution, backup and legal obligations.
 
-Retention periods may differ by data category. Before publication,
-counsel and the technical team should approve a documented retention
-schedule covering at least account data, precise/live location, route
-and GPX data, ride chat, security logs, support records, third-party
-imported data, backups and deleted accounts.
+Retention periods may differ by data category.
 
 ## 42. Account Closure and Deletion
 
@@ -687,91 +668,12 @@ applicable law.
 
 ## 52. Contact
 
--   Operator / Legal Entity: \[TO BE COMPLETED\]
+-   Operator / Legal Entity: ELNINO
 
--   Business Address: \[TO BE COMPLETED\]
+-   Business Address: Temporary name without address
 
--   General Email: \[TO BE COMPLETED\]
+-   General Email: tipusharim@gmail.com
 
--   Privacy Email: \[TO BE COMPLETED\]
+-   Privacy Email: tipusharim@gmail.com
 
--   Abuse / Content Reports: \[TO BE COMPLETED\]
-
-# APPENDIX A - COUNSEL REVIEW CHECKLIST
-
-Before approval for publication, counsel should specifically confirm:
-
--   The legal identity and address of the El Niño operator.
-
--   Whether Israeli law / Israeli courts are the desired governing-law
-    and forum provisions.
-
--   The 18+ account rule and the intended treatment of minors
-    participating under parental responsibility.
-
--   The exact production data flows, including live location, route
-    history, chat, analytics, authentication and connected services.
-
--   The lawful bases and required notices/consents for jurisdictions
-    where GDPR, UK GDPR or similar laws apply.
-
--   Whether a representative, DPO, registration, notification or other
-    privacy governance step is required in any target jurisdiction.
-
--   A concrete retention schedule, particularly for precise location,
-    chat, logs and imported activity data.
-
--   Cookie / tracking consent requirements based on the actual
-    production stack.
-
--   Electronic-marketing consent and unsubscribe requirements by target
-    country.
-
--   The reporting/moderation workflow for unlawful or abusive content
-    and whether platform-specific obligations apply in target markets.
-
--   Third-party API/developer terms for Garmin, Strava, mapping,
-    weather, authentication and other providers actually used.
-
--   Whether any paid subscriptions, organizer plans, event fees or
-    commercial services require consumer, cancellation, refund, tax or
-    payment terms.
-
--   Whether the limitation-of-liability and indemnity language requires
-    jurisdiction-specific modifications.
-
--   Whether additional insurance disclosures are advisable.
-
--   Whether a separate English Privacy Policy and Terms of Use should be
-    published as separate pages even if approved from this combined
-    review draft.
-
-# APPENDIX B - PRODUCT / ENGINEERING ITEMS TO VERIFY BEFORE PUBLICATION
-
--   Account creation enforces the approved age policy.
-
--   Live-location behavior and visibility match the published wording.
-
--   Privacy defaults match the published wording.
-
--   Delete Account exists and backend behavior matches the retention
-    policy.
-
--   Marketing consent is not silently bundled with acceptance of Terms
-    where separate consent is required.
-
--   Unsubscribe / notification preference mechanisms function correctly.
-
--   Report User / Ride / Message or an equivalent reporting channel
-    exists if required by the approved policy.
-
--   Third-party service names in the final Privacy Policy match services
-    actually used in production.
-
--   No analytics, advertising or tracking technology is omitted from the
-    final disclosure.
-
--   Security and breach-response procedures exist operationally, not
-    only in the legal text.
-
-END OF DRAFT - FOR LEGAL REVIEW
+-   Abuse / Content Reports: tipusharim@gmail.com

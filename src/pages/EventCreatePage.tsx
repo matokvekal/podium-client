@@ -151,6 +151,7 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SafetySheet } from "../app/SafetySheet";
 import { TrackGallerySheet } from "../app/TrackGallerySheet";
 import { TrackUploadButton, type UploadedTrack } from "../app/TrackUploadButton";
+import { TrackVideoField } from "../app/TrackVideoField";
 import { useAuth } from "../auth/AuthContext";
 import {
   BUILT_IN_RIDE_IMAGES_ENABLED,
@@ -162,6 +163,7 @@ import { ApiError, apiRequest } from "../lib/api-client";
 import { config } from "../lib/config";
 import { COUNTRIES, flagEmoji, orderedCountries } from "../lib/countries";
 import { defaultRideCountry } from "../lib/default-ride-country";
+import { type EventRouteVideo, fetchEventRouteVideo, uploadRouteVideo } from "../lib/route-video";
 import { effectiveLimits } from "../lib/entitlements";
 import { createGenerationGuard } from "../lib/generation-guard";
 import {
@@ -679,6 +681,14 @@ export function EventCreatePage() {
   const [existingRouteAttached, setExistingRouteAttached] = useState(false);
   const [removeExistingRoute, setRemoveExistingRoute] = useState(false);
   /**
+   * The track's flyover video (lib/route-video.ts, app/TrackVideoField.tsx). `trackVideo` is the
+   * SAVED track's id/owner/video, loaded in edit mode — its owner manages the video live.
+   * `pendingVideo` is a file picked for a NEW track uploaded in this form: that track has no id
+   * until the ride is saved, so the file is uploaded right after saveExtras() creates it.
+   */
+  const [trackVideo, setTrackVideo] = useState<EventRouteVideo | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+  /**
    * The organizer's meeting-point override (events.meeting_lat/meeting_lon, sql/050), or null to
    * use the attached route's own start point — the default, and what almost every ride keeps.
    * Set only through the small map picker below ("Change meeting point"); never touched by
@@ -689,6 +699,15 @@ export function EventCreatePage() {
   const [meetingPointEditing, setMeetingPointEditing] = useState(false);
   /** The pin's position while the picker is open, uncommitted until "Save meeting point". */
   const [meetingPointDraft, setMeetingPointDraft] = useState<[number, number] | null>(null);
+  /** A brand-new line (uploaded file / drawn) — the rider will own the track it creates, so a
+   *  video can be picked now and uploaded after save. Library / copied tracks are not: their
+   *  video belongs to whoever owns that track (managed from Manage Ride if that is this rider). */
+  const newTrackInForm =
+    !existingRouteAttached && copiedRoute != null && copiedFrom == null && fromRouteId == null;
+  // A video picked for a track the rider then removed must not reappear on the next upload.
+  useEffect(() => {
+    if (!newTrackInForm) setPendingVideo(null);
+  }, [newTrackInForm]);
   /** Any track on the form — a known one, an uploaded file, or (edit) the saved one. */
   const trackAttached =
     copiedFrom != null || fromRouteId != null || uploadedFileName != null || existingRouteAttached;
@@ -849,6 +868,12 @@ export function EventCreatePage() {
         if (!cancelled && attached?.points?.length) {
           setCopiedRoute(attached);
           setExistingRouteAttached(true);
+          // Who owns this track and whether it has a video — best-effort, like the route.
+          void fetchEventRouteVideo(eventId)
+            .then((info) => {
+              if (!cancelled) setTrackVideo(info);
+            })
+            .catch(() => undefined);
         }
       } catch {
         // No route, offline, or an older server — the Upload / Browse choices show instead.
@@ -1317,6 +1342,26 @@ export function EventCreatePage() {
     });
   }
 
+  /**
+   * After the ride (and so its new track) is saved: upload the video picked for that new track.
+   * Never fails the save — the ride is already stored — it just says so and the rider can add the
+   * video from Manage Ride.
+   */
+  async function uploadPendingVideo(id: string) {
+    if (!pendingVideo || !newTrackInForm) return;
+    try {
+      const info = await fetchEventRouteVideo(id);
+      if (!info || info.ownerId !== profile?.id) return;
+      await uploadRouteVideo(info.routeId, pendingVideo);
+    } catch (err) {
+      window.alert(
+        `Ride saved, but the track video was not uploaded${
+          err instanceof Error && err.message ? `: ${err.message}` : ""
+        }. You can add it from Manage Ride.`,
+      );
+    }
+  }
+
   async function saveExtras(id: string) {
     if (level) setEventLevel(id, level);
     setEventActivityType(id, activityType);
@@ -1541,6 +1586,7 @@ export function EventCreatePage() {
           },
         });
         await saveExtras(eventId);
+        await uploadPendingVideo(eventId);
         // Same id, mutated in place — never a new event. Merge the server's updated fields
         // into the list caches so the card shows the new values without waiting for a refetch;
         // EventDetailPage re-fetches GET /events/:id on arrival for the rest.
@@ -1642,6 +1688,7 @@ export function EventCreatePage() {
         created as unknown as EventDetail,
       );
       await saveExtras(created.id);
+      await uploadPendingVideo(created.id);
       setLastDefaults({
         location,
         area,
@@ -1925,6 +1972,19 @@ export function EventCreatePage() {
                   Remove
                 </button>
               </div>
+            ) : null}
+            {/* Track flyover video — owner manages it; a new track's video uploads on save. */}
+            {existingRouteAttached && trackVideo && profile && trackVideo.ownerId === profile.id ? (
+              <TrackVideoField
+                mode="live"
+                routeId={trackVideo.routeId}
+                video={trackVideo.video}
+                onChange={(video) => setTrackVideo({ ...trackVideo, video })}
+              />
+            ) : existingRouteAttached && trackVideo?.video ? (
+              <TrackVideoField mode="readonly" video={trackVideo.video} />
+            ) : newTrackInForm ? (
+              <TrackVideoField mode="pending" file={pendingVideo} onPick={setPendingVideo} />
             ) : null}
             {copiedRoute && (
               <div className={styles.mapFrame}>

@@ -1274,7 +1274,11 @@ export function EventDetailPage() {
   const inviteLine = showInvite
     ? inviteGreeting(event.name || invite.name, event.startsAt, invite.via)
     : null;
-  const canEditNow = showOrganizerUi && displayStatus !== "live" && displayStatus !== "finished";
+  // A ride the server closed because its date passed before anyone started it stays editable,
+  // so a wrong date can be fixed (server `canReschedule`).
+  const canEditNow =
+    showOrganizerUi &&
+    ((displayStatus !== "live" && displayStatus !== "finished") || event.canReschedule === true);
   // Who gets into the live page. The old gate here was `event.showLiveLocations` alone, which
   // hid the live map from the ride's own registered riders: show_live_locations defaults to
   // FALSE (plan/02-database-schema.md:195), so on a typical event nobody but the organizer

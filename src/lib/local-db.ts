@@ -302,6 +302,9 @@ export interface EventOwner {
 }
 
 export interface EventDetail extends EventSummary {
+  /** An auto-finished ride its organizer never started: still editable to fix the date, and a
+   *  future date reopens it (server isUnriddenAutoFinished). Organizers only. */
+  canReschedule?: boolean;
   /**
    * The real organizer. The client used to read flat `ownerName`/`ownerAvatarUrl` fields that
    * NO event endpoint has ever sent — the server puts this data in a nested `owner` object

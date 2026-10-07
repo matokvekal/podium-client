@@ -1,3 +1,4 @@
+import { isPastDatetimeLocal } from "../lib/ride-date";
 import { DESCRIPTION_MAX_CHARS } from "../lib/event-limits";
 
 // Every form rule in the app, in one file.
@@ -66,6 +67,12 @@ export interface CreateEventFormValues {
   isEditing: boolean;
   /** Optional everywhere; only ever checked for length. */
   description: string;
+  /** Edit only: the start the form loaded with. Left unchanged it may be in the past (the
+   *  ride may simply have begun); any NEW start must be in the future. */
+  originalStartsAt?: string;
+  /** Reopening an auto-finished ride: the start must be a future one even if unchanged. */
+  mustBeFuture?: boolean;
+  now?: Date;
 }
 
 /**
@@ -90,6 +97,16 @@ export function validateCreateEventForm(
   // The textarea's maxLength already stops typing at the cap; this catches the ways round it
   // (paste on some browsers, autofill, a value restored from a draft) so the organizer is told
   // here instead of by a 400. Trimmed because the server trims before it measures.
+  const changed = !values.isEditing || values.startsAt !== values.originalStartsAt;
+  if (
+    !errors.startsAt &&
+    (changed || values.mustBeFuture) &&
+    isPastDatetimeLocal(values.startsAt, values.now)
+  ) {
+    errors.startsAt = "This date has already passed. Check the day and month.";
+  } else if (values.mustBeFuture && !values.startsAt) {
+    errors.startsAt = "Pick a new future date to reopen this ride.";
+  }
   if (values.description.trim().length > DESCRIPTION_MAX_CHARS) {
     errors.description = `Description must be ${DESCRIPTION_MAX_CHARS} characters or fewer.`;
   }

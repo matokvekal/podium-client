@@ -14,6 +14,8 @@ function form(over: Partial<CreateEventFormValues> = {}): CreateEventFormValues 
   return {
     name: "Saturday ride",
     startsAt: "2026-09-12T06:00",
+    // Pinned so the fixture date never turns into a past date as the calendar moves on.
+    now: new Date("2026-09-01T00:00"),
     hasRoute: true,
     isEditing: false,
     description: "",
@@ -82,5 +84,66 @@ describe("validateCreateEventForm description", () => {
   it("does not invent a description requirement in either mode", () => {
     expect(validateCreateEventForm(form({ description: "   " })).ok).toBe(true);
     expect(validateCreateEventForm(form({ isEditing: true, description: "" })).ok).toBe(true);
+  });
+});
+
+describe("validateCreateEventForm — start date in the past", () => {
+  const now = new Date("2026-10-07T12:00");
+  const base = { name: "Sovev Kinneret", hasRoute: true, description: "", now };
+
+  it("refuses creating a ride on a past date", () => {
+    const { ok, errors } = validateCreateEventForm({
+      ...base,
+      isEditing: false,
+      startsAt: "2026-07-11T07:00",
+    });
+    expect(ok).toBe(false);
+    expect(errors.startsAt).toMatch(/already passed/);
+  });
+
+  it("accepts a future date", () => {
+    expect(
+      validateCreateEventForm({ ...base, isEditing: false, startsAt: "2026-11-07T07:00" }).ok,
+    ).toBe(true);
+  });
+
+  it("refuses an edit that moves the start into the past", () => {
+    const { errors } = validateCreateEventForm({
+      ...base,
+      isEditing: true,
+      originalStartsAt: "2026-11-07T07:00",
+      startsAt: "2026-07-11T07:00",
+    });
+    expect(errors.startsAt).toMatch(/already passed/);
+  });
+
+  it("lets an edit keep an unchanged start that has already passed", () => {
+    expect(
+      validateCreateEventForm({
+        ...base,
+        isEditing: true,
+        originalStartsAt: "2026-10-07T11:00",
+        startsAt: "2026-10-07T11:00",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("reopening a never-started ride needs a new future date", () => {
+    const stale = validateCreateEventForm({
+      ...base,
+      isEditing: true,
+      mustBeFuture: true,
+      originalStartsAt: "2026-07-11T07:00",
+      startsAt: "2026-07-11T07:00",
+    });
+    expect(stale.ok).toBe(false);
+    const fixed = validateCreateEventForm({
+      ...base,
+      isEditing: true,
+      mustBeFuture: true,
+      originalStartsAt: "2026-07-11T07:00",
+      startsAt: "2026-11-07T07:00",
+    });
+    expect(fixed.ok).toBe(true);
   });
 });

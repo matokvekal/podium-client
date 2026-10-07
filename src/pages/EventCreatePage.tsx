@@ -223,12 +223,16 @@ import { useEventsStore } from "../store/eventsStore";
 import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import { validateCreateEventForm } from "../validation/forms";
+import { RideDateField } from "../app/RideDateField";
+import { formatRideStart } from "../lib/ride-date";
 import styles from "./EventCreatePage.module.css";
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
 
 interface ExistingEvent {
   id: string;
+  /** An auto-finished ride its organizer never started — editable to fix the date. */
+  canReschedule?: boolean;
   name: string;
   status: string;
   visibility: "public" | "private";
@@ -560,6 +564,13 @@ export function EventCreatePage() {
   // to catch.
   const [startsAt, setStartsAt] = useState("");
   const [startsAtEdited, setStartsAtEdited] = useState(false);
+  /** The day picked in RideDateField while its time is still empty ("YYYY-MM-DD"), else null. */
+  const startsAtDraftDate = useRef<string | null>(null);
+  /** The start the edit form loaded with — an unchanged start may stay in the past. */
+  const [originalStartsAt, setOriginalStartsAt] = useState("");
+  /** An auto-finished ride that never started (server `canReschedule`): editable to fix the
+   *  date, and saving a future date reopens it. */
+  const [reopening, setReopening] = useState(false);
   const [dateHint, setDateHint] = useState<string | null>(null);
   const [location, setLocation] = useState(lastDefaults?.location ?? "");
   const [area, setArea] = useState(lastDefaults?.area ?? "");
@@ -771,7 +782,7 @@ export function EventCreatePage() {
         // The server rejects PATCH /events/:eventId once live/finished (Manage mode is
         // add/remove riders + pause/stop only, not general details) — redirect here rather
         // than let the save button fail after a full form load.
-        if (found.status === "live" || found.status === "finished") {
+        if ((found.status === "live" || found.status === "finished") && !found.canReschedule) {
           navigate(`/events/${eventId}`, {
             replace: true,
             state: {
@@ -800,7 +811,12 @@ export function EventCreatePage() {
         setCountrySettled(true);
         setDescription(found.description ?? "");
         setVisibility(found.visibility);
-        if (found.startsAt) setStartsAt(toDatetimeLocalValue(new Date(found.startsAt)));
+        if (found.startsAt) {
+          const loaded = toDatetimeLocalValue(new Date(found.startsAt));
+          setStartsAt(loaded);
+          setOriginalStartsAt(loaded);
+        }
+        setReopening(found.canReschedule === true);
         setRequiresApproval(found.requiresApproval);
         setRidersListVisible(found.showParticipants);
         // Server value wins for difficulty / activity type — it is the same for every device
@@ -1215,7 +1231,13 @@ export function EventCreatePage() {
   }
 
   function pickStartsAtTime(hour: number) {
-    const base = startsAt ? new Date(startsAt) : nextWeekdayStart(6, hour);
+    // A day picked in the date fields while the time is still empty counts: the chip completes
+    // it rather than jumping to next Saturday.
+    const base = startsAt
+      ? new Date(startsAt)
+      : startsAtDraftDate.current
+        ? new Date(`${startsAtDraftDate.current}T00:00`)
+        : nextWeekdayStart(6, hour);
     base.setHours(hour, 0, 0, 0);
     setStartsAt(toDatetimeLocalValue(base));
     setStartsAtEdited(true);
@@ -1233,9 +1255,7 @@ export function EventCreatePage() {
     }
     setStartsAt(toDatetimeLocalValue(found.date));
     setDateHint(
-      `Detected "${found.label}" → ${found.date.toLocaleDateString()} at ${found.date
-        .toTimeString()
-        .slice(0, 5)}. Edit Start time above to change it.`,
+      `Detected "${found.label}" → ${formatRideStart(toDatetimeLocalValue(found.date))}. Edit Start time above to change it.`,
     );
   }
 
@@ -1479,6 +1499,8 @@ export function EventCreatePage() {
       hasRoute: copiedRoute != null || fromRouteId != null,
       isEditing,
       description,
+      originalStartsAt: isEditing ? originalStartsAt : undefined,
+      mustBeFuture: reopening,
     });
     setInvalidName(errors.name != null);
     setInvalidStartsAt(errors.startsAt != null);
@@ -1488,7 +1510,11 @@ export function EventCreatePage() {
       // A too-long description is the one failure here the generic sentence cannot explain —
       // the field is filled in, it is filled in too far, and the counter is the only other
       // clue. Say the actual rule instead.
-      setError(errors.description ?? "Fill in the highlighted fields before saving.");
+      setError(
+        errors.description ??
+          (startsAt && errors.startsAt) ??
+          "Fill in the highlighted fields before saving.",
+      );
       return;
     }
 
@@ -2241,18 +2267,24 @@ export function EventCreatePage() {
                   <Clock aria-hidden="true" />
                   Date/time
                 </label>
-                <input
+                <RideDateField
                   id="startsAt"
-                  type="datetime-local"
-                  className={`${styles.input} ${invalidStartsAt ? styles.inputInvalid : ""}`}
+                  inputClassName={`${styles.input} ${invalidStartsAt ? styles.inputInvalid : ""}`}
                   value={startsAt}
-                  onChange={(e) => {
-                    setStartsAt(e.target.value);
+                  onChange={(value, draftDate) => {
+                    setStartsAt(value);
+                    startsAtDraftDate.current = draftDate;
                     setStartsAtEdited(true);
                     setDateHint(null);
-                    if (e.target.value) setInvalidStartsAt(false);
+                    if (value) setInvalidStartsAt(false);
                   }}
                 />
+                {reopening && (
+                  <p className={`${styles.hint} ${styles["hint--active"]}`}>
+                    This ride closed automatically because its date passed before it started. Pick
+                    a new date and save to reopen it.
+                  </p>
+                )}
                 {!isEditing && (
                   <div className={styles.quickPickRow}>
                     {STARTS_AT_DAY_CHIPS.map(({ label, day }) => (

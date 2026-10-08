@@ -12,6 +12,7 @@ import { apiRequest } from "../lib/api-client";
 import {
   clearCachedEvents,
   clearUserScopedCache,
+  deleteCachedEvent,
   type EventSource,
   type EventSummary,
   getCachedEvents,
@@ -77,6 +78,10 @@ interface EventsState {
    *  status transition — into My Rides and the IndexedDB cache in one step, so the two never
    *  disagree about an event the server has already told us the truth about. */
   upsertRide(event: EventSummary): void;
+  /** A ride its organizer just cancelled: gone from My Rides and the "mine" cache at once. The
+   *  server's lists already leave cancelled rides out, so a refetch agrees; without this the
+   *  cache-first paint kept showing the ride until a refetch succeeded. */
+  removeRide(id: string): void;
   /** Sign-out: drops in-memory My Rides and the "mine" IndexedDB cache bucket so the next
    *  rider on a shared device never briefly sees the previous rider's rides. */
   clearMyRides(): void;
@@ -101,7 +106,8 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     }
     const requestId = ++myRidesRequestId;
 
-    const cached = await getCachedEvents("mine");
+    // Never paint a cancelled ride from the cache — the server's list would not contain it.
+    const cached = (await getCachedEvents("mine")).filter((event) => event.status !== "cancelled");
     if (requestId === myRidesRequestId && cached.length > 0) {
       set({ myRides: cached, myRidesSettled: true });
     }
@@ -189,7 +195,20 @@ export const useEventsStore = create<EventsState>((set, get) => ({
     }));
   },
 
+  removeRide(id) {
+    set((state) => ({
+      myRides: state.myRides.filter((ride) => ride.id !== id),
+      joinedRideIds: state.joinedRideIds.filter((rideId) => rideId !== id),
+    }));
+    void deleteCachedEvent(id);
+  },
+
   upsertRide(event) {
+    // A cancelled ride does not belong in My Rides (the server's lists leave it out too).
+    if (event.status === "cancelled") {
+      get().removeRide(event.id);
+      return;
+    }
     set((state) => {
       const index = state.myRides.findIndex((ride) => ride.id === event.id);
       if (index === -1) return { myRides: [event, ...state.myRides] };

@@ -20,7 +20,9 @@
  * Route:   /stats/achievements
  * Loads:   GET /statistics/periods via store/statisticsStore.ts (device cache first),
  *          public/images/statistics/achievements/*.jpg (the 5 gem renders)
- * Actions: Month/Year switch (resets the timeline); infinite scroll reveals older periods
+ * Actions: Month/Year switch (resets the timeline); infinite scroll reveals older periods;
+ *          Medals tab (?tab=medals[&medal=<eventId>]) — Event Completion Medals (sql/061), a
+ *          separate thing from the gems: one permanent medal per ride the organizer gave one for
  *
  * "Rankings" per period (ME vs OTHER RIDERS) is a later phase — the button below holds its place.
  */
@@ -41,7 +43,9 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { EventMedalsSection } from "../app/medals/EventMedalsSection";
 import { useCanSeeStatisticsPreview } from "../app/statisticsPreview";
 import { useMyIdentity } from "../app/useMyIdentity";
 import {
@@ -72,6 +76,12 @@ export function StatisticsAchievementsPage() {
   const me = useMyIdentity();
   const canSeeStatistics = useCanSeeStatisticsPreview();
   const [periodType, setPeriodType] = useState<PeriodType>("month");
+  // The Medals tab lives in the URL so a Past Ride's 🏅 can deep-link straight to one medal.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const medalsTab = searchParams.get("tab") === "medals";
+  const highlightMedal = searchParams.get("medal");
+  const { profile } = useAuth();
+  const hasNewMedals = (profile?.unseenMedalCount ?? 0) > 0;
   const slot = useStatisticsStore((s) => s.timelines[periodType]);
   const loadTimeline = useStatisticsStore((s) => s.loadTimeline);
   const [count, setCount] = useState(PAGE_SIZE);
@@ -105,6 +115,11 @@ export function StatisticsAchievementsPage() {
   function switchPeriodType(next: PeriodType) {
     setPeriodType(next);
     setCount(PAGE_SIZE);
+    if (medalsTab) setSearchParams({}, { replace: true });
+  }
+
+  function openMedalsTab() {
+    if (!medalsTab) setSearchParams({ tab: "medals" }, { replace: true });
   }
 
   // Infinite scroll: reveal the next batch of older periods as the sentinel comes into view —
@@ -122,7 +137,7 @@ export function StatisticsAchievementsPage() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore]);
+  }, [hasMore, medalsTab]);
 
   return (
     <div className={styles.page}>
@@ -151,9 +166,11 @@ export function StatisticsAchievementsPage() {
         <button
           type="button"
           role="tab"
-          aria-selected={periodType === "month"}
+          aria-selected={!medalsTab && periodType === "month"}
           className={
-            periodType === "month" ? `${styles.periodTab} ${styles.active}` : styles.periodTab
+            !medalsTab && periodType === "month"
+              ? `${styles.periodTab} ${styles.active}`
+              : styles.periodTab
           }
           onClick={() => switchPeriodType("month")}
         >
@@ -162,15 +179,34 @@ export function StatisticsAchievementsPage() {
         <button
           type="button"
           role="tab"
-          aria-selected={periodType === "year"}
+          aria-selected={!medalsTab && periodType === "year"}
           className={
-            periodType === "year" ? `${styles.periodTab} ${styles.active}` : styles.periodTab
+            !medalsTab && periodType === "year"
+              ? `${styles.periodTab} ${styles.active}`
+              : styles.periodTab
           }
           onClick={() => switchPeriodType("year")}
         >
           Year
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={medalsTab}
+          className={medalsTab ? `${styles.periodTab} ${styles.active}` : styles.periodTab}
+          onClick={openMedalsTab}
+        >
+          Medals
+          {hasNewMedals && (
+            <span className={styles.tabDot} role="img" aria-label="new medals" />
+          )}
+        </button>
       </div>
+
+      {medalsTab ? (
+        <EventMedalsSection highlightEventId={highlightMedal} />
+      ) : (
+        <>
 
       <p className={styles.sectionEyebrow}>MY RESULTS</p>
 
@@ -264,6 +300,8 @@ export function StatisticsAchievementsPage() {
         })}
         <div ref={sentinelRef} aria-hidden="true" />
       </div>
+        </>
+      )}
 
       {showBackToTop && (
         <button

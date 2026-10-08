@@ -246,6 +246,15 @@ export interface EventSummary {
   /** Whether the ride has a chat (server sql/056). Absent/true = it does, exactly as before; false
    *  = the owner switched it off: no chat button, badge, polling or page. See lib/ride-chat.ts. */
   chatEnabled?: boolean;
+  /** Completion medal (server sql/061). Absent = off, exactly as before. */
+  medalEnabled?: boolean;
+  medalText?: string | null;
+  /** The medal's background ids (sql/061); absent/null = the original look. */
+  medalColorId?: string | null;
+  medalStyleId?: string | null;
+  /** True when THIS rider received the ride's completion medal — only GET /events (my rides)
+   *  fills it in. Absent (older server, old cache) = no 🏅 on the card. */
+  myMedal?: boolean;
   /** Present on a LIST row ONLY for a promoteOnly event (its locked card shows it). */
   description?: string | null;
   /**

@@ -356,3 +356,14 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* The "new medals" dot on the Medals tab (Event Completion Medals, sql/061). */
+.tabDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: var(--status-danger);
+}

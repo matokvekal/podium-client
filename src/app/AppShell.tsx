@@ -30,6 +30,7 @@ import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useCountryStore } from "../store/countryStore";
 import { AppDrawer } from "./AppDrawer";
 import { Avatar } from "./Avatar";
+import { MedalReveal } from "./medals/MedalReveal";
 import { useAutoCheckIn } from "./useAutoCheckIn";
 import { useEnforceOrganizerEligibility } from "./useEnforceOrganizerEligibility";
 import { useMyIdentity } from "./useMyIdentity";
@@ -179,6 +180,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         colorTheme={colorTheme}
         onToggleColorTheme={toggleColorTheme}
       />
+
+      {/* New completion medal(s) → the one-time medal reveal (sql/061). Renders nothing — and
+          requests nothing — unless the profile says there are unseen medals. */}
+      <MedalReveal />
 
       {/* The one global offline indicator. Two independent things can put the app in this
           state, and either is enough:

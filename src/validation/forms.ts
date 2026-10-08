@@ -1,5 +1,6 @@
 import { isPastDatetimeLocal } from "../lib/ride-date";
 import { DESCRIPTION_MAX_CHARS } from "../lib/event-limits";
+import { countWords, MEDAL_TEXT_MAX_WORDS } from "../lib/medal";
 
 // Every form rule in the app, in one file.
 //
@@ -56,7 +57,7 @@ export function validateProfileForm(values: ProfileFormValues): ValidationResult
 
 // --- create event --------------------------------------------------------------------------
 
-export type CreateEventField = "name" | "startsAt" | "route" | "description";
+export type CreateEventField = "name" | "startsAt" | "route" | "description" | "medalText";
 
 export interface CreateEventFormValues {
   name: string;
@@ -73,6 +74,9 @@ export interface CreateEventFormValues {
   /** Reopening an auto-finished ride: the start must be a future one even if unchanged. */
   mustBeFuture?: boolean;
   now?: Date;
+  /** Completion medal (sql/061): when switched on, the dedication is required, ≤30 words. */
+  medalEnabled?: boolean;
+  medalText?: string;
 }
 
 /**
@@ -109,6 +113,13 @@ export function validateCreateEventForm(
   }
   if (values.description.trim().length > DESCRIPTION_MAX_CHARS) {
     errors.description = `Description must be ${DESCRIPTION_MAX_CHARS} characters or fewer.`;
+  }
+  // Only while the medal is on — a dedication left behind with the switch off is never sent.
+  if (values.medalEnabled) {
+    const words = countWords(values.medalText ?? "");
+    if (words === 0) errors.medalText = "Write a medal dedication, or turn the medal off.";
+    else if (words > MEDAL_TEXT_MAX_WORDS)
+      errors.medalText = `The medal dedication can be at most ${MEDAL_TEXT_MAX_WORDS} words.`;
   }
   return result(errors);
 }

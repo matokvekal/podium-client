@@ -147,8 +147,21 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
                   My Statistics
                 </NavLink>
               )}
-              <NavLink to="/stats/achievements" className="drawer__nav-subaction" onClick={onClose}>
+              {/* A completion medal the rider has not opened yet (sql/061) tags the entry and
+                  lands them straight on the Medals tab. */}
+              <NavLink
+                to={
+                  (profile?.unseenMedalCount ?? 0) > 0
+                    ? "/stats/achievements?tab=medals"
+                    : "/stats/achievements"
+                }
+                className="drawer__nav-subaction"
+                onClick={onClose}
+              >
                 Achievements
+                {(profile?.unseenMedalCount ?? 0) > 0 && (
+                  <span className="drawer__nav-tag">New</span>
+                )}
               </NavLink>
               {canSeeStatistics && (
                 <NavLink to="/stats/leaderboard" className="drawer__nav-subaction" onClick={onClose}>

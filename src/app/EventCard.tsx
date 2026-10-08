@@ -46,8 +46,11 @@ import {
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { lazy, Suspense, useState } from "react";
-import { Link } from "react-router-dom";
+import { MedalBadge } from "./medals/MedalBadge";
+import medalStyles from "./medals/Medals.module.css";
+import { Link, useNavigate } from "react-router-dom";
 import type { EventSummary } from "../lib/local-db";
+import { medalHref } from "../lib/medal";
 import { wazeUrl } from "../lib/nav-links";
 import { estimateDurationMin, formatDuration, formatEstimatedDuration } from "../lib/ride-duration";
 import { resolveRideImage, useRideImagePending, useRideImages } from "../lib/ride-images-dynamic";
@@ -206,6 +209,17 @@ function EventCardLink({
     onShare();
   }
 
+  // The rider's completion medal for this ride (sql/061) — only when the server says this rider
+  // actually received it (one batched lookup for the whole list, never per card). Tapping it opens
+  // that medal in Achievements; it must not also open the ride, so the card link is stopped.
+  const navigate = useNavigate();
+  const hasMedal = event.myMedal === true && status === "finished";
+  function handleMedal(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(medalHref(event.id));
+  }
+
   function handleFavorite(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -318,6 +332,18 @@ function EventCardLink({
 
         {/* Chat stacked on top of the heart, at the card's side. */}
         <div className={styles.sideActions}>
+          {hasMedal && (
+            <button
+              type="button"
+              className={medalStyles.cardMedalButton}
+              onClick={handleMedal}
+              aria-label={`View your medal for ${event.name}`}
+              title="Your completion medal"
+              data-testid="card-medal"
+            >
+              <MedalBadge size={22} />
+            </button>
+          )}
           {canShare && (
             <button
               type="button"

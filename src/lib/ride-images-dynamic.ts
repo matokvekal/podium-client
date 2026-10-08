@@ -68,9 +68,15 @@ export function isRideImagePending(
   catalog: readonly RideImageDto[] | null,
   key: string | null | undefined,
   failed: boolean,
+  /** The catalog was already re-fetched once for this key (rideImagesStore.missingChecked). */
+  missingChecked = false,
 ): boolean {
-  if (!key || catalog !== null || failed) return false;
-  return getStaticRideImage(key) === null;
+  if (!key || failed) return false;
+  if (catalog === null) return getStaticRideImage(key) === null;
+  // Loaded, but without this key: the catalog may be older than the image (an admin upload after
+  // this session loaded it). Pending until one re-fetch has answered; a key still unknown after
+  // that falls back exactly as before.
+  return !missingChecked && !catalog.some((img) => img.key === key);
 }
 
 /** What the Create/Edit Ride picker grid offers. */
@@ -95,5 +101,13 @@ export function useRideImages(): readonly RideImageDto[] | null {
 export function useRideImagePending(key: string | null | undefined): boolean {
   const images = useRideImagesStore((s) => s.images);
   const failed = useRideImagesStore((s) => s.error !== null);
-  return isRideImagePending(images, key, failed);
+  const checked = useRideImagesStore((s) => (key ? s.missingChecked.includes(key) : false));
+  const pending = isRideImagePending(images, key, failed, checked);
+  // A key the loaded catalog lacks -> re-fetch the catalog once (deduped per key in the store).
+  useEffect(() => {
+    if (pending && key && images !== null) {
+      void useRideImagesStore.getState().refreshForMissingKey(key);
+    }
+  }, [pending, key, images]);
+  return pending;
 }

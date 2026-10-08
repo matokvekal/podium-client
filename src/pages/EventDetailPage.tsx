@@ -1023,6 +1023,8 @@ export function EventDetailPage() {
         method: "DELETE",
       });
       setEvent((previous) => mergeParticipantStatus(previous, updated));
+      // Out of My Rides and its device cache right now — not only after the next refetch.
+      useEventsStore.getState().removeRide(eventId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not cancel this event.");
     } finally {

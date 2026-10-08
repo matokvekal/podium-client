@@ -25,18 +25,37 @@ interface RideImagesState {
   images: RideImageDto[] | null;
   loading: boolean;
   error: string | null;
+  /** Keys a ride named that the loaded catalog did not have, already re-asked for once. */
+  missingChecked: string[];
   ensureLoaded(): Promise<void>;
   refresh(): Promise<void>;
+  /** A ride names `key` but the catalog this session loaded does not have it — typically an
+   *  image an admin uploaded (on another device, or after this tab loaded) that a ride was then
+   *  set to. Re-fetch the catalog ONCE for that key; until it answers the cover is "pending"
+   *  (neutral placeholder) rather than a wrong fallback picture. */
+  refreshForMissingKey(key: string): Promise<void>;
 }
 
 export const useRideImagesStore = create<RideImagesState>()((set, get) => ({
   images: null,
   loading: false,
   error: null,
+  missingChecked: [],
 
   async ensureLoaded() {
     if (get().images !== null || get().loading) return;
     await get().refresh();
+  },
+
+  async refreshForMissingKey(key) {
+    if (get().missingChecked.includes(key)) return;
+    // Marked only after the fetch that can answer it, so the cover stays "pending" (placeholder)
+    // meanwhile instead of flashing the wrong fallback picture. One fetch serves every card
+    // waiting at the same time.
+    if (!get().loading) await get().refresh();
+    set((s) =>
+      s.missingChecked.includes(key) ? s : { missingChecked: [...s.missingChecked, key] },
+    );
   },
 
   async refresh() {

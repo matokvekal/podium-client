@@ -556,6 +556,17 @@ export async function clearCachedEvents(source: EventSource): Promise<void> {
   }
 }
 
+/** Drops one event from the list cache — a ride its organizer just cancelled, so the next
+ *  cache-first paint of My Rides can never show it again. Best effort, like the rest. */
+export async function deleteCachedEvent(id: string): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.delete("events", id);
+  } catch {
+    // Best effort — the next successful list refresh drops it anyway.
+  }
+}
+
 export async function getCachedEvent(id: string): Promise<EventSummary | null> {
   try {
     const db = await getDb();

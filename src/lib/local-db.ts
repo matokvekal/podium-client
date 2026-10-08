@@ -72,6 +72,10 @@ export interface EventSummary {
    *  point. Never the route/GPX itself — see EventDetailPage.tsx's routePoint. */
   meetingPoint?: { lat: number; lon: number } | null;
   ownerId: number | null;
+  /** The caller's role on the ride — "owner" (created it), "operator" (a manager the creator
+   *  appointed — lib/ride-managers.ts) or null for a ride they only joined. Only GET /events
+   *  (the caller's own list) sends it; absent everywhere else. */
+  myRole?: "owner" | "operator" | "viewer" | null;
   /** Owner's nickname if set, else "first last" (either half optional), else null — resolved
    * server-side (event.queries.ts). Null for a legacy/ownerless event or an owner who set
    * neither. */
@@ -242,6 +246,15 @@ export interface EventSummary {
   /** Whether the ride has a chat (server sql/056). Absent/true = it does, exactly as before; false
    *  = the owner switched it off: no chat button, badge, polling or page. See lib/ride-chat.ts. */
   chatEnabled?: boolean;
+  /** Completion medal (server sql/061). Absent = off, exactly as before. */
+  medalEnabled?: boolean;
+  medalText?: string | null;
+  /** The medal's background ids (sql/061); absent/null = the original look. */
+  medalColorId?: string | null;
+  medalStyleId?: string | null;
+  /** True when THIS rider received the ride's completion medal — only GET /events (my rides)
+   *  fills it in. Absent (older server, old cache) = no 🏅 on the card. */
+  myMedal?: boolean;
   /** Present on a LIST row ONLY for a promoteOnly event (its locked card shows it). */
   description?: string | null;
   /**
@@ -318,7 +331,11 @@ export interface EventDetail extends EventSummary {
   /** When the ride actually went live (server sql/048); null before it has, or from an older
    *  server. The live screen's Elapsed clock counts from this — lib/ride-elapsed.ts. */
   startedAt?: string | null;
+  /** The creator OR one of the ride's managers — what shows the organizer controls. */
   isOwner: boolean;
+  /** Only the creator. A manager gets `isOwner: true, isCreator: false`. Absent from an older
+   *  server or a cached detail. */
+  isCreator?: boolean;
   requiresApproval: boolean;
   isPaused: boolean;
   effectiveStatus: EventStatus;

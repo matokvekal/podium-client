@@ -111,6 +111,9 @@ export interface Profile {
   canSeeStatistics?: boolean;
   /** PROMOTE switch visibility — true for the System Admin only (UI gate; the server enforces). */
   canManagePromote?: boolean;
+  /** Completion medals not opened yet (sql/061) — the "New" tag on Achievements and the one-time
+   *  medal reveal. Absent on an older server = 0. Cleared locally via applyProfile once seen. */
+  unseenMedalCount?: number;
 }
 
 interface AuthResponse {

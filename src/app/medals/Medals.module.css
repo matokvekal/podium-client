@@ -1,0 +1,590 @@
+/* Event Completion Medals — the medal, its card, the collection grid and the reveal moment.
+   Motion is CSS @keyframes only (no library). Everything that moves is switched off under
+   prefers-reduced-motion at the bottom of this file. */
+
+/* ---- The medal ------------------------------------------------------------------------------ */
+
+.medalBadge {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  filter: drop-shadow(0 4px 6px rgba(120, 78, 5, 0.28));
+}
+
+.medalBadge svg {
+  display: block;
+}
+
+/* Gold light sweeping across the disc. The disc sits at 50% / 64% of the badge, radius 37.5% of
+   its width — the clip keeps the sweep on the gold, off the ribbon. */
+.medalShine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: circle(30% at 50% 64%);
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0) 38%,
+    rgba(255, 255, 255, 0.85) 48%,
+    rgba(255, 248, 200, 0.6) 54%,
+    transparent 64%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  animation: medal-shine 5.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+@keyframes medal-shine {
+  0% {
+    background-position: 130% 0;
+  }
+  28%,
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+.medalMuted {
+  filter: grayscale(1) opacity(0.35);
+}
+
+/* The card's medal during its celebration: a bounce and a faster, brighter shine. */
+.medalPop {
+  animation: medal-pop 900ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.medalPop.medalShine::after {
+  animation: medal-shine 1.4s ease-in-out 0.2s 2;
+}
+
+@keyframes medal-pop {
+  0% {
+    transform: scale(0.6) rotate(-12deg);
+  }
+  60% {
+    transform: scale(1.12) rotate(4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* ---- Confetti --------------------------------------------------------------------------------- */
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.confettiPiece {
+  position: absolute;
+  top: -14px;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), 340px, 0) rotate(var(--spin));
+  }
+}
+
+/* ---- The card --------------------------------------------------------------------------------- */
+
+.medalsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.medalsCount {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.medalGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .medalGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .medalGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.medalCard {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-radius: var(--radius-lg);
+  /* The organizer's background (lib/medal-backgrounds.ts). The fallbacks ARE the original card,
+     so a medal with no background chosen looks exactly as it always did. */
+  --medal-glow: rgba(247, 201, 72, 0.22);
+  border: 1px solid var(--medal-border, rgba(214, 158, 30, 0.45));
+  background:
+    var(--medal-layers, radial-gradient(120% 70% at 50% 0%, var(--medal-glow), transparent 70%)),
+    var(--medal-base, var(--surface));
+  color: var(--medal-ink, var(--text));
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  scroll-margin-block: 96px;
+  transition:
+    box-shadow var(--beat-3, 400ms) ease,
+    transform var(--beat-3, 400ms) ease;
+}
+
+.medalCard[data-celebrating] {
+  box-shadow:
+    0 0 0 2px rgba(247, 201, 72, 0.6),
+    0 10px 28px rgba(214, 158, 30, 0.35);
+  transform: translateY(-2px);
+}
+
+.medalCard[data-highlighted] {
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 10px 28px rgba(214, 158, 30, 0.35);
+}
+
+.newRibbon {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: -30px;
+  width: 110px;
+  padding: 3px 0;
+  transform: rotate(45deg);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  color: #5a3a00;
+  background: linear-gradient(90deg, #ffe58a, #f7c948, #ffe58a);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+  z-index: 3;
+}
+
+[dir="rtl"] .newRibbon,
+:global([dir="rtl"]) .newRibbon {
+  transform: rotate(-45deg);
+}
+
+.medalTitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-md);
+  font-weight: var(--weight-bold);
+  color: var(--medal-ink, var(--text));
+  overflow-wrap: anywhere;
+}
+
+.medalDate {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--medal-muted, var(--text-muted));
+}
+
+.medalText {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--medal-ink, var(--text));
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  max-width: 34ch;
+}
+
+.medalLabel {
+  margin: var(--space-3) 0 0;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.16em;
+  color: var(--medal-label, #b7791f);
+}
+
+.medalAwarded {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--medal-muted, var(--text-muted));
+}
+
+/* ---- Empty / notes ------------------------------------------------------------------------- */
+
+.emptyMedals {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.emptyTitle {
+  margin: var(--space-2) 0 0;
+  font-weight: var(--weight-bold);
+}
+
+.emptyHint {
+  margin: 0;
+  max-width: 36ch;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.noteButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent-strong);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---- The reveal moment ------------------------------------------------------------------------ */
+
+.revealBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(10, 12, 20, 0.72);
+  animation: reveal-fade var(--beat-3, 400ms) ease both;
+}
+
+.revealPanel {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 380px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  border-radius: var(--radius-lg);
+  --medal-glow: rgba(247, 201, 72, 0.35);
+  background:
+    var(--medal-layers, radial-gradient(110% 60% at 50% 0%, var(--medal-glow), transparent 70%)),
+    var(--medal-base, var(--surface));
+  color: var(--medal-ink, var(--text));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  animation: reveal-rise 500ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.revealMedals {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 190px;
+}
+
+.revealMedal {
+  position: relative;
+  z-index: 2;
+  animation: reveal-drop 1100ms cubic-bezier(0.25, 1.5, 0.45, 1) 150ms both;
+}
+
+.revealMedalBack {
+  z-index: 1;
+  margin-inline-start: -44px;
+  opacity: 0.85;
+  animation-delay: 450ms;
+}
+
+.revealTitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-xl, 1.5rem);
+  font-weight: var(--weight-bold);
+  color: var(--medal-ink, var(--text));
+}
+
+.revealEvent {
+  margin: 0;
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.revealDate {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-normal);
+  color: var(--medal-muted, var(--text-muted));
+}
+
+.revealText {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.revealActions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-220px) rotate(-18deg) scale(0.7);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(12px) rotate(6deg) scale(1.06);
+  }
+  75% {
+    transform: translateY(-6px) rotate(-3deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---- Organizer form preview ------------------------------------------------------------------- */
+
+.formPreview {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+.formPreview .medalCard {
+  width: min(100%, 320px);
+}
+
+/* ---- Past Ride card icon ---------------------------------------------------------------------- */
+
+.cardMedalButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardMedalButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Organizer: medal background picker ------------------------------------------------------ */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  min-width: 0;
+}
+
+.pickerHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+.pickerChosen {
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
+/* One scrollable row per choice, snapping — thumb-friendly on a phone, no wrapping wall. */
+.pickerRow {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 8px 10px;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 8px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.swatch {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--beat-1, 130ms) ease;
+}
+
+.swatch[aria-checked="true"] {
+  border-color: transparent;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px #d69e1e;
+  transform: scale(1.06);
+}
+
+.swatch[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 999px;
+  background: #f7c948;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.styleTile {
+  flex: none;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  scroll-snap-align: start;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.styleSample {
+  width: 72px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--medal-border, var(--border));
+  background: var(--medal-layers), var(--medal-base);
+}
+
+.styleTile[aria-checked="true"] .styleSample {
+  border-color: #d69e1e;
+  box-shadow: 0 0 0 2px rgba(214, 158, 30, 0.35);
+}
+
+.styleTile[aria-checked="true"] {
+  color: var(--text);
+  font-weight: var(--weight-bold);
+}
+
+.swatch:focus-visible,
+.styleTile:focus-visible .styleSample {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pickerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.pickerReset {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font: inherit;
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+/* ---- Reduced motion --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .medalShine::after,
+  .medalPop,
+  .medalPop.medalShine::after,
+  .revealMedal,
+  .revealPanel,
+  .confettiPiece {
+    animation: none;
+  }
+  .medalShine::after {
+    display: none;
+  }
+  .medalCard {
+    transition: none;
+  }
+  .medalCard[data-celebrating] {
+    transform: none;
+  }
+}

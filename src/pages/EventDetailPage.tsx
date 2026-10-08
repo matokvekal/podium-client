@@ -60,6 +60,7 @@ import {
   Share2,
   Ticket,
   Truck,
+  UserCog,
   Users,
   Play,
   UsersRound,
@@ -2495,7 +2496,14 @@ export function EventDetailPage() {
           />
           <div className={styles.menu} role="menu">
             <div className={styles.menuHeader}>
-              <span>Organizer actions</span>
+              <span>
+                Organizer actions
+                {event.isCreator === false && (
+                  <span className="badge" style={{ marginLeft: 8 }}>
+                    You're a manager
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 className={styles.menuClose}
@@ -2534,6 +2542,18 @@ export function EventDetailPage() {
               <UsersRound width={16} height={16} aria-hidden="true" />
               Groups
             </Link>
+            {/* People the creator lets run this ride with them (lib/ride-managers.ts). Offered
+                to the creator only — the server's event:manage_members capability. */}
+            {event.capabilities?.includes("event:manage_members") && (
+              <Link
+                className={styles.menuItem}
+                to={`/events/${event.id}/managers`}
+                onClick={() => setMenuOpen(false)}
+              >
+                <UserCog width={16} height={16} aria-hidden="true" />
+                Managers
+              </Link>
+            )}
             {/* One link for several rides on the same day. Here rather than in the hero:
                 it is a sharing decision an organizer makes once, not a per-visit action. It
                 stays available while the ride is LIVE — the server's event:manage_link_group

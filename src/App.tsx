@@ -17,6 +17,7 @@ import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { EventCreatePage } from "./pages/EventCreatePage";
 import { EventDetailPage } from "./pages/EventDetailPage";
 import { EventGroupsPage } from "./pages/EventGroupsPage";
+import { EventManagersPage } from "./pages/EventManagersPage";
 import { EventParticipantsPage } from "./pages/EventParticipantsPage";
 import { EventsListPage } from "./pages/EventsListPage";
 import { JoinPage } from "./pages/JoinPage";
@@ -233,6 +234,16 @@ export function App() {
           element={
             <RequireAuth>
               <EventGroupsPage />
+            </RequireAuth>
+          }
+        />
+        {/* Ride managers — the creator names people by email who then run the ride with them.
+            The server decides who may see / change the list; see pages/EventManagersPage.tsx. */}
+        <Route
+          path="/events/:eventId/managers"
+          element={
+            <RequireAuth>
+              <EventManagersPage />
             </RequireAuth>
           }
         />

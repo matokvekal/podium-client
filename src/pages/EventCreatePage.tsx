@@ -119,6 +119,7 @@ import {
   ImagePlus,
   LifeBuoy,
   LocateFixed,
+  Medal,
   MessageCircle,
   Lock,
   MapPin,
@@ -224,6 +225,11 @@ import { useLastEventDefaultsStore } from "../store/lastEventDefaultsStore";
 import { useTeamsStore } from "../store/teamsStore";
 import { validateCreateEventForm } from "../validation/forms";
 import { RideDateField } from "../app/RideDateField";
+import { MedalBackgroundPicker } from "../app/medals/MedalBackgroundPicker";
+import { MedalCard } from "../app/medals/MedalCard";
+import { DEFAULT_MEDAL_COLOR, DEFAULT_MEDAL_STYLE } from "../lib/medal-backgrounds";
+import medalStyles from "../app/medals/Medals.module.css";
+import { countWords, MEDAL_TEXT_MAX_CHARS, MEDAL_TEXT_MAX_WORDS } from "../lib/medal";
 import { formatRideStart } from "../lib/ride-date";
 import styles from "./EventCreatePage.module.css";
 
@@ -277,6 +283,12 @@ interface ExistingEvent {
   promoteRegistrationMessage?: string | null;
   /** Chat on/off (sql/056); absent = on. */
   chatEnabled?: boolean;
+  /** Completion medal (sql/061); absent = off. */
+  medalEnabled?: boolean;
+  medalText?: string | null;
+  /** Medal background (lib/medal-backgrounds.ts). Absent = the original look. */
+  medalColorId?: string | null;
+  medalStyleId?: string | null;
   /** The Organizer display name (events.organizer_group); null/absent = the creator's own name. */
   organizerGroup?: string | null;
   /** Auto check-in at the start (sql/040). Absent on an older server; edit mode then shows it on,
@@ -532,6 +544,17 @@ export function EventCreatePage() {
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   // "Enable Chat" (sql/056). On by default, and for every existing ride. Independent of PROMOTE.
   const [chatEnabled, setChatEnabled] = useState(true);
+  // Completion medal (sql/061). OFF by default and for every existing ride. medalLoadedOn = the
+  // ride had it on when the edit form opened: only then (or when switched on now) are the medal
+  // fields sent at all, so a medal-off ride's save is byte-for-byte what it was before.
+  const [medalEnabled, setMedalEnabled] = useState(false);
+  const [medalText, setMedalText] = useState("");
+  const [medalLoadedOn, setMedalLoadedOn] = useState(false);
+  const [invalidMedalText, setInvalidMedalText] = useState(false);
+  // The medal's background: one of 20 colours × 10 styles (sql/061). Defaults to the original
+  // medal look. Sent with the other medal fields, and snapshotted onto every awarded medal.
+  const [medalColorId, setMedalColorId] = useState(DEFAULT_MEDAL_COLOR);
+  const [medalStyleId, setMedalStyleId] = useState(DEFAULT_MEDAL_STYLE);
   // How many riders the organizer expects to turn up (sql/028). Held as text so the field can
   // be cleared back to empty; parsed to a positive int (or null) on submit. NOT a capacity —
   // the real cap is this account's plan limit, which the server enforces and which the plan
@@ -864,6 +887,11 @@ export function EventCreatePage() {
         }
         setAutoCheckIn(found.autoCheckIn ?? true);
         setChatEnabled(found.chatEnabled !== false);
+        setMedalEnabled(found.medalEnabled === true);
+        setMedalLoadedOn(found.medalEnabled === true);
+        setMedalText(found.medalText ?? "");
+        setMedalColorId(found.medalColorId ?? DEFAULT_MEDAL_COLOR);
+        setMedalStyleId(found.medalStyleId ?? DEFAULT_MEDAL_STYLE);
         setExpectedParticipants(
           found.expectedParticipants != null ? String(found.expectedParticipants) : "",
         );
@@ -1501,7 +1529,10 @@ export function EventCreatePage() {
       description,
       originalStartsAt: isEditing ? originalStartsAt : undefined,
       mustBeFuture: reopening,
+      medalEnabled,
+      medalText,
     });
+    setInvalidMedalText(errors.medalText != null);
     setInvalidName(errors.name != null);
     setInvalidStartsAt(errors.startsAt != null);
     setInvalidRoute(errors.route != null);
@@ -1512,6 +1543,7 @@ export function EventCreatePage() {
       // clue. Say the actual rule instead.
       setError(
         errors.description ??
+          errors.medalText ??
           (startsAt && errors.startsAt) ??
           "Fill in the highlighted fields before saving.",
       );
@@ -1594,6 +1626,16 @@ export function EventCreatePage() {
             // Chat on/off (sql/056). Always sent, so switching it off - or back on - on an edit
             // really does; the messages are never touched either way.
             chatEnabled,
+            // Completion medal (sql/061) — only when it is on, or was on when the form opened
+            // (so switching it off really does). A ride that never had one sends nothing new.
+            ...(medalEnabled || medalLoadedOn
+              ? {
+                  medalEnabled,
+                  ...(medalEnabled
+                    ? { medalText: medalText.trim(), medalColorId, medalStyleId }
+                    : {}),
+                }
+              : {}),
             // Expected riders (sql/028). Always sent, so clearing the field on an edit clears
             // the stored number too.
             expectedParticipants: expectedParticipantsValue,
@@ -1683,6 +1725,10 @@ export function EventCreatePage() {
           // Chat on/off (sql/056) - sent explicitly so an organizer who switched it off is never
           // given the default.
           chatEnabled,
+          // Completion medal (sql/061) — only when switched on; off is the server default.
+          ...(medalEnabled
+            ? { medalEnabled: true, medalText: medalText.trim(), medalColorId, medalStyleId }
+            : {}),
           // Expected riders (sql/028) — null when the organizer left the field blank.
           expectedParticipants: expectedParticipantsValue,
           // Terrain grade (sql/038) — off-road rides only, null otherwise.
@@ -3018,6 +3064,100 @@ export function EventCreatePage() {
                     ? "Riders on this ride and you can chat. Independent of PROMOTE."
                     : "Off — no chat button or messages for this ride. Earlier messages are kept if you turn it back on."}
                 </p>
+                {/* Completion medal (sql/061). OFF by default. When on, every rider who rides it
+                    receives a permanent medal with this dedication once the ride is finished.
+                    The ride's name and date are printed by the medal itself. */}
+                <label className={styles.switchRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.switchInput}
+                    checked={medalEnabled}
+                    onChange={(e) => {
+                      setMedalEnabled(e.target.checked);
+                      if (!e.target.checked) setInvalidMedalText(false);
+                    }}
+                    data-testid="medal-switch"
+                  />
+                  <span className={`${styles.switchTrack} ${styles.switchTrackPositive}`}>
+                    <span className={styles.switchThumb} />
+                  </span>
+                  <span
+                    className={`${styles.switchState} ${medalEnabled ? styles.switchStateOnPositive : ""}`}
+                  >
+                    {medalEnabled ? "Yes" : "No"}
+                  </span>
+                  <span className={styles.switchLabel}>
+                    <Medal aria-hidden="true" />
+                    Give participants a completion medal
+                  </span>
+                </label>
+                <p className={styles.hint}>
+                  {medalEnabled
+                    ? "Participants will receive this medal after the event is completed."
+                    : "Off — no medal for this ride."}
+                </p>
+                {medalEnabled && (
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="medal-text">
+                      Medal dedication
+                    </label>
+                    <textarea
+                      id="medal-text"
+                      dir="auto"
+                      className={`${styles.input} ${invalidMedalText ? styles.inputInvalid : ""}`}
+                      data-invalid={invalidMedalText || undefined}
+                      rows={3}
+                      maxLength={MEDAL_TEXT_MAX_CHARS}
+                      value={medalText}
+                      onChange={(e) => {
+                        setMedalText(e.target.value);
+                        if (invalidMedalText) setInvalidMedalText(false);
+                      }}
+                      placeholder="e.g. Thank you for riding with us — well done!"
+                    />
+                    <p
+                      className={styles.hint}
+                      data-testid="medal-word-count"
+                      style={
+                        countWords(medalText) > MEDAL_TEXT_MAX_WORDS
+                          ? { color: "var(--status-danger)" }
+                          : undefined
+                      }
+                    >
+                      Maximum {MEDAL_TEXT_MAX_WORDS} words · {countWords(medalText)} /{" "}
+                      {MEDAL_TEXT_MAX_WORDS}
+                    </p>
+                    <MedalBackgroundPicker
+                      colorId={medalColorId}
+                      styleId={medalStyleId}
+                      onChange={(next) => {
+                        setMedalColorId(next.colorId);
+                        setMedalStyleId(next.styleId);
+                      }}
+                    />
+                    {/* Live preview — exactly the card every rider of this ride will receive. */}
+                    <p className={styles.fieldLabel} style={{ marginTop: "var(--space-3)" }}>
+                      Preview
+                    </p>
+                    <div className={medalStyles.formPreview} aria-label="Medal preview">
+                      <MedalCard
+                        medal={{
+                          eventId: "preview",
+                          eventTitle: name.trim() || "Your ride",
+                          eventDate: startsAt
+                            ? new Date(startsAt).toISOString()
+                            : new Date().toISOString(),
+                          medalText: medalText.trim() || "Your dedication will appear here.",
+                          awardedAt: new Date().toISOString(),
+                          seen: true,
+                          cursor: "",
+                          medalColorId,
+                          medalStyleId,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </fieldset>
             </div>
           </div>

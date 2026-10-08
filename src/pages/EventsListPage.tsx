@@ -50,13 +50,14 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { EmptyRidesState } from "../app/EmptyRidesState";
 import { EventCard } from "../app/EventCard";
 import { ExploreTracksIntro } from "../app/ExploreTracksIntro";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useRideChatUnread } from "../app/RideChatButton";
+import { useIncrementalList } from "../app/useIncrementalList";
 import { chatRideIds } from "../lib/ride-chat";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
@@ -83,6 +84,7 @@ import {
   type WhenFilter,
 } from "../lib/find-rides-filter";
 import type { EventSummary } from "../lib/local-db";
+import { isMyOrganizedRide } from "../lib/ride-managers";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
 import { type PublicBucket, useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
@@ -109,7 +111,9 @@ const SORT_LABEL: Record<SortKey, string> = {
 };
 
 // Home row: most recent My Rides only, before "See All" takes over.
-const HOME_ROW_LIMIT = 10;
+/** My Rides draws this many cards, then this many more each time the list's end scrolls into
+ *  view (app/useIncrementalList.ts) — never every ride at once, never a dead end. */
+const MY_RIDES_PAGE_SIZE = 20;
 
 /**
  * My Rides is split into Past / Current / Upcoming — plain client-side views over the
@@ -198,10 +202,10 @@ export function EventsListPage() {
     const joined = new Set(joinedRideIds);
     return rawMyRides.filter((ride) => joined.has(ride.id));
   }, [rawMyRides, joinedRideIds]);
-  // "Created" = events this user owns (Organizer mode only). Same ownerId check the rest of
-  // the app uses for isOwner; an event can be in BOTH lists and that is correct.
+  // "Created" = events this user organizes (Organizer mode only): the ones they created and
+  // the ones a creator made them a manager of. An event can be in BOTH lists and that is correct.
   const createdRides = useMemo(
-    () => rawMyRides.filter((ride) => profile != null && ride.ownerId === profile.id),
+    () => rawMyRides.filter((ride) => profile != null && isMyOrganizedRide(ride, profile.id)),
     [rawMyRides, profile],
   );
   const myRidesSettled = useEventsStore((state) => state.myRidesSettled);
@@ -324,7 +328,9 @@ export function EventsListPage() {
   // One flat, ordered list for the home view — the reference design shows a single stream of
   // cards, not the separate Live/Upcoming/Past sections this used to render. Order is always
   // live → upcoming → past; the chip selection only decides which of those blocks appear.
-  const homeList = useMemo(() => {
+  // `homeCount` is the chip-filtered total, not the cards drawn so far. The heading badge shows it as
+  // "12 of 151" (or "151 Total" when no chip narrows the list), so the number follows the chips.
+  const { homeRides, homeCount } = useMemo(() => {
     const { live, upcoming, past } = myRidesByBucket;
     const show = (bucket: MyRidesFilter) => myFilters.length === 0 || myFilters.includes(bucket);
     const ordered = [
@@ -332,8 +338,9 @@ export function EventsListPage() {
       ...(show("upcoming") ? upcoming : []),
       ...(show("past") ? past : []),
     ];
-    return ordered.slice(0, HOME_ROW_LIMIT);
+    return { homeRides: ordered, homeCount: ordered.length };
   }, [myRidesByBucket, myFilters]);
+  const homePage = useIncrementalList(homeRides, myFilters.join(","), MY_RIDES_PAGE_SIZE);
 
   // See-All list: search + favourites filter first, then bucketed the same way as the home
   // row, with the chosen sort applied inside each bucket (Live is small enough that its own
@@ -392,6 +399,24 @@ export function EventsListPage() {
       total: live.length + upcoming.length + past.length,
     };
   }, [filteredMyRidesByBucket, myFilters]);
+  // The See-All sections as ONE sequence, so it can be drawn a page at a time across the
+  // Live / Upcoming / Past boundaries; a section's label is drawn above its first row.
+  const seeAllRows = useMemo(
+    () => [
+      ...seeAllByBucket.live.map((event) => ({ section: "live" as const, event })),
+      ...seeAllByBucket.upcoming.map((event) => ({ section: "upcoming" as const, event })),
+      ...seeAllByBucket.past.map((event) => ({ section: "past" as const, event })),
+    ],
+    [seeAllByBucket],
+  );
+  // Created has no chips or search, so only the list itself decides what is drawn; its heading
+  // count is createdRides.length — every ride, not the cards drawn so far.
+  const createdPage = useIncrementalList(createdSorted, "created", MY_RIDES_PAGE_SIZE);
+  const seeAllPage = useIncrementalList(
+    seeAllRows,
+    [myFilters.join(","), q, favoritesOnly, sortBy].join("|"),
+    MY_RIDES_PAGE_SIZE,
+  );
 
   // Find Rides — the public list, identical for everyone, RIDE-type only (see the doc comment
   // above re: no Find Races tab). Fetched once; ALL filtering + sorting is client-side over the
@@ -634,7 +659,13 @@ export function EventsListPage() {
             <div className="section-header">
               <div className="section-title-row">
                 <h2>My Rides</h2>
-                {myRides.length > 0 && <span className="section-count">{myRides.length}</span>}
+                {myRides.length > 0 && (
+                  <span className="section-count">
+                    {myFilters.length === 0 || myFilters.length === MY_RIDES_FILTERS.length
+                      ? `${myRides.length} Total`
+                      : `${homeCount} of ${myRides.length}`}
+                  </span>
+                )}
               </div>
               <div className={styles.toolbarLeft}>
                 {myRides.length > 0 && (
@@ -769,47 +800,28 @@ export function EventsListPage() {
                 </p>
               ) : (
                 <div className={styles.list}>
-                  {seeAllByBucket.live.length > 0 && (
-                    <>
-                      <div className={styles.sectionLabel} data-tone="live">
-                        Live now
-                      </div>
-                      {seeAllByBucket.live.map((event) => (
-                        <EventCard
-                          key={event.id}
-                          event={event}
-                          isNew={event.id === newEventId}
-                          justOpened={event.id === returnHighlightId}
-                        />
-                      ))}
-                    </>
-                  )}
-                  {seeAllByBucket.upcoming.length > 0 && (
-                    <>
-                      <div className={styles.sectionLabel}>Upcoming</div>
-                      {seeAllByBucket.upcoming.map((event) => (
-                        <EventCard
-                          key={event.id}
-                          event={event}
-                          isNew={event.id === newEventId}
-                          justOpened={event.id === returnHighlightId}
-                        />
-                      ))}
-                    </>
-                  )}
-                  {seeAllByBucket.past.length > 0 && (
-                    <>
-                      <div className={styles.sectionLabel}>Past</div>
-                      {seeAllByBucket.past.map((event) => (
-                        <EventCard
-                          key={event.id}
-                          event={event}
-                          isNew={event.id === newEventId}
-                          justOpened={event.id === returnHighlightId}
-                        />
-                      ))}
-                    </>
-                  )}
+                  {seeAllPage.visible.map(({ section, event }, i) => (
+                    <Fragment key={event.id}>
+                      {section !== seeAllPage.visible[i - 1]?.section && (
+                        <div
+                          className={styles.sectionLabel}
+                          data-tone={section === "live" ? "live" : undefined}
+                        >
+                          {section === "live"
+                            ? "Live now"
+                            : section === "upcoming"
+                              ? "Upcoming"
+                              : "Past"}
+                        </div>
+                      )}
+                      <EventCard
+                        event={event}
+                        isNew={event.id === newEventId}
+                        justOpened={event.id === returnHighlightId}
+                      />
+                    </Fragment>
+                  ))}
+                  {seeAllPage.hasMore && <div ref={seeAllPage.sentinelRef} aria-hidden="true" />}
                 </div>
               )}
             </div>
@@ -849,7 +861,7 @@ export function EventsListPage() {
                 </button>
               </div>
 
-              {homeList.length === 0 ? (
+              {homeRides.length === 0 ? (
                 <p className={styles.noResults}>
                   {myFilters.length === 0
                     ? "No rides yet."
@@ -863,7 +875,7 @@ export function EventsListPage() {
                 </p>
               ) : (
                 <div className={styles.homeList}>
-                  {homeList.map((event) => (
+                  {homePage.visible.map((event) => (
                     <EventCard
                       key={event.id}
                       event={event}
@@ -871,6 +883,7 @@ export function EventsListPage() {
                       justOpened={event.id === returnHighlightId}
                     />
                   ))}
+                  {homePage.hasMore && <div ref={homePage.sentinelRef} aria-hidden="true" />}
                 </div>
               )}
             </div>
@@ -899,7 +912,7 @@ export function EventsListPage() {
             />
           ) : (
             <div className={styles.homeList}>
-              {createdSorted.map((event) => (
+              {createdPage.visible.map((event) => (
                 <EventCard
                   key={event.id}
                   event={event}
@@ -907,6 +920,7 @@ export function EventsListPage() {
                   justOpened={event.id === returnHighlightId}
                 />
               ))}
+              {createdPage.hasMore && <div ref={createdPage.sentinelRef} aria-hidden="true" />}
             </div>
           )}
         </section>

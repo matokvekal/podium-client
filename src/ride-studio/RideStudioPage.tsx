@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api-client";
-import { useRideImages } from "../lib/ride-images-dynamic";
+import { resolveRideImage, useRideImages } from "../lib/ride-images-dynamic";
 import { useEventsStore } from "../store/eventsStore";
 import { type CreatedRide, createRide } from "./adapters/createRide";
 import {
@@ -228,6 +228,8 @@ function Studio({ userId, profileCountry }: { userId: number; profileCountry: st
               missing={missing}
               creating={creating}
               error={createError}
+              coverLabel={resolveRideImage(catalog, draft.coverKey)?.label ?? null}
+              onChangeCover={() => setCoverOpen(true)}
               onEdit={(id) => studio.go(id)}
               onBack={onBack}
               onCreate={onCreate}

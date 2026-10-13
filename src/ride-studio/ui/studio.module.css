@@ -670,7 +670,13 @@
 }
 
 /* <fieldset> used as a semantic group: strip the browser frame. */
-fieldset.cards,
+fieldset.cards {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
 fieldset.langGroup {
   margin: 0;
   padding: 0;

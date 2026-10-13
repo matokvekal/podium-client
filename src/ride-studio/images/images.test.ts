@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RideImageDto } from "../../store/rideImagesStore";
 import { EXPECTED_DISTRIBUTION, promptSheet, STUDIO_IMAGES, type StudioImage } from "./catalog";
-import { suggestCover, suggestCovers } from "./resolver";
+import { isIllustrativeCover, suggestCover, suggestCovers } from "./resolver";
 
 describe("the 20-image library", () => {
   it("has exactly 20 images with unique ids and files", () => {
@@ -86,6 +86,14 @@ function library(): StudioImage[] {
 }
 
 describe("choosing a cover", () => {
+  it("only labels the library's own AI artwork as illustrative, never the app's existing covers", () => {
+    expect(isIllustrativeCover("hills-road", library())).toBe(true);
+    expect(isIllustrativeCover("road-a", library())).toBe(false);
+    expect(isIllustrativeCover("tikva1", library())).toBe(false);
+    expect(isIllustrativeCover(null, library())).toBe(false);
+    expect(isIllustrativeCover("hills-road")).toBe(false); // nothing is generated yet
+  });
+
   it("until the library exists, falls back to the registry's covers for the ride type", () => {
     const pick = suggestCover({ rideType: "mtb", country: "IL", region: "carmel" }, registry);
     expect(pick).toMatchObject({ key: "mtb-a", tier: "registry", illustrative: false });

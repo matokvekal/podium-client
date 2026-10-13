@@ -36,6 +36,7 @@ import { TermsPage } from "./pages/TermsPage";
 import { TracksPage } from "./pages/TracksPage";
 import { EntryChoicePage } from "./ride-studio/EntryChoicePage";
 import { RideStudioPage } from "./ride-studio/RideStudioPage";
+import { StudioGate } from "./ride-studio/StudioGate";
 import { useUserModeStore } from "./store/userModeStore";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -162,26 +163,27 @@ export function App() {
             </RequireAuth>
           }
         />
-        {/* Ride Studio (src/ride-studio). Both pages hand anyone they cannot serve — flag off,
-            no organizer permission — straight back to /events/new, which is unchanged. */}
+        {/* Ride Studio (src/ride-studio): full-screen, no app shell (StudioGate). Both pages hand
+            anyone they cannot serve — flag off, no organizer permission — straight back to
+            /events/new, which is unchanged. */}
         <Route
           path="/events/start"
           element={
-            <RequireAuth>
+            <StudioGate>
               <RequireOrganizer>
                 <EntryChoicePage />
               </RequireOrganizer>
-            </RequireAuth>
+            </StudioGate>
           }
         />
         <Route
           path="/events/studio"
           element={
-            <RequireAuth>
+            <StudioGate>
               <RequireOrganizer>
                 <RideStudioPage />
               </RequireOrganizer>
-            </RequireAuth>
+            </StudioGate>
           }
         />
         {/* Same component as /events/new — EventCreatePage.tsx detects an :eventId param and

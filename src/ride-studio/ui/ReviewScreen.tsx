@@ -75,6 +75,8 @@ export function ReviewScreen({
   missing,
   creating,
   error,
+  coverLabel,
+  onChangeCover,
   onEdit,
   onBack,
   onCreate,
@@ -84,6 +86,9 @@ export function ReviewScreen({
   missing: QuestionDef[];
   creating: boolean;
   error: string | null;
+  /** The chosen cover's name, or null for none. */
+  coverLabel: string | null;
+  onChangeCover: () => void;
   onEdit: (questionId: string) => void;
   onBack: () => void;
   onCreate: () => void;
@@ -112,6 +117,15 @@ export function ReviewScreen({
             </button>
           </div>
         ))}
+        <div className={styles.reviewRow}>
+          <span className={styles.reviewKey}>{t(locale, "image.title")}</span>
+          <span className={styles.reviewValue} data-empty={!coverLabel}>
+            {coverLabel ?? t(locale, "image.none")}
+          </span>
+          <button type="button" className={styles.linkBtn} onClick={onChangeCover}>
+            {t(locale, "ui.change")}
+          </button>
+        </div>
       </div>
 
       {missing.length > 0 ? (

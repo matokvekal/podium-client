@@ -163,6 +163,16 @@ function overlap(image: StudioImage, wanted: readonly Landscape[]): number {
   return image.landscape.filter((l) => wanted.includes(l)).length;
 }
 
+/** True when this registry key is one of the Studio library's AI illustrations (as opposed to
+ *  one of the app's own existing covers), so the UI only labels artwork that is actually
+ *  illustrative. */
+export function isIllustrativeCover(
+  key: string | null | undefined,
+  library: readonly StudioImage[] = STUDIO_IMAGES,
+): boolean {
+  return key != null && library.some((i) => i.registryKey === key);
+}
+
 /** The single pre-selected suggestion, or null when the registry has not loaded / is empty. */
 export function suggestCover(
   query: CoverQuery,

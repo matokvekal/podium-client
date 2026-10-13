@@ -12,6 +12,7 @@ import { resolveRideImage, useRideImages } from "../../lib/ride-images-dynamic";
 import { SURFACE_TYPE_ICON } from "../../lib/surface-types";
 import type { RideDraft } from "../engine/types";
 import { formatNumber, formatStart, type StudioKey, t } from "../i18n";
+import { isIllustrativeCover } from "../images/resolver";
 import styles from "./studio.module.css";
 
 export function LivePreview({
@@ -57,7 +58,7 @@ export function LivePreview({
           {cover ? (
             <img className={styles.coverImg} src={cover.src} alt={cover.label} key={cover.key} />
           ) : null}
-          {cover ? (
+          {cover && isIllustrativeCover(cover.key) ? (
             <span className={styles.coverBadge}>{t(locale, "image.illustration")}</span>
           ) : null}
           <button type="button" className={styles.coverChange} onClick={onChangeCover}>

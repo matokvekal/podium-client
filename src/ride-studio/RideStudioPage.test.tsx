@@ -556,6 +556,19 @@ describe("cover image", () => {
     ).toContain("road-b");
   });
 
+  it("the review shows the cover and lets the organizer change it (the phone preview is collapsed)", async () => {
+    renderStudio();
+    await walkToReview();
+    expect(screen.getByText("Road A")).toBeTruthy(); // the suggestion for a road ride
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    const sheet = await screen.findByRole("dialog", { name: "Cover image" });
+    fireEvent.click(within(sheet).getByRole("button", { name: /Road B/ }));
+    expect(screen.getByText("Road B")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    fireEvent.click(await screen.findByRole("button", { name: "No cover image" }));
+    expect(screen.getAllByText("No cover image").length).toBeGreaterThan(0);
+  });
+
   it("the organizer can choose no cover at all", async () => {
     await toNameWithType(/^Road/);
     const preview = screen.getByLabelText("Your ride");

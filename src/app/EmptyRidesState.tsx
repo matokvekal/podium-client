@@ -7,6 +7,7 @@
 
 import { Bike, Plus, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
+import { NewRideLink } from "../ride-studio/NewRideLink";
 import { useIsOrganizer } from "../store/userModeStore";
 import styles from "./EmptyRidesState.module.css";
 
@@ -35,10 +36,10 @@ export function EmptyRidesState({ title = "No rides yet", subtitle }: EmptyRides
 
       <div className={styles.actions}>
         {isOrganizer && (
-          <Link className={styles.btnPrimary} to="/events/new">
+          <NewRideLink className={styles.btnPrimary}>
             <Plus width={18} height={18} aria-hidden="true" />
             Create a ride or race
-          </Link>
+          </NewRideLink>
         )}
 
         <Link className={styles.btnSecondary} to="/join">

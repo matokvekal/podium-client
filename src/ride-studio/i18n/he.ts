@@ -12,6 +12,7 @@ export const he: Record<StudioKey, string> = {
   "ui.remove": "הסרה",
   "ui.close": "סגירה",
   "ui.selectFromList": "בחרו מהרשימה",
+  "ui.chooseOne": "בחרו אחת",
   "ui.optional": "לא חובה",
   "ui.draftSaved": "הטיוטה נשמרה במכשיר הזה",
   "ui.language": "שפה",

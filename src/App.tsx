@@ -34,6 +34,8 @@ import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TermsPage } from "./pages/TermsPage";
 import { TracksPage } from "./pages/TracksPage";
+import { EntryChoicePage } from "./ride-studio/EntryChoicePage";
+import { RideStudioPage } from "./ride-studio/RideStudioPage";
 import { useUserModeStore } from "./store/userModeStore";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -156,6 +158,28 @@ export function App() {
             <RequireAuth>
               <RequireOrganizer>
                 <EventCreatePage />
+              </RequireOrganizer>
+            </RequireAuth>
+          }
+        />
+        {/* Ride Studio (src/ride-studio). Both pages hand anyone they cannot serve — flag off,
+            no organizer permission — straight back to /events/new, which is unchanged. */}
+        <Route
+          path="/events/start"
+          element={
+            <RequireAuth>
+              <RequireOrganizer>
+                <EntryChoicePage />
+              </RequireOrganizer>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/events/studio"
+          element={
+            <RequireAuth>
+              <RequireOrganizer>
+                <RideStudioPage />
               </RequireOrganizer>
             </RequireAuth>
           }

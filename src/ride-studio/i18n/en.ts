@@ -15,6 +15,7 @@ export const en = {
   "ui.remove": "Remove",
   "ui.close": "Close",
   "ui.selectFromList": "Select from the list",
+  "ui.chooseOne": "Choose one",
   "ui.optional": "Optional",
   "ui.draftSaved": "Draft saved on this device",
   "ui.language": "Language",

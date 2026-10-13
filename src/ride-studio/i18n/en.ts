@@ -1,0 +1,138 @@
+/**
+ * Ride Studio's words — English, the reference language. he.ts must define every key here
+ * (its type enforces it), so a missing translation is a compile error, not a blank label.
+ * The rest of the app has no translation layer; this one is scoped to the studio on purpose.
+ */
+
+export const en = {
+  // shared
+  "ui.back": "Back",
+  "ui.continue": "Continue",
+  "ui.skip": "Skip",
+  "ui.saveExit": "Save & exit",
+  "ui.edit": "Edit",
+  "ui.change": "Change",
+  "ui.remove": "Remove",
+  "ui.close": "Close",
+  "ui.selectFromList": "Select from the list",
+  "ui.optional": "Optional",
+  "ui.draftSaved": "Draft saved on this device",
+  "ui.language": "Language",
+  "ui.studioName": "Ride Studio",
+
+  // stages
+  "stage.idea": "The idea",
+  "stage.details": "Route & details",
+  "stage.review": "Review & share",
+
+  // entry choice
+  "entry.title": "New ride",
+  "entry.subtitle": "How would you like to set it up?",
+  "entry.normal.title": "Create normally",
+  "entry.normal.body": "The classic form. Everything on one screen.",
+  "entry.studio.title": "Create with Ride Studio",
+  "entry.studio.body":
+    "Easy and interactive: one question at a time, with a live preview. Save and pick it up later.",
+  "entry.remember": "Remember my choice",
+  "entry.resume": "Continue your unfinished ride",
+  "entry.resume.named": 'Continue "{name}"',
+  "entry.discard": "Start a new one instead",
+
+  // ride types
+  "type.road": "Road",
+  "type.mtb": "MTB",
+  "type.gravel": "Gravel",
+  "type.running": "Running",
+  "type.road.hint": "Paved roads and climbs",
+  "type.mtb.hint": "Trails and singletrack",
+  "type.gravel.hint": "Dirt roads and mixed surfaces",
+  "type.running.hint": "On foot",
+
+  // questions
+  "q.type.title": "What kind of ride is it?",
+  "q.type.hint": "This sets the scene for your ride.",
+  "q.name.title": "What will you call it?",
+  "q.name.hint": "A short name riders will recognise.",
+  "q.name.placeholder": "e.g. Saturday morning loop",
+  "q.where.title": "Where is it happening?",
+  "q.where.hint": "The country and area help riders find it.",
+  "q.where.country": "Country",
+  "q.where.region": "Region",
+  "q.where.regionAny": "Any region",
+  "q.where.place": "Meeting point or start place",
+  "q.where.placeHint": "Optional, e.g. the car park or the cafe",
+  "q.route.title": "Which route are you riding?",
+  "q.route.hint": "Pick a track other riders have used, or upload your own GPX file.",
+  "q.route.library": "Browse tracks",
+  "q.route.libraryHint": "Choose from rides people have ridden",
+  "q.route.upload": "Upload a GPX file",
+  "q.route.uploadHint": "GPX or CSV from your device",
+  "q.route.chosen": "Route",
+  "q.route.distance": "{km} km",
+  "q.route.climb": "{m} m climb",
+  "q.start.title": "When does it start?",
+  "q.start.hint": "The date and time riders should be at the start.",
+  "q.visibility.title": "Who can see this ride?",
+  "q.visibility.hint": "You can change this later.",
+  "vis.public.title": "Public",
+  "vis.public.body": "Anyone can find and join it.",
+  "vis.private.title": "Private",
+  "vis.private.body": "Only people you invite with the ride code.",
+  "q.details.title": "A few last details",
+  "q.details.hint": "All optional — skip if you like.",
+  "q.details.description": "Description",
+  "q.details.descriptionPlaceholder": "Pace, meeting time, what to bring…",
+  "q.details.approval": "I approve each rider before they join",
+  "q.details.joinAsRider": "I'm riding too",
+  "q.review.title": "Ready to create your ride?",
+  "q.review.hint": "Check the details. Nothing is created until you confirm.",
+
+  // review + create
+  "review.missing": "Still needed",
+  "review.create": "Create ride",
+  "review.creating": "Creating…",
+  "review.editAnswer": "Edit",
+  "review.notSet": "Not set",
+  "review.created": "Your ride is ready",
+  "review.createdBody": '"{name}" has been created.',
+  "review.viewRide": "View ride",
+  "review.copyCode": "Copy ride code",
+  "review.codeCopied": "Code copied",
+  "review.another": "Create another",
+  "review.error": "We could not create the ride. Nothing was lost — try again.",
+
+  // preview
+  "preview.title": "Your ride",
+  "preview.show": "Show preview",
+  "preview.hide": "Hide preview",
+  "preview.untitled": "Your ride",
+  "preview.noDate": "Date and time to come",
+  "preview.noPlace": "Location to come",
+  "preview.noRoute": "No route yet",
+
+  // cover image
+  "image.title": "Cover image",
+  "image.suggested": "Suggested for your ride",
+  "image.change": "Change image",
+  "image.pick": "Choose a cover",
+  "image.none": "No cover image",
+  "image.illustration": "Illustrative artwork, not a photo of the route",
+
+  // validation
+  "err.type": "Choose a ride type.",
+  "err.name": "Give your ride a name.",
+  "err.nameLong": "That name is too long.",
+  "err.country": "Choose a country.",
+  "err.region": "That region does not match the country.",
+  "err.place": "That place is too long.",
+  "err.route": "Pick a track for this ride.",
+  "err.startRequired": "Choose the date and time.",
+  "err.startPast": "That time has already passed. Check the day and month.",
+  "err.visibility": "Choose who can see it.",
+  "err.descriptionLong": "The description is too long.",
+  "err.flag": "That option is not valid.",
+  "err.cover": "That image is not available.",
+  "err.unknownField": "That answer is not recognised.",
+} as const;
+
+export type StudioKey = keyof typeof en;

@@ -97,7 +97,9 @@ import { draftStorageKey, saveDraft } from "./engine/draft-storage";
 import { applyAnswers, markAnswered } from "./engine/flow";
 import { LOCALE_PREF_KEY } from "./engine/locale-pref";
 import { RIDE_STUDIO_OVERRIDE_KEY } from "./flag";
+import { NewRideLink } from "./NewRideLink";
 import { RideStudioPage } from "./RideStudioPage";
+import { resetRuntimeConfigForTests } from "./runtime-config";
 import { upsertSpy } from "./testSupport";
 
 vi.mock("../store/eventsStore", async () => {
@@ -162,6 +164,7 @@ async function walkToReview() {
 
 beforeEach(() => {
   localStorage.clear();
+  resetRuntimeConfigForTests({ settled: true });
   localStorage.setItem(RIDE_STUDIO_OVERRIDE_KEY, "on");
   profile = { id: 7, canOrganize: true, country: "US" };
   apiMutate.mockReset();
@@ -642,5 +645,73 @@ describe("sharing the created ride", () => {
   it("the success screen shows a full battery", async () => {
     await createRideAndReachSuccess();
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("7");
+  });
+});
+
+describe("on by default, with an emergency switch", () => {
+  const clickLink = (name: string) => screen.getByRole("link", { name });
+
+  function renderLink() {
+    return render(
+      <MemoryRouter>
+        <NewRideLink>New Ride</NewRideLink>
+      </MemoryRouter>,
+    );
+  }
+
+  it("an organizer sees both ways to create with nothing activated", () => {
+    localStorage.removeItem(RIDE_STUDIO_OVERRIDE_KEY); // no localStorage activation at all
+    renderLink();
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/start");
+    cleanup();
+    renderStudio("/events/start");
+    expect(screen.getByRole("button", { name: /Quick Create/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Guided Create/ })).toBeTruthy();
+  });
+
+  it("Quick Create still leads to the unchanged original form", () => {
+    localStorage.removeItem(RIDE_STUDIO_OVERRIDE_KEY);
+    renderStudio("/events/start");
+    fireEvent.click(screen.getByRole("button", { name: /Quick Create/ }));
+    expect(screen.getByText("original-form")).toBeTruthy();
+  });
+
+  it("a user who cannot organize gets no studio and the original link", () => {
+    localStorage.removeItem(RIDE_STUDIO_OVERRIDE_KEY);
+    profile = { id: 7, canOrganize: false, country: "US" };
+    renderLink();
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/new");
+    cleanup();
+    renderStudio("/events/start");
+    expect(screen.getByText("original-form")).toBeTruthy();
+  });
+
+  it("the emergency switch sends everyone back to the original form, no redeploy", () => {
+    localStorage.removeItem(RIDE_STUDIO_OVERRIDE_KEY);
+    resetRuntimeConfigForTests({ enabled: false, settled: true });
+    renderLink();
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/new");
+    cleanup();
+    renderStudio("/events/start");
+    expect(screen.getByText("original-form")).toBeTruthy();
+    cleanup();
+    renderStudio("/events/studio");
+    expect(screen.getByText("original-form")).toBeTruthy();
+  });
+
+  it("turning the switch off while the page is open takes effect without a reload", async () => {
+    localStorage.removeItem(RIDE_STUDIO_OVERRIDE_KEY);
+    renderLink();
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/start");
+    act(() => {
+      resetRuntimeConfigForTests({ enabled: false, settled: true });
+    });
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/new");
+  });
+
+  it("a browser's own opt-out still wins", () => {
+    localStorage.setItem(RIDE_STUDIO_OVERRIDE_KEY, "off");
+    renderLink();
+    expect(clickLink("New Ride").getAttribute("href")).toBe("/events/new");
   });
 });

@@ -14,8 +14,8 @@ import { loadDraft } from "./engine/draft-storage";
 import { readLocalePref, writeLocalePref } from "./engine/locale-pref";
 import {
   type CreateMethod,
-  isRideStudioEnabled,
   readCreateMethod,
+  useRideStudioEnabled,
   writeCreateMethod,
 } from "./flag";
 import { localeDir, STUDIO_LOCALES, t } from "./i18n";
@@ -28,7 +28,7 @@ export function EntryChoicePage() {
   const [remember, setRemember] = useState(false);
   const [picked, setPicked] = useState(readLocalePref);
 
-  const enabled = isRideStudioEnabled({ userId: profile?.id, canOrganize: profile?.canOrganize });
+  const enabled = useRideStudioEnabled({ userId: profile?.id, canOrganize: profile?.canOrganize });
   if (!profile || !enabled) return <Navigate to="/events/new" replace />;
 
   const remembered = readCreateMethod();

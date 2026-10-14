@@ -95,6 +95,7 @@ import { EntryChoicePage } from "./EntryChoicePage";
 import { draftStorageKey } from "./engine/draft-storage";
 import { RIDE_STUDIO_OVERRIDE_KEY } from "./flag";
 import { RideStudioPage } from "./RideStudioPage";
+import { resetRuntimeConfigForTests } from "./runtime-config";
 import { upsertSpy } from "./testSupport";
 
 vi.mock("../store/eventsStore", async () => {
@@ -159,6 +160,7 @@ async function walkToReview() {
 
 beforeEach(() => {
   localStorage.clear();
+  resetRuntimeConfigForTests({ settled: true });
   localStorage.setItem(RIDE_STUDIO_OVERRIDE_KEY, "on");
   profile = { id: 7, canOrganize: true, country: "US" };
   apiMutate.mockReset();

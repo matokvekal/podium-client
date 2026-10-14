@@ -58,7 +58,6 @@ import { ExploreTracksIntro } from "../app/ExploreTracksIntro";
 import { consumeOpenedEventId, figmaStatus } from "../app/event-visuals";
 import { useRideChatUnread } from "../app/RideChatButton";
 import { useIncrementalList } from "../app/useIncrementalList";
-import { chatRideIds } from "../lib/ride-chat";
 import { useAuth } from "../auth/AuthContext";
 import { useConnectivityStore } from "../lib/connectivity";
 import {
@@ -84,8 +83,10 @@ import {
   type WhenFilter,
 } from "../lib/find-rides-filter";
 import type { EventSummary } from "../lib/local-db";
+import { chatRideIds } from "../lib/ride-chat";
 import { isMyOrganizedRide } from "../lib/ride-managers";
 import { SURFACE_TYPE_ICON, SURFACE_TYPE_LABEL, type SurfaceType } from "../lib/surface-types";
+import { NewRideLink } from "../ride-studio/NewRideLink";
 import { type PublicBucket, useEventsStore } from "../store/eventsStore";
 import { useInvitedEventsStore } from "../store/invitedEventsStore";
 import { useIsOrganizer } from "../store/userModeStore";
@@ -678,10 +679,10 @@ export function EventsListPage() {
                   </button>
                 )}
                 {isOrganizer && (
-                  <Link className={styles.addBtn} to="/events/new">
+                  <NewRideLink className={styles.addBtn}>
                     <Plus width={15} height={15} aria-hidden="true" />
                     New Ride
-                  </Link>
+                  </NewRideLink>
                 )}
               </div>
             </div>
@@ -759,10 +760,10 @@ export function EventsListPage() {
                   </button>
                 </div>
                 {isOrganizer && (
-                  <Link className={styles.addBtn} to="/events/new">
+                  <NewRideLink className={styles.addBtn}>
                     <Plus width={15} height={15} aria-hidden="true" />
                     New Ride
-                  </Link>
+                  </NewRideLink>
                 )}
               </div>
 
@@ -900,10 +901,10 @@ export function EventsListPage() {
                 <span className="section-count">{createdRides.length}</span>
               )}
             </div>
-            <Link className={styles.addBtn} to="/events/new">
+            <NewRideLink className={styles.addBtn}>
               <Plus width={15} height={15} aria-hidden="true" />
               New Ride
-            </Link>
+            </NewRideLink>
           </div>
           {createdRides.length === 0 ? (
             <EmptyRidesState

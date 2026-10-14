@@ -682,3 +682,319 @@ fieldset.langGroup {
   padding: 0;
   min-inline-size: 0;
 }
+
+/* ── ride-type cards ─────────────────────────────────────────────────────────────────────── */
+
+.typeCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: 124px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  padding-inline-end: var(--space-4);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color var(--beat-2),
+    box-shadow var(--beat-2),
+    transform var(--beat-1);
+}
+
+.typeCard:hover {
+  border-color: var(--status-live-strong);
+}
+
+.typeCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.typeCard:active {
+  transform: scale(0.99);
+}
+
+.typeCard[aria-pressed="true"] {
+  border-color: var(--status-live-strong);
+  box-shadow: 0 0 0 1px var(--status-live-strong);
+}
+
+.typeThumb {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.typeThumb img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  transition: transform 450ms ease-out;
+}
+
+.typeCard:hover .typeThumb img,
+.typeCard[aria-pressed="true"] .typeThumb img {
+  transform: scale(1.08);
+}
+
+.typeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.typeCheck {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  display: grid;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border-radius: 50%;
+  background: var(--status-live-strong);
+  color: #fff;
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--beat-2),
+    transform 240ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.typeCard[aria-pressed="true"] .typeCheck {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ── start: day and time shortcuts ───────────────────────────────────────────────────────── */
+
+.startPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+fieldset.chipGroup {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.chipLegend {
+  padding: 0;
+  margin-block-end: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-block-size: var(--tap-target);
+  min-inline-size: 64px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--beat-2),
+    background var(--beat-2),
+    transform var(--beat-1);
+}
+
+.chip:hover {
+  border-color: var(--status-live-strong);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--status-live-strong);
+  background: color-mix(in srgb, var(--status-live-strong) 12%, var(--surface));
+  color: var(--status-live-strong);
+  font-weight: var(--weight-bold);
+  box-shadow: inset 0 0 0 1px var(--status-live-strong);
+}
+
+.chipSub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--weight-regular, 400);
+}
+
+.chip[aria-pressed="true"] .chipSub {
+  color: inherit;
+}
+
+.chipTime {
+  min-inline-size: 56px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeInput {
+  max-inline-size: 160px;
+}
+
+.startReadout {
+  margin: 0;
+  color: var(--status-live-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* ── progress battery ────────────────────────────────────────────────────────────────────── */
+
+.battery {
+  padding: var(--space-3) var(--space-4) 0;
+  max-inline-size: 960px;
+  margin-inline: auto;
+  inline-size: 100%;
+  box-sizing: border-box;
+}
+
+.batteryBar {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.batterySeg {
+  position: relative;
+  flex: 1 1 0;
+  block-size: 10px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.batteryFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--status-live-strong), #4ade80);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.battery[data-dir="rtl"] .batteryFill {
+  transform-origin: right;
+}
+
+.batterySeg[data-done="true"] .batteryFill {
+  transform: scaleX(1);
+}
+
+.batterySeg[data-fresh] {
+  overflow: visible;
+  animation: batteryGlow 1100ms ease-out 1;
+}
+
+.batterySeg[data-fresh] .batteryFill {
+  animation: batteryFill 360ms ease-out 1;
+}
+
+@keyframes batteryFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes batteryGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+  35% {
+    box-shadow: 0 0 10px 3px rgba(34, 197, 94, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.batteryMsg {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  min-block-size: 1.4em;
+}
+
+.battery[data-complete="true"] .batteryMsg {
+  color: var(--status-live-strong);
+  font-weight: var(--weight-bold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batterySeg[data-fresh],
+  .batterySeg[data-fresh] .batteryFill {
+    animation: none;
+  }
+
+  .typeThumb img,
+  .typeCheck,
+  .typeCard,
+  .chip {
+    transition: none;
+  }
+
+  .typeCard:hover .typeThumb img,
+  .typeCard[aria-pressed="true"] .typeThumb img {
+    transform: none;
+  }
+}
+
+/* ── share ───────────────────────────────────────────────────────────────────────────────── */
+
+.shareBtn {
+  inline-size: 100%;
+  font-size: var(--text-base);
+}
+
+.shareLink {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.shareLink input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.shareLink .btn {
+  white-space: nowrap;
+}

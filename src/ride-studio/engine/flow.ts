@@ -23,6 +23,35 @@ import {
   type Stage,
 } from "./types";
 
+/** "YYYY-MM-DD" that is a real calendar day (no 31 Nov). */
+export function isRealDate(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const check = new Date(y, mo - 1, d);
+  return check.getFullYear() === y && check.getMonth() === mo - 1 && check.getDate() === d;
+}
+
+/** "HH:mm", 00:00 to 23:59. */
+export function isRealTime(value: string): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(value);
+  return !!m && Number(m[1]) < 24 && Number(m[2]) < 60;
+}
+
+/** One half of the start changed: `startsAt` is the join of both once both are set, "" until. */
+function withStart(
+  draft: RideDraft,
+  part: Partial<Pick<RideDraft, "startDate" | "startTime">>,
+): Partial<RideDraft> {
+  const startDate = part.startDate ?? draft.startDate;
+  const startTime = part.startTime ?? draft.startTime;
+  return {
+    startDate,
+    startTime,
+    startsAt: startDate && startTime ? `${startDate}T${startTime}` : "",
+  };
+}
+
 export const STAGES: readonly Stage[] = ["idea", "details", "review"];
 
 /** The questions the organizer can currently be asked, in order. */
@@ -122,8 +151,26 @@ function checkAndSet(
       if (value === null) return ok({ route: null });
       return isStoredRoute(value) ? ok({ route: value }) : fail("err.route");
 
-    case "startsAt":
-      return typeof value === "string" ? ok({ startsAt: value }) : fail("err.startRequired");
+    case "startsAt": {
+      // The whole value at once (an interpreter, or a restored answer): split it into halves.
+      if (typeof value !== "string") return fail("err.startRequired");
+      if (value === "") return ok({ startsAt: "", startDate: "", startTime: "" });
+      const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value);
+      if (!m || !isRealDate(m[1]) || !isRealTime(m[2])) return fail("err.startRequired");
+      return ok({ startsAt: value, startDate: m[1], startTime: m[2] });
+    }
+
+    case "startDate":
+      if (typeof value !== "string" || (value !== "" && !isRealDate(value))) {
+        return fail("err.startRequired");
+      }
+      return ok(withStart(draft, { startDate: value }));
+
+    case "startTime":
+      if (typeof value !== "string" || (value !== "" && !isRealTime(value))) {
+        return fail("err.timeRequired");
+      }
+      return ok(withStart(draft, { startTime: value }));
 
     case "visibility":
       if (value === null) return ok({ visibility: null });

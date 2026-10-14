@@ -11,13 +11,14 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { defaultStudioLocale, draftHasContent } from "./engine/draft";
 import { loadDraft } from "./engine/draft-storage";
+import { readLocalePref, writeLocalePref } from "./engine/locale-pref";
 import {
   type CreateMethod,
   isRideStudioEnabled,
   readCreateMethod,
   writeCreateMethod,
 } from "./flag";
-import { localeDir, t } from "./i18n";
+import { localeDir, STUDIO_LOCALES, t } from "./i18n";
 import styles from "./ui/studio.module.css";
 
 export function EntryChoicePage() {
@@ -25,6 +26,7 @@ export function EntryChoicePage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [remember, setRemember] = useState(false);
+  const [picked, setPicked] = useState(readLocalePref);
 
   const enabled = isRideStudioEnabled({ userId: profile?.id, canOrganize: profile?.canOrganize });
   if (!profile || !enabled) return <Navigate to="/events/new" replace />;
@@ -36,7 +38,9 @@ export function EntryChoicePage() {
 
   const stored = loadDraft(profile.id);
   const draft = stored && draftHasContent(stored) ? stored : null;
-  const locale = draft?.locale ?? defaultStudioLocale(profile.country);
+  // The rider's own choice first, then what an unfinished draft was using, then the country /
+  // device default (which ends at English).
+  const locale = picked ?? draft?.locale ?? defaultStudioLocale(profile.country);
 
   const choose = (method: CreateMethod, to: string) => {
     if (remember) writeCreateMethod(method);
@@ -46,6 +50,23 @@ export function EntryChoicePage() {
   return (
     <div className={styles.root} dir={localeDir(locale)} lang={locale}>
       <div className={styles.entry}>
+        <fieldset className={styles.langGroup} data-entry-language>
+          <legend className={styles.srOnly}>{t(locale, "ui.language")}</legend>
+          {STUDIO_LOCALES.map((l) => (
+            <button
+              key={l}
+              type="button"
+              className={styles.langBtn}
+              aria-pressed={locale === l}
+              onClick={() => {
+                writeLocalePref(l);
+                setPicked(l);
+              }}
+            >
+              {l === "he" ? "עב" : "EN"}
+            </button>
+          ))}
+        </fieldset>
         <h1 className={styles.title}>{t(locale, "entry.title")}</h1>
         <p className={styles.hint}>{t(locale, "entry.subtitle")}</p>
 

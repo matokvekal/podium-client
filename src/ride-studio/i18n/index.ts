@@ -44,6 +44,19 @@ export function formatStart(locale: StudioLocale, startsAt: string): string {
   }).format(d);
 }
 
+/** A day with no time yet ("YYYY-MM-DD"), for the preview while the rider is still choosing the
+ *  departure time. */
+export function formatStartDay(locale: StudioLocale, startDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate);
+  if (!m) return "";
+  return new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+}
+
 export function formatNumber(locale: StudioLocale, value: number, digits = 0): string {
   return new Intl.NumberFormat(locale === "he" ? "he-IL" : "en-GB", {
     maximumFractionDigits: digits,

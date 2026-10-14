@@ -4,7 +4,9 @@
  * pressed — including everything on this screen.
  */
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { config } from "../../lib/config";
 import { COUNTRIES, flagEmoji } from "../../lib/countries";
 import type { EventSummary } from "../../lib/local-db";
 import { IL_REGIONS } from "../../lib/regions";
@@ -172,6 +174,14 @@ export function ReviewScreen({
   );
 }
 
+/** The link a recipient opens: the app's own join link for this ride (its code is what grants
+ *  access to a private ride, so sharing is the organizer's deliberate act). */
+export function rideShareUrl(event: Pick<EventSummary, "id" | "code">): string {
+  return event.code
+    ? `${config.shareBaseUrl}/join/${encodeURIComponent(event.code)}`
+    : `${config.shareBaseUrl}/events/${event.id}`;
+}
+
 export function CreatedScreen({
   locale,
   event,
@@ -183,13 +193,44 @@ export function CreatedScreen({
   routeError: string | null;
   onAnother: () => void;
 }) {
-  const copy = async () => {
+  const [note, setNote] = useState<"copied" | "failed" | null>(null);
+  const [showLink, setShowLink] = useState(false);
+  const url = rideShareUrl(event);
+  const nativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(event.code);
+      await navigator.clipboard.writeText(url);
+      setNote("copied");
     } catch {
-      /* clipboard can be blocked; the code is on screen */
+      // Clipboard can be blocked: the link is on screen to copy by hand.
+      setNote("failed");
+    }
+    setShowLink(true);
+  };
+
+  // Only ever called from the button: nothing opens by itself, and sharing never touches the
+  // API, so it cannot create a second ride.
+  const share = async () => {
+    setNote(null);
+    if (!nativeShare) {
+      await copyLink();
+      return;
+    }
+    const when = event.startsAt ? formatStart(locale, event.startsAt) : "";
+    try {
+      await navigator.share({
+        title: t(locale, "share.title", { name: event.name }),
+        text: t(locale, when ? "share.text" : "share.textNoDate", { name: event.name, when }),
+        url,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return; // the rider closed the sheet
+      setNote("failed");
+      setShowLink(true);
     }
   };
+
   return (
     <section className={`${styles.screen} ${styles.success}`} aria-live="polite">
       <div className={styles.successMark} aria-hidden="true">
@@ -197,25 +238,51 @@ export function CreatedScreen({
       </div>
       <h2 className={styles.title}>{t(locale, "review.created")}</h2>
       <p className={styles.hint}>{t(locale, "review.createdBody", { name: event.name })}</p>
-      {event.code ? <p className={styles.cardTitle}>{event.code}</p> : null}
       {routeError ? (
         <p className={styles.error} role="alert">
           {routeError}
         </p>
       ) : null}
+      <button
+        type="button"
+        className={`${styles.btn} ${styles.btnPrimary} ${styles.shareBtn}`}
+        onClick={share}
+      >
+        {t(locale, "share.button")}
+      </button>
+      {note === "copied" ? (
+        <p className={styles.hint} role="status">
+          {t(locale, "share.linkCopied")}
+        </p>
+      ) : null}
+      {note === "failed" ? (
+        <p className={styles.error} role="alert">
+          {t(locale, "share.failed")}
+        </p>
+      ) : null}
+      {showLink || !nativeShare ? (
+        <div className={styles.shareLink}>
+          <input
+            className={styles.input}
+            readOnly
+            value={url}
+            dir="ltr"
+            aria-label={t(locale, "share.copyLink")}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <button type="button" className={styles.btn} onClick={copyLink}>
+            {t(locale, "share.copyLink")}
+          </button>
+        </div>
+      ) : null}
       <div className={styles.nav}>
-        <Link className={`${styles.btn} ${styles.btnPrimary}`} to={`/events/${event.id}`}>
+        <Link className={styles.btn} to={`/events/${event.id}`}>
           {t(locale, "review.viewRide")}
         </Link>
-        {event.code ? (
-          <button type="button" className={styles.btn} onClick={copy}>
-            {t(locale, "review.copyCode")}
-          </button>
-        ) : null}
+        <button type="button" className={styles.linkBtn} onClick={onAnother}>
+          {t(locale, "review.another")}
+        </button>
       </div>
-      <button type="button" className={styles.linkBtn} onClick={onAnother}>
-        {t(locale, "review.another")}
-      </button>
     </section>
   );
 }

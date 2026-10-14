@@ -80,12 +80,15 @@ export const QUESTIONS: readonly QuestionDef[] = [
     id: "ride.start",
     stage: "details",
     kind: "datetime",
-    fields: ["startsAt"],
+    fields: ["startsAt", "startDate", "startTime"],
     required: true,
     titleKey: "q.start.title",
     hintKey: "q.start.hint",
     problem: (d, now): ErrorKey | null => {
-      if (!START_PATTERN.test(d.startsAt)) return "err.startRequired";
+      if (!START_PATTERN.test(d.startsAt)) {
+        // A day without a time is the one half-done state worth its own words.
+        return d.startDate && !d.startTime ? "err.timeRequired" : "err.startRequired";
+      }
       return isPastDatetimeLocal(d.startsAt, now) ? "err.startPast" : null;
     },
   }),

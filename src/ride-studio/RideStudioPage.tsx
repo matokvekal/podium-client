@@ -33,6 +33,7 @@ import { suggestCover } from "./images/resolver";
 import { QUESTIONS, questionById } from "./schema/questions";
 import { CoverSheet } from "./ui/CoverSheet";
 import { LivePreview } from "./ui/LivePreview";
+import { ProgressBattery } from "./ui/ProgressBattery";
 import {
   type BodyProps,
   DetailsBody,
@@ -191,6 +192,8 @@ function Studio({ userId, profileCountry }: { userId: number; profileCountry: st
           ))}
         </fieldset>
       </header>
+
+      <ProgressBattery draft={draft} allDone={created !== null} />
 
       {!created ? (
         <nav className={styles.stages} aria-label={t(locale, "ui.studioName")}>

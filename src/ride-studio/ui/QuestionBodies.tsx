@@ -5,7 +5,6 @@
  */
 
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { RideDateField } from "../../app/RideDateField";
 import { TrackUploadButton, type UploadedTrack } from "../../app/TrackUploadButton";
 import { apiRequest } from "../../lib/api-client";
 import { COUNTRIES, flagEmoji, orderedCountries } from "../../lib/countries";
@@ -13,14 +12,16 @@ import { DESCRIPTION_MAX_CHARS } from "../../lib/event-limits";
 import type { EventRoute } from "../../lib/event-route";
 import type { EventSummary } from "../../lib/local-db";
 import { IL_REGIONS } from "../../lib/regions";
-import { SURFACE_TYPE_ICON } from "../../lib/surface-types";
 import {
   type DraftField,
   type RideDraft,
   STUDIO_RIDE_TYPES,
   type StudioLocale,
+  type StudioRideType,
 } from "../engine/types";
 import { formatNumber, type StudioKey, t } from "../i18n";
+import { TYPE_IMAGES } from "../images/type-images";
+import { StartPicker } from "./StartPicker";
 import styles from "./studio.module.css";
 
 const TrackGallerySheet = lazy(() =>
@@ -40,29 +41,75 @@ export interface BodyProps {
 
 // ── ride type ─────────────────────────────────────────────────────────────────────────────
 
+/** One ride-type card: a landscape picture, the name, one motivating line, a check when chosen.
+ *  The picture is decoration (the name beside it says the same), and a file that cannot load
+ *  simply leaves the card's gradient showing. */
+function TypeCard({
+  type,
+  locale,
+  selected,
+  onChoose,
+}: {
+  type: StudioRideType;
+  locale: StudioLocale;
+  selected: boolean;
+  onChoose: () => void;
+}) {
+  const [broken, setBroken] = useState(false);
+  const image = TYPE_IMAGES[type];
+  const bodyId = `ride-type-${type}-body`;
+  return (
+    <button
+      type="button"
+      className={styles.typeCard}
+      aria-pressed={selected}
+      aria-label={t(locale, `typeCard.${type}.title` as StudioKey)}
+      aria-describedby={bodyId}
+      data-ride-type={type}
+      onClick={onChoose}
+    >
+      <span className={styles.typeThumb} style={{ background: image.gradient }}>
+        {broken ? null : (
+          <img
+            src={image.src}
+            alt=""
+            width={960}
+            height={540}
+            loading="lazy"
+            decoding="async"
+            onError={() => setBroken(true)}
+          />
+        )}
+      </span>
+      <span className={styles.typeText}>
+        <span className={styles.cardTitle}>{t(locale, `typeCard.${type}.title` as StudioKey)}</span>
+        <span className={styles.cardBody} id={bodyId}>
+          {t(locale, `typeCard.${type}.body` as StudioKey)}
+        </span>
+      </span>
+      <span className={styles.typeCheck} aria-hidden="true">
+        ✓
+      </span>
+    </button>
+  );
+}
+
 export function TypeBody({ draft, locale, onAnswer, onAdvance, wasAnswered }: BodyProps) {
   return (
-    <fieldset className={styles.cards}>
+    <fieldset className={`${styles.cards} ${styles.cardsOne}`}>
       <legend className={styles.srOnly}>{t(locale, "ui.chooseOne")}</legend>
-      {STUDIO_RIDE_TYPES.map((type) => {
-        const Icon = SURFACE_TYPE_ICON[type];
-        return (
-          <button
-            key={type}
-            type="button"
-            className={styles.card}
-            aria-pressed={draft.activityType === type}
-            onClick={() => {
-              onAnswer("activityType", type);
-              if (!wasAnswered) onAdvance();
-            }}
-          >
-            <Icon className={styles.cardIcon} aria-hidden="true" />
-            <span className={styles.cardTitle}>{t(locale, `type.${type}` as StudioKey)}</span>
-            <span className={styles.cardBody}>{t(locale, `type.${type}.hint` as StudioKey)}</span>
-          </button>
-        );
-      })}
+      {STUDIO_RIDE_TYPES.map((type) => (
+        <TypeCard
+          key={type}
+          type={type}
+          locale={locale}
+          selected={draft.activityType === type}
+          onChoose={() => {
+            onAnswer("activityType", type);
+            if (!wasAnswered) onAdvance();
+          }}
+        />
+      ))}
     </fieldset>
   );
 }
@@ -254,17 +301,8 @@ export function RouteBody({ draft, locale, onAnswer }: BodyProps) {
 
 // ── start ─────────────────────────────────────────────────────────────────────────────────
 
-export function StartBody({ draft, onAnswer }: BodyProps) {
-  return (
-    <div className={styles.dateRow}>
-      <RideDateField
-        id="ride-studio-start"
-        value={draft.startsAt}
-        inputClassName={styles.select}
-        onChange={(value) => onAnswer("startsAt", value)}
-      />
-    </div>
-  );
+export function StartBody(props: BodyProps) {
+  return <StartPicker {...props} />;
 }
 
 // ── visibility ────────────────────────────────────────────────────────────────────────────

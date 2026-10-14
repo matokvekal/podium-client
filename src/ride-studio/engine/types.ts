@@ -19,13 +19,12 @@ import type { SurfaceType } from "../../lib/surface-types";
  *  decisions later (no tracking is added by this module). */
 export type AnswerSource = "ui" | "text" | "voice" | "ai";
 
-/** The ride types Ride Studio offers: the same set the original form's Terrain picker shows
- *  today (Hiking is hidden there, so it is hidden here). */
+/** The ride types Ride Studio offers, in the order the cards show them. It is a cycling app: the
+ *  original form's Running option is not offered here. The stored values are the original form's. */
 export const STUDIO_RIDE_TYPES = [
   "road",
-  "mtb",
   "gravel",
-  "running",
+  "mtb",
 ] as const satisfies readonly SurfaceType[];
 export type StudioRideType = (typeof STUDIO_RIDE_TYPES)[number];
 
@@ -67,6 +66,11 @@ export interface RideDraft {
   route: DraftRoute | null;
   /** "YYYY-MM-DDTHH:mm", the organizer's wall-clock time (same shape as the original form). */
   startsAt: string;
+  /** The two halves of `startsAt`, kept apart so a day can be chosen before the time (two taps:
+   *  a day shortcut, then a departure time). `startsAt` is always their join once both are set,
+   *  and "" until then — so the payload and every check keep reading the one value they always did. */
+  startDate: string;
+  startTime: string;
   visibility: Visibility | null;
   description: string;
   requiresApproval: boolean;
@@ -95,6 +99,8 @@ export type DraftField =
   | "place"
   | "route"
   | "startsAt"
+  | "startDate"
+  | "startTime"
   | "visibility"
   | "description"
   | "requiresApproval"
@@ -121,6 +127,7 @@ export type ErrorKey =
   | "err.route"
   | "err.startRequired"
   | "err.startPast"
+  | "err.timeRequired"
   | "err.visibility"
   | "err.descriptionLong"
   | "err.flag"

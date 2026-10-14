@@ -8,9 +8,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createDraft, defaultStudioLocale, FIRST_QUESTION_ID } from "../engine/draft";
+import { createDraft, FIRST_QUESTION_ID } from "../engine/draft";
 import { loadDraft, saveDraft } from "../engine/draft-storage";
 import { applyAnswers, goTo, markAnswered, setLocale, suggestCover } from "../engine/flow";
+import { effectiveStudioLocale, readLocalePref, writeLocalePref } from "../engine/locale-pref";
 import type { Answer, RideDraft, StudioLocale } from "../engine/types";
 
 const SAVE_DELAY_MS = 400;
@@ -44,10 +45,14 @@ export function useRideStudio(options: {
   // Read once, on mount: a later profile or storage change must not rewind the conversation.
   const [initial] = useState(() => {
     const stored = fresh ? null : loadDraft(userId);
-    if (stored) return { draft: stored, restored: true };
+    if (stored) {
+      // A language the rider picked themselves outranks whatever the saved draft was using.
+      const chosen = readLocalePref();
+      return { draft: chosen ? setLocale(stored, chosen) : stored, restored: true };
+    }
     return {
       draft: createDraft({
-        locale: defaultStudioLocale(profileCountry),
+        locale: effectiveStudioLocale(profileCountry),
         country: profileCountry ?? null,
       }),
       restored: false,
@@ -121,7 +126,13 @@ export function useRideStudio(options: {
       (id, nextId) => update((d) => goTo(markAnswered(d, id), nextId ?? d.currentQuestionId)),
       [update],
     ),
-    setLanguage: useCallback((locale) => update((d) => setLocale(d, locale)), [update]),
+    setLanguage: useCallback(
+      (locale) => {
+        writeLocalePref(locale);
+        update((d) => setLocale(d, locale));
+      },
+      [update],
+    ),
     offerCover: useCallback((key) => update((d) => suggestCover(d, key)), [update]),
     restart: useCallback(() => {
       const fresh = createDraft({

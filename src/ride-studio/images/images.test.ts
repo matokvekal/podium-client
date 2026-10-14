@@ -97,8 +97,8 @@ describe("choosing a cover", () => {
   it("until the library exists, falls back to the registry's covers for the ride type", () => {
     const pick = suggestCover({ rideType: "mtb", country: "IL", region: "carmel" }, registry);
     expect(pick).toMatchObject({ key: "mtb-a", tier: "registry", illustrative: false });
-    expect(suggestCover({ rideType: "running", country: null, region: null }, registry)?.key).toBe(
-      "gen-a",
+    expect(suggestCover({ rideType: "gravel", country: null, region: null }, registry)?.key).toBe(
+      "gravel-a",
     );
   });
 

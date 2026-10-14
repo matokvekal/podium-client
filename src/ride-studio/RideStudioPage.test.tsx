@@ -129,20 +129,17 @@ function renderStudio(path = "/events/studio") {
   );
 }
 
-const nextYear = new Date().getFullYear() + 1;
-
+/** Two taps: a day shortcut, then a departure time. */
 function pickDate() {
-  fireEvent.change(screen.getByLabelText("Year"), { target: { value: String(nextYear) } });
-  fireEvent.change(screen.getByLabelText("Month"), { target: { value: "12" } });
-  fireEvent.change(screen.getByLabelText("Day"), { target: { value: "20" } });
-  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "06:30" } });
+  fireEvent.click(screen.getByRole("button", { name: /^Next Saturday/ }));
+  fireEvent.click(screen.getByRole("button", { name: "07:00" }));
 }
 
 const cont = () => fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
 /** Walks the conversation to the review screen with a valid public ride. */
 async function walkToReview() {
-  fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
   fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
     target: { value: "Saturday loop" },
   });
@@ -151,7 +148,7 @@ async function walkToReview() {
   cont();
   fireEvent.click(await screen.findByRole("button", { name: /Upload a GPX file/ }));
   cont();
-  await screen.findByText("When does it start?");
+  await screen.findByText("When does the ride start?");
   pickDate();
   cont();
   fireEvent.click(await screen.findByRole("button", { name: /^Public/ }));
@@ -197,15 +194,15 @@ describe("entry", () => {
 
   it("offers both ways to create, and the original one leads to /events/new", () => {
     renderStudio("/events/start");
-    expect(screen.getByRole("button", { name: /Create with Ride Studio/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Create normally/ }));
+    expect(screen.getByRole("button", { name: /Guided Create/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Quick Create/ }));
     expect(screen.getByText("original-form")).toBeTruthy();
   });
 
   it("remembers the choice and skips the fork next time", () => {
     const first = renderStudio("/events/start");
     fireEvent.click(screen.getByLabelText("Remember my choice"));
-    fireEvent.click(screen.getByRole("button", { name: /Create with Ride Studio/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Guided Create/ }));
     expect(screen.getByText("What kind of ride is it?")).toBeTruthy();
     first.unmount();
     renderStudio("/events/start");
@@ -215,7 +212,7 @@ describe("entry", () => {
   it("?choose=1 shows the fork again even when a choice is remembered", () => {
     localStorage.setItem("podium.rideCreateMethod", "studio");
     renderStudio("/events/start?choose=1");
-    expect(screen.getByRole("button", { name: /Create normally/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Quick Create/ })).toBeTruthy();
   });
 });
 
@@ -225,14 +222,16 @@ describe("the conversation", () => {
     expect(screen.getByText("What kind of ride is it?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save & exit" })).toBeTruthy();
-    for (const type of ["Road", "MTB", "Gravel", "Running"]) {
+    for (const type of ["Road Cycling", "Gravel Cycling", "Mountain Biking"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${type}`) })).toBeTruthy();
     }
+    // A cycling studio: no Running card.
+    expect(screen.queryByRole("button", { name: /Running/ })).toBeNull();
   });
 
   it("one tap on a type moves on, and the preview follows", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^MTB/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Mountain Biking/ }));
     expect(await screen.findByText("What will you call it?")).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Dawn trail" },
@@ -243,7 +242,7 @@ describe("the conversation", () => {
 
   it("will not continue without a name, and says so", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     await screen.findByText("What will you call it?");
     cont();
     expect((await screen.findByRole("alert")).textContent).toBe("Give your ride a name.");
@@ -252,7 +251,7 @@ describe("the conversation", () => {
 
   it("Back keeps what was typed", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Keep me" },
     });
@@ -268,12 +267,12 @@ describe("the conversation", () => {
   it("Back on the first question returns to the fork", () => {
     renderStudio();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("button", { name: /Create normally/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Quick Create/ })).toBeTruthy();
   });
 
   it("the dropdown says 'Select from the list'", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     await screen.findByText("What will you call it?");
     fireEvent.change(screen.getByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "x" },
@@ -293,7 +292,7 @@ describe("the conversation", () => {
 
   it("the route can come from the gallery, with its geometry fetched like the original form does", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "x" },
     });
@@ -309,7 +308,7 @@ describe("the conversation", () => {
   it("a gallery track with no saved route is refused with a message", async () => {
     apiRequest.mockResolvedValue(null);
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "x" },
     });
@@ -347,7 +346,7 @@ describe("saving and resuming", () => {
 
   it("a refresh mid-typing loses nothing (the draft is flushed when the page hides)", async () => {
     const view = renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Typed just now" },
     });
@@ -360,7 +359,7 @@ describe("saving and resuming", () => {
 
   it("each user has their own draft", async () => {
     const view = renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Mine" },
     });
@@ -372,7 +371,7 @@ describe("saving and resuming", () => {
 
   it("the fork offers to resume, naming the unfinished ride", async () => {
     const view = renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Loop" },
     });
@@ -388,7 +387,7 @@ describe("saving and resuming", () => {
 describe("language", () => {
   it("switches to Hebrew right-to-left without erasing the draft", async () => {
     const { container } = renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     fireEvent.change(await screen.findByRole("textbox", { name: "What will you call it?" }), {
       target: { value: "Keep this" },
     });
@@ -432,7 +431,7 @@ describe("creating the ride", () => {
 
   it("the review lists what is missing, links to it, and blocks Create", async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole("button", { name: /^Road/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Road Cycling/ }));
     // jump to the review through the stage chips
     fireEvent.click(screen.getByRole("button", { name: "Review & share" }));
     const create = (await screen.findByRole("button", {
@@ -532,7 +531,7 @@ describe("cover image", () => {
   }
 
   it("suggests a cover for the ride type, with a way to change it", async () => {
-    await toNameWithType(/^Road/);
+    await toNameWithType(/^Road Cycling/);
     const preview = screen.getByLabelText("Your ride");
     expect((within(preview).getByRole("img") as HTMLImageElement).src).toContain(
       "/ride-images/road-",
@@ -541,7 +540,7 @@ describe("cover image", () => {
   });
 
   it("the organizer's own pick is kept when the type changes afterwards", async () => {
-    await toNameWithType(/^Road/);
+    await toNameWithType(/^Road Cycling/);
     const preview = screen.getByLabelText("Your ride");
     fireEvent.click(within(preview).getByRole("button", { name: "Change image" }));
     const sheet = await screen.findByRole("dialog", { name: "Cover image" });
@@ -549,7 +548,7 @@ describe("cover image", () => {
     expect((within(preview).getByRole("img") as HTMLImageElement).src).toContain("road-b");
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    fireEvent.click(await screen.findByRole("button", { name: /^MTB/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Mountain Biking/ }));
     // Re-picking on a question already answered stays put (no jump ahead); the cover is theirs.
     expect(
       (within(screen.getByLabelText("Your ride")).getByRole("img") as HTMLImageElement).src,
@@ -570,7 +569,7 @@ describe("cover image", () => {
   });
 
   it("the organizer can choose no cover at all", async () => {
-    await toNameWithType(/^Road/);
+    await toNameWithType(/^Road Cycling/);
     const preview = screen.getByLabelText("Your ride");
     fireEvent.click(within(preview).getByRole("button", { name: "Change image" }));
     fireEvent.click(await screen.findByRole("button", { name: "No cover image" }));

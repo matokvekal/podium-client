@@ -11,7 +11,7 @@ import { IL_REGIONS } from "../../lib/regions";
 import { resolveRideImage, useRideImages } from "../../lib/ride-images-dynamic";
 import { SURFACE_TYPE_ICON } from "../../lib/surface-types";
 import type { RideDraft } from "../engine/types";
-import { formatNumber, formatStart, type StudioKey, t } from "../i18n";
+import { formatNumber, formatStart, formatStartDay, type StudioKey, t } from "../i18n";
 import { isIllustrativeCover } from "../images/resolver";
 import styles from "./studio.module.css";
 
@@ -39,7 +39,11 @@ export function LivePreview({
     .join(" · ");
   const Icon = draft.activityType ? SURFACE_TYPE_ICON[draft.activityType] : null;
   const route = draft.route;
-  const start = draft.startsAt ? formatStart(locale, draft.startsAt) : "";
+  const start = draft.startsAt
+    ? formatStart(locale, draft.startsAt)
+    : draft.startDate
+      ? formatStartDay(locale, draft.startDate)
+      : "";
 
   return (
     <aside className={styles.preview} data-open={open} aria-label={t(locale, "preview.title")}>

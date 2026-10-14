@@ -43,6 +43,8 @@ export function createDraft(options: {
     place: "",
     route: null,
     startsAt: "",
+    startDate: "",
+    startTime: "",
     visibility: null,
     description: "",
     requiresApproval: false,
@@ -63,6 +65,8 @@ export function draftHasContent(draft: RideDraft): boolean {
     draft.name.trim() !== "" ||
     draft.route !== null ||
     draft.startsAt !== "" ||
+    draft.startDate !== "" ||
+    draft.startTime !== "" ||
     draft.visibility !== null ||
     draft.description.trim() !== ""
   );
@@ -90,14 +94,14 @@ export function parseStoredDraft(raw: unknown): RideDraft | null {
     submissionId: d.submissionId,
     currentQuestionId: d.currentQuestionId,
     answered: d.answered as string[],
-    activityType:
-      type === "road" || type === "mtb" || type === "gravel" || type === "running" ? type : null,
+    activityType: type === "road" || type === "mtb" || type === "gravel" ? type : null,
     name: str(d.name),
     country: strOrNull(d.country),
     region: strOrNull(d.region),
     place: str(d.place),
     route: isStoredRoute(d.route) ? d.route : null,
     startsAt: str(d.startsAt),
+    ...storedStartParts(d),
     visibility: d.visibility === "public" || d.visibility === "private" ? d.visibility : null,
     description: str(d.description),
     requiresApproval: bool(d.requiresApproval, false),
@@ -107,6 +111,18 @@ export function parseStoredDraft(raw: unknown): RideDraft | null {
     locale: d.locale,
     updatedAt: typeof d.updatedAt === "number" ? d.updatedAt : Date.now(),
   };
+}
+
+/** Drafts saved before the date and the time were kept apart carry only `startsAt`: its halves
+ *  are read back from it, so a restored draft never loses (or rewrites) a valid start. */
+function storedStartParts(d: Record<string, unknown>): { startDate: string; startTime: string } {
+  const startsAt = typeof d.startsAt === "string" ? d.startsAt : "";
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(startsAt);
+  const date =
+    typeof d.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.startDate) ? d.startDate : "";
+  const time =
+    typeof d.startTime === "string" && /^\d{2}:\d{2}$/.test(d.startTime) ? d.startTime : "";
+  return { startDate: date || match?.[1] || "", startTime: time || match?.[2] || "" };
 }
 
 export function isStoredRoute(value: unknown): value is NonNullable<RideDraft["route"]> {

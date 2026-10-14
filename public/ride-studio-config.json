@@ -1,0 +1,4 @@
+{
+  "enabled": true,
+  "note": "Ride Studio emergency switch. Set \"enabled\" to false (edit this file on the server, no redeploy) to send everyone back to the original New Ride form. Anything else keeps Ride Studio on."
+}

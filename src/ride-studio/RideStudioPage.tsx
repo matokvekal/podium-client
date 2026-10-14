@@ -27,7 +27,7 @@ import {
   visibleQuestions,
 } from "./engine/flow";
 import type { DraftField, StudioLocale } from "./engine/types";
-import { isRideStudioEnabled } from "./flag";
+import { useRideStudioEnabled } from "./flag";
 import { localeDir, STUDIO_LOCALES, type StudioKey, t } from "./i18n";
 import { suggestCover } from "./images/resolver";
 import { QUESTIONS, questionById } from "./schema/questions";
@@ -61,7 +61,7 @@ const BODIES: Record<string, (props: BodyProps) => React.ReactNode> = {
 
 export function RideStudioPage() {
   const { profile } = useAuth();
-  const enabled = isRideStudioEnabled({
+  const enabled = useRideStudioEnabled({
     userId: profile?.id,
     canOrganize: profile?.canOrganize,
   });

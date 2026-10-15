@@ -26,7 +26,7 @@ export function TermsPage() {
         style={{ alignSelf: "flex-start" }}
         onClick={() => {
           if (window.history.length > 1) navigate(-1);
-          else navigate("/");
+          else navigate("/login");
         }}
       >
         ← Back
@@ -50,7 +50,7 @@ export function TermsPage() {
       </pre>
 
       <p className="muted" style={{ marginTop: "var(--space-3)" }}>
-        <Link to="/">Return to El-Niño</Link>
+        <Link to="/login">Return to sign-in</Link>
       </p>
     </main>
   );

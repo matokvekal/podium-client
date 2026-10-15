@@ -96,7 +96,7 @@ function readSeen(): boolean {
   }
 }
 
-function markSeen() {
+export function markSeen() {
   try {
     localStorage.setItem(SEEN_KEY, "1");
   } catch {
@@ -139,7 +139,7 @@ export function AboutElNino({ language }: { language: string }) {
   );
 }
 
-function WelcomeModal({ initialLang, onClose }: { initialLang: Lang; onClose: () => void }) {
+export function WelcomeModal({ initialLang, onClose }: { initialLang: Lang; onClose: () => void }) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [skipped, setSkipped] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);

@@ -14,6 +14,7 @@
 import {
   BarChart3,
   Bike,
+  Info,
   LogOut,
   Map as MapIcon,
   Megaphone,
@@ -28,10 +29,13 @@ import {
 import { lazy, Suspense, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { appTagline } from "../lib/app-tagline";
 import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import type { ColorTheme } from "../lib/color-theme";
+import { useCountryStore } from "../store/countryStore";
 import { organizerSwitchEnabled } from "../lib/user-mode";
 import { useIsOrganizer, useUserModeStore } from "../store/userModeStore";
+import { markSeen, WelcomeModal } from "./AboutElNino";
 import { Avatar } from "./Avatar";
 import { useCanSeeStatisticsPreview } from "./statisticsPreview";
 import { useMyIdentity } from "./useMyIdentity";
@@ -67,6 +71,9 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
   const me = useMyIdentity();
   const displayName = me.displayName;
   const [contactOpen, setContactOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const country = useCountryStore((s) => s.code);
+  const aboutLang = appTagline(country).language === "he" ? "he" : "en";
 
   function go(path: string) {
     onClose();
@@ -235,6 +242,19 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
         </nav>
 
         <div className="drawer__footer">
+          {/* The same welcome story the header pill opens once — kept here for good, so it can
+              be read again after the pill is gone. */}
+          <button
+            type="button"
+            className="drawer__nav-item"
+            onClick={() => {
+              markSeen();
+              setAboutOpen(true);
+            }}
+          >
+            <Info aria-hidden="true" />
+            About El Niño
+          </button>
           {status === "signed-in" ? (
             <>
               <button type="button" className="drawer__nav-item" onClick={() => go("/account")}>
@@ -261,6 +281,10 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
           )}
         </div>
       </div>
+
+      {aboutOpen && (
+        <WelcomeModal initialLang={aboutLang} onClose={() => setAboutOpen(false)} />
+      )}
 
       {contactOpen && (
         <Suspense fallback={null}>

@@ -129,7 +129,27 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+  flex: 1;
+}
+
+/* Checkbox + Google: pushed down by .footer's 33dvh, so they sit a third of the screen up
+   from the bottom edge, where a thumb (and an eye) lands first. */
+.signIn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
   margin-top: auto;
+}
+
+/* Find a ride + version stay on the bottom edge. */
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 33dvh;
 }
 
 .error {
@@ -149,6 +169,9 @@
   display: flex;
   justify-content: center;
   min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #6aa84f;
   /* Google's own button, unmodified — its exact mark and wording are required (see
      auth/google-signin.ts). Only the drop shadow is ours, so it does not float flat on the
      photograph. */
@@ -200,36 +223,27 @@
 .googlePlaceholder {
   min-height: 44px;
   padding: 0 var(--space-5);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.75);
-  font-weight: 600;
-  cursor: not-allowed;
+  background: #6aa84f;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
 }
 
 /* The green pill from the reference. Browsing rides needs no account (see App.tsx's
    OpenHome), so it is a real destination, not a decoration. */
 .browse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 3.25rem;
-  padding: 0 var(--space-5);
-  border-radius: 999px;
-  background: #6aa84f;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: var(--text-base);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-decoration: none;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .browse:hover {
-  background: #75b558;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .hint {

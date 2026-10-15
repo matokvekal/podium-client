@@ -154,28 +154,42 @@ export function AppShell({ children }: { children: ReactNode }) {
           <AboutElNino language={tagline.language} />
         </span>
 
-        <button
-          type="button"
-          className="app-header__avatar"
-          aria-label={status === "signed-in" ? "Account" : "Sign in"}
-          onClick={() => (status === "signed-in" ? navigate("/account") : setDrawerOpen(true))}
-        >
-          {/* A signed-in rider sees their own picture here — their chosen avatar, else their
-              Google photo, else the initial placeholder every other avatar in the app uses.
-              Signed out there is nobody to show, so the generic icon stays. */}
-          {me.signedIn ? (
-            <Avatar
-              className="identity-avatar"
-              name={me.displayName}
-              avatarUrl={me.avatarUrl}
-              identity={me.avatar}
-              localSelection={me.localAvatar}
-              seed={me.seed}
-            />
-          ) : (
-            <User aria-hidden="true" />
+        <div className="app-header__end">
+          {/* A visitor who is only browsing gets a visible way to register — the avatar alone
+              reads as "profile", not "sign up". Goes to the login/register screen and, once
+              signed in, back to where they were (LoginPage reads state.from). */}
+          {status === "signed-out" && (
+            <Link
+              to="/login"
+              state={{ from: location.pathname + location.search }}
+              className="app-header__register"
+            >
+              Register
+            </Link>
           )}
-        </button>
+          <button
+            type="button"
+            className="app-header__avatar"
+            aria-label={status === "signed-in" ? "Account" : "Sign in"}
+            onClick={() => (status === "signed-in" ? navigate("/account") : setDrawerOpen(true))}
+          >
+            {/* A signed-in rider sees their own picture here — their chosen avatar, else their
+                Google photo, else the initial placeholder every other avatar in the app uses.
+                Signed out there is nobody to show, so the generic icon stays. */}
+            {me.signedIn ? (
+              <Avatar
+                className="identity-avatar"
+                name={me.displayName}
+                avatarUrl={me.avatarUrl}
+                identity={me.avatar}
+                localSelection={me.localAvatar}
+                seed={me.seed}
+              />
+            ) : (
+              <User aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </header>
 
       <AppDrawer

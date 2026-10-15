@@ -204,6 +204,31 @@ textarea {
   flex-shrink: 0;
 }
 
+.app-header__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.app-header__register {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  background: #6aa84f;
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-header__register:hover {
+  background: #75b558;
+}
+
 .app-header__avatar {
   display: flex;
   align-items: center;

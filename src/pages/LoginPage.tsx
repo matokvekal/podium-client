@@ -250,16 +250,7 @@ export function LoginPage() {
             </p>
           )}
 
-          {/* The reference screen's green call to action, in its place. Browsing rides
-              genuinely needs no account (App.tsx, OpenHome), so this is a real way in, not a
-              second sign-in — but only for someone who has no particular ride in mind. See
-              arrivedWithDestination above. */}
-          {!arrivedWithDestination && (
-            <Link className={styles.browse} to="/">
-              Find a ride
-            </Link>
-          )}
-
+          <div className={styles.signIn}>
           {/* Terms gate — a real, required checkbox (not just fine print), because signing in
               here is also how a new rider registers. No sign-in method is usable until it is
               ticked; once ticked it is remembered on this device (see acceptedTerms above). */}
@@ -269,41 +260,22 @@ export function LoginPage() {
               <label className={styles.terms}>
                 <input
                   type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(event) => setAcceptedTerms(event.target.checked)}
+                  checked={allConsentsAccepted}
+                  onChange={(event) => {
+                    const on = event.target.checked;
+                    setAcceptedTerms(on);
+                    setAcceptedInfoMessages(on);
+                    setAcceptedThirdPartySharing(on);
+                  }}
                 />
                 <span>
                   I have read and agree to the{" "}
-                  <Link to="/terms" target="_blank" rel="noopener noreferrer">
+                  <Link to="/terms">
                     Terms &amp; Conditions
                   </Link>
-                  .
-                </span>
-              </label>
-              <label className={styles.terms}>
-                <input
-                  type="checkbox"
-                  checked={acceptedInfoMessages}
-                  onChange={(event) =>
-                    setAcceptedInfoMessages(event.target.checked)
-                  }
-                />
-                <span>
-                  I agree to receive app information and service messages (such
-                  as ride updates and account notices).
-                </span>
-              </label>
-              <label className={styles.terms}>
-                <input
-                  type="checkbox"
-                  checked={acceptedThirdPartySharing}
-                  onChange={(event) =>
-                    setAcceptedThirdPartySharing(event.target.checked)
-                  }
-                />
-                <span>
-                  I agree that my ride movement data may be shared with approved
-                  third parties as described in the Terms &amp; Conditions.
+                  , including receiving app and service messages and sharing
+                  my ride movement data with approved third parties as
+                  described there.
                 </span>
               </label>
               {termsNudge && !acceptedTerms && (
@@ -328,7 +300,6 @@ export function LoginPage() {
               Google's own, rendered by their script — it is not restyled, only placed. */}
           {providers.includes("GOOGLE") && (
             <>
-              <p className={styles.hint}>Already a member?</p>
               {allConsentsAccepted ? (
                 <div className={styles.googleSlot} ref={googleButtonRef} />
               ) : (
@@ -345,7 +316,10 @@ export function LoginPage() {
               )}
             </>
           )}
+          </div>
 
+          {/* Browsing needs no account (App.tsx, OpenHome) but must not compete with
+              registering: a small, quiet link under the main button. */}
           {smsLoginVisible && providers.includes("SMS") && (
             <section className={styles.phoneCard}>
               <h2>Continue with your phone</h2>
@@ -417,7 +391,14 @@ export function LoginPage() {
             <p className={styles.hint}>Loading sign-in options…</p>
           )}
 
-          <p className={styles.version}>Version {config.appVersion}</p>
+          <div className={styles.footer}>
+            {!arrivedWithDestination && (
+              <Link className={styles.browse} to="/">
+                Find a ride
+              </Link>
+            )}
+            <p className={styles.version}>Version {config.appVersion}</p>
+          </div>
         </div>
       </div>
     </main>

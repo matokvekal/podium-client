@@ -149,6 +149,14 @@ textarea {
   height: 20px;
 }
 
+/* Brand + the one-time "About El Niño" pill (app/AboutElNino.tsx), centred together. */
+.app-header__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .app-header__brand {
   display: inline-flex;
   align-items: center;

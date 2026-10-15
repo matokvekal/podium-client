@@ -28,6 +28,7 @@ import {
 import { useConnectivityStore } from "../lib/connectivity";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useCountryStore } from "../store/countryStore";
+import { AboutElNino } from "./AboutElNino";
 import { AppDrawer } from "./AppDrawer";
 import { Avatar } from "./Avatar";
 import { MedalReveal } from "./medals/MedalReveal";
@@ -133,22 +134,25 @@ export function AppShell({ children }: { children: ReactNode }) {
             directly. The subtitle is small on purpose: the header's height is set by the 44px
             icon buttons either side, and both lines together stay under that, so adding it
             does not push the header down. */}
-        <NavLink to="/" className="app-header__brand">
-          <img
-            className="app-header__logo"
-            src="/logo.png"
-            alt=""
-            aria-hidden="true"
-            width={22}
-            height={22}
-          />
-          <span className="app-header__brand-text">
-            <span className="app-header__brand-name">El Niño Ride</span>
-            <span className="app-header__tagline" lang={tagline.language} dir={tagline.dir}>
-              {tagline.text}
+        <span className="app-header__title">
+          <NavLink to="/" className="app-header__brand">
+            <img
+              className="app-header__logo"
+              src="/logo.png"
+              alt=""
+              aria-hidden="true"
+              width={22}
+              height={22}
+            />
+            <span className="app-header__brand-text">
+              <span className="app-header__brand-name">El Niño Ride</span>
+              <span className="app-header__tagline" lang={tagline.language} dir={tagline.dir}>
+                {tagline.text}
+              </span>
             </span>
-          </span>
-        </NavLink>
+          </NavLink>
+          <AboutElNino language={tagline.language} />
+        </span>
 
         <button
           type="button"

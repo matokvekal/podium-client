@@ -93,6 +93,9 @@ export interface PlaceResult {
   name: string;
   lat: number;
   lng: number;
+  /** [south, north, west, east] — the place's extent when Nominatim gives one (a city, a
+   *  country), so a map can show all of it rather than zooming onto its centre point. */
+  bbox?: [number, number, number, number];
 }
 
 /**
@@ -139,7 +142,12 @@ export function parsePlaceResults(body: unknown): PlaceResult[] {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
     const name = typeof rec.display_name === "string" ? rec.display_name : `${lat}, ${lng}`;
-    out.push({ name, lat, lng });
+    const box = Array.isArray(rec.boundingbox) ? rec.boundingbox.map(Number) : [];
+    const bbox =
+      box.length === 4 && box.every(Number.isFinite) && box[0] <= box[1] && box[2] <= box[3]
+        ? (box as [number, number, number, number])
+        : undefined;
+    out.push(bbox ? { name, lat, lng, bbox } : { name, lat, lng });
   }
   return out;
 }

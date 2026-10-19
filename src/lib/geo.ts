@@ -108,3 +108,80 @@ export function nearestIndexForDistance(cumulative: readonly number[], targetKm:
   }
   return lo;
 }
+
+/**
+ * Which indices to keep so a line fits in `maxCount` points — Douglas-Peucker run as a
+ * priority split, ported from elnino-server/src/lib/geo.ts simplifyIndicesToCount. The span
+ * whose worst point sits farthest from its chord is split there, again and again, so corners
+ * and switchbacks keep their points and a straight road keeps two. Even-stride thinning (what
+ * EventCreatePage's capRoutePayload does) spends points evenly and cuts every corner.
+ *
+ * Returns ascending indices, always including the first and last; every index when the line
+ * already fits. Local flat projection — exact enough for one ride's extent.
+ */
+export function simplifyIndicesToCount(
+  points: readonly [number, number][],
+  maxCount: number,
+): number[] {
+  const n = points.length;
+  if (n <= maxCount) return points.map((_, i) => i);
+  if (maxCount < 2) return n > 1 ? [0, n - 1] : [0];
+
+  const kx = Math.cos(toRadians(points[0][0])) * 111_320;
+  const ky = 110_540;
+  const xs = new Float64Array(n);
+  const ys = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    xs[i] = points[i][1] * kx;
+    ys[i] = points[i][0] * ky;
+  }
+
+  interface Span {
+    start: number;
+    end: number;
+    worst: number;
+    worstDistance: number;
+  }
+
+  const measure = (start: number, end: number): Span => {
+    const dx = xs[end] - xs[start];
+    const dy = ys[end] - ys[start];
+    const lengthSq = dx * dx + dy * dy;
+    let worst = -1;
+    let worstDistance = 0;
+    for (let i = start + 1; i < end; i++) {
+      let t = lengthSq === 0 ? 0 : ((xs[i] - xs[start]) * dx + (ys[i] - ys[start]) * dy) / lengthSq;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(xs[i] - (xs[start] + t * dx), ys[i] - (ys[start] + t * dy));
+      if (d > worstDistance) {
+        worstDistance = d;
+        worst = i;
+      }
+    }
+    return { start, end, worst, worstDistance };
+  };
+
+  const kept = new Set<number>([0, n - 1]);
+  let spans: Span[] = [measure(0, n - 1)];
+  while (kept.size < maxCount) {
+    let best = -1;
+    for (let i = 0; i < spans.length; i++) {
+      if (
+        spans[i].worst !== -1 &&
+        (best === -1 || spans[i].worstDistance > spans[best].worstDistance)
+      ) {
+        best = i;
+      }
+    }
+    if (best === -1) break;
+    const span = spans[best];
+    kept.add(span.worst);
+    spans = [
+      ...spans.slice(0, best),
+      measure(span.start, span.worst),
+      measure(span.worst, span.end),
+      ...spans.slice(best + 1),
+    ];
+  }
+  return [...kept].sort((a, b) => a - b);
+}

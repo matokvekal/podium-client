@@ -132,6 +132,7 @@ import {
   Timer,
   Trash2,
   Truck,
+  PenLine,
   Upload,
   Users,
   X,
@@ -231,6 +232,8 @@ import { DEFAULT_MEDAL_COLOR, DEFAULT_MEDAL_STYLE } from "../lib/medal-backgroun
 import medalStyles from "../app/medals/Medals.module.css";
 import { countWords, MEDAL_TEXT_MAX_CHARS, MEDAL_TEXT_MAX_WORDS } from "../lib/medal";
 import { formatRideStart } from "../lib/ride-date";
+import { type BuilderRouteHandoff, RouteBuilderPage } from "../route-builder/RouteBuilderPage";
+import { discardRouteBuilderDraft } from "../route-builder/store";
 import styles from "./EventCreatePage.module.css";
 
 const RouteMap = lazy(() => import("../app/RouteMap"));
@@ -438,6 +441,8 @@ export function EventCreatePage() {
   // Built by lib/track-handoff.ts. Partial because an older link / bookmark may carry fewer
   // fields — each one missing is simply left for the organizer.
   const pickedTrack = (routerLocation.state ?? null) as Partial<TrackHandoff> | null;
+  // Or a track drawn in the Route Builder (route-builder/RouteBuilderPage.tsx, "Ride it now").
+  const builderHandoff = (routerLocation.state ?? null) as Partial<BuilderRouteHandoff> | null;
   const teams = useTeamsStore((s) => s.teams);
   const createTeam = useTeamsStore((s) => s.createTeam);
   const addEventToTeam = useTeamsStore((s) => s.addEventToTeam);
@@ -764,6 +769,14 @@ export function EventCreatePage() {
    * current (lib/generation-guard.ts) before applying its result.
    */
   const trackGenerationRef = useRef(createGenerationGuard());
+  /** History entries whose router-state hand-off (Find Tracks / Route Builder) was already
+   *  applied. Going back to an entry re-reads its state as a new object; without this, closing
+   *  the builder would re-apply an old hand-off over the route the organizer just drew. */
+  const appliedHandoffKeysRef = useRef(new Set<string>());
+  /** The route that came from the Route Builder, so a saved ride can retire the builder draft. */
+  const builderRouteRef = useRef<EventRoute | null>(null);
+  /** The builder was opened from this page (so closing it is a Back, not a replace). */
+  const builderOpenedHereRef = useRef(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1301,6 +1314,8 @@ export function EventCreatePage() {
     if (isEditing) return;
     const picked = pickedTrack;
     if (!picked?.fromRouteId) return;
+    if (appliedHandoffKeysRef.current.has(`pick:${routerLocation.key}`)) return;
+    appliedHandoffKeysRef.current.add(`pick:${routerLocation.key}`);
     const generation = trackGenerationRef.current.next();
     setFromRouteId(picked.fromRouteId);
     applyTrackFacts({
@@ -1350,6 +1365,64 @@ export function EventCreatePage() {
       .catch(() => undefined);
     // Once only — re-running on every render would fight the organizer's own edits.
   }, [isEditing, pickedTrack]);
+
+  /**
+   * Apply a track drawn in the Route Builder. It arrives as geometry, exactly like an uploaded
+   * GPX, and goes the same way: posted inline with the ride (POST /events/:id/route), never
+   * added to the organizer's library. Router state survives a refresh, so this re-applies then.
+   */
+  useEffect(() => {
+    if (isEditing) return;
+    const handoff = builderHandoff;
+    if (!handoff?.builderRoute || handoff.builderRoute.points.length < 2) return;
+    if (appliedHandoffKeysRef.current.has(`build:${routerLocation.key}`)) return;
+    appliedHandoffKeysRef.current.add(`build:${routerLocation.key}`);
+    applyBuilderRoute(handoff);
+  }, [isEditing, builderHandoff]);
+
+  function applyBuilderRoute(handoff: Partial<BuilderRouteHandoff>) {
+    if (!handoff.builderRoute || handoff.builderRoute.points.length < 2) return;
+    builderRouteRef.current = handoff.builderRoute;
+    handleUploadRoute({
+      route: handoff.builderRoute,
+      restStops: [],
+      fileName: handoff.builderName?.trim() || "Route Builder track",
+    });
+    const trackName = handoff.builderName?.trim();
+    if (trackName) {
+      setName((current: string) => current || trackName);
+      setInvalidName(false);
+    }
+    if (handoff.builderProfile) setActivityType(handoff.builderProfile);
+  }
+
+  /**
+   * "Create a New Route": the Route Builder opens OVER this form (?build=1), so every field
+   * already typed stays exactly where it is — the form never unmounts. Back (the browser's or
+   * the builder's own) closes it with nothing attached; "Use this route" attaches the line the
+   * same way an uploaded GPX is attached. A refresh keeps the builder and its draft open.
+   */
+  const builderOpen = searchParams.get("build") === "1";
+
+  function openRouteBuilder() {
+    const next = new URLSearchParams(searchParams);
+    next.set("build", "1");
+    builderOpenedHereRef.current = true;
+    navigate(`${routerLocation.pathname}?${next.toString()}`);
+  }
+
+  function closeRouteBuilder() {
+    if (builderOpenedHereRef.current) {
+      builderOpenedHereRef.current = false;
+      navigate(-1);
+      return;
+    }
+    // Opened by a refresh or a link: there is no entry of ours to go back to.
+    const next = new URLSearchParams(searchParams);
+    next.delete("build");
+    const query = next.toString();
+    navigate(`${routerLocation.pathname}${query ? `?${query}` : ""}`, { replace: true });
+  }
 
   function saveNewTeam() {
     if (!newTeamName.trim() || !profile) return;
@@ -1760,6 +1833,12 @@ export function EventCreatePage() {
         created as unknown as EventDetail,
       );
       await saveExtras(created.id);
+      // A track from the Route Builder ("Ride it now" or "Create a New Route") is now this ride's route — the builder's
+      // draft has done its job. Only when the ride really used it (not replaced by a file or a
+      // library pick on this form).
+      if (builderRouteRef.current && copiedRoute === builderRouteRef.current) {
+        discardRouteBuilderDraft();
+      }
       await uploadPendingVideo(created.id);
       setLastDefaults({
         location,
@@ -1846,6 +1925,17 @@ export function EventCreatePage() {
 
   return (
     <section className={styles.page}>
+      {builderOpen && (
+        <RouteBuilderPage
+          forRide={{
+            onUse: (handoff) => {
+              applyBuilderRoute(handoff);
+              closeRouteBuilder();
+            },
+            onCancel: closeRouteBuilder,
+          }}
+        />
+      )}
       <div className={styles.deck}>
         <header className={styles.header}>
           <div className={styles.headerIcon}>
@@ -2199,6 +2289,14 @@ export function EventCreatePage() {
                   </svg>
                   <span className={styles.trackBrowseLabel}>See other rides</span>
                   <span className={styles.trackBrowseHint}>From rides people have ridden</span>
+                </button>
+
+                {/* Third way: draw it. Opens the Route Builder over this form (see
+                    openRouteBuilder) — nothing typed here is lost. */}
+                <button type="button" className={styles.trackCreateBtn} onClick={openRouteBuilder}>
+                  <PenLine aria-hidden="true" size={18} className={styles.trackBtnIcon} />
+                  <span className={styles.trackUploadLabel}>Create a New Route</span>
+                  <span className={styles.trackUploadHint}>Draw it on the map · יצירת מסלול חדש</span>
                 </button>
               </div>
             )}

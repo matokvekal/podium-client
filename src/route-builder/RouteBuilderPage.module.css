@@ -657,3 +657,73 @@
 .confirmRow .danger {
   color: var(--status-danger);
 }
+
+/* ---- the unfinished-draft choice (and replace-on-import) ------------------------------------ */
+
+.choiceBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.choiceCard {
+  position: absolute;
+  z-index: 3001;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100% - 32px));
+  box-sizing: border-box;
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 20px;
+  padding: var(--sp-5, 20px);
+  box-shadow: var(--shadow-md);
+}
+
+.choiceTitle {
+  margin: 0 0 4px;
+  font-size: var(--fs-lg, 18px);
+  font-weight: 700;
+}
+
+.choiceDetail {
+  margin: 0 0 var(--sp-4, 16px);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: plaintext;
+}
+
+.choiceActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 8px);
+}
+
+.choiceActions button {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: var(--fs-md, 16px);
+  cursor: pointer;
+}
+
+.choiceActions .primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.choiceActions .choiceDanger {
+  border-color: transparent;
+  background: var(--status-danger);
+  color: #fff;
+}
+
+.choiceActions .choiceDangerQuiet {
+  color: var(--status-danger);
+}

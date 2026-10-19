@@ -139,7 +139,10 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [routingEnabled, setRoutingEnabled] = useState(true);
   const [storageProblem, setStorageProblem] = useState(false);
-  const [resumed, setResumed] = useState(false);
+  /** The one unfinished draft, found on opening: ask before anything can touch it. */
+  const [ask, setAsk] = useState<null | "choose" | "confirm-delete">(null);
+  /** A GPX picked while a route is on the map — replacing it waits for a yes. */
+  const [pendingImport, setPendingImport] = useState<RouteDraft | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
@@ -148,19 +151,31 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
 
   // ---- restore, persist ----------------------------------------------------------------------
 
-  // A draft left on this device comes straight back — no "continue?" question in the way. It
-  // says so, with Start over right there.
+  // ONE unfinished draft per browser (draftStorage.ts). Opening the builder with one — after a
+  // refresh, from the menu, or from the ride form — shows it behind a two-way choice: Continue
+  // Editing, or Delete and Start New (confirmed). Nothing can draw over it until the rider picks.
   const [restoreChecked, setRestoreChecked] = useState(false);
   useEffect(() => {
-    if (useRouteBuilderStore.getState().draft.waypoints.length === 0) {
+    let existing = useRouteBuilderStore.getState().draft;
+    if (existing.waypoints.length === 0) {
       const stored = loadDraft();
       if (stored && stored.draft.waypoints.length > 0) {
+        existing = stored.draft;
         reset(stored.draft);
-        setResumed(true);
       }
     }
+    if (existing.waypoints.length > 0) setAsk("choose");
     setRestoreChecked(true);
   }, [reset]);
+
+  /** Delete and Start New, after the rider confirmed: gone for good, not an Undo step. */
+  function deleteDraftAndStartNew() {
+    clearDraft();
+    reset(emptyDraft(draft.profile));
+    setSelectedId(null);
+    setFinishOpen(false);
+    setAsk(null);
+  }
 
   useEffect(() => {
     if (!restoreChecked) return;
@@ -214,7 +229,6 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
         setSelectedId(null);
         return;
       }
-      setResumed(false);
       edit((d) => addWaypoint(d, position));
       vibrate();
     },
@@ -296,7 +310,7 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
         ? !draft.manual
           ? "Tap where you want to ride to"
           : "Tap the next point"
-        : pointCount === 2 && !resumed
+        : pointCount === 2
           ? "Drag a point to adjust · tap the line to add one"
           : null;
 
@@ -390,22 +404,22 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
       );
     }
     const name = file.name.replace(/\.gpx$/i, "");
+    const imported = importTrack(draft.profile, points, elevations, name);
+    // Never silently over an unfinished route: with one on the map, ask first.
+    if (draft.waypoints.length > 0) setPendingImport(imported);
+    else applyImport(imported);
+  }
+
+  function applyImport(imported: RouteDraft) {
     // An edit, not a reset: Undo brings back whatever was on the map before the import.
-    edit((d) => importTrack(d.profile, points, elevations, name));
+    edit(() => imported);
     setSelectedId(null);
-    setResumed(false);
-    setFocus({ nonce: Date.now(), point: points[0], bbox: bboxOf(points) });
+    setPendingImport(null);
+    const points = imported.segments[0]?.geometry ?? [];
+    if (points.length) setFocus({ nonce: Date.now(), point: points[0], bbox: bboxOf(points) });
   }
 
   // ---- finish --------------------------------------------------------------------------------
-
-  // An edit, so Undo brings the track back; the emptied draft also clears storage.
-  function startOver() {
-    edit((d) => emptyDraft(d.profile));
-    setSelectedId(null);
-    setResumed(false);
-    setFinishOpen(false);
-  }
 
   return (
     <div className={styles.page}>
@@ -573,18 +587,6 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
       <div className={styles.bottom}>
         {hint && !place && <p className={styles.hint}>{hint}</p>}
 
-        {resumed && pointCount > 0 && (
-          <div className={styles.banner}>
-            <span>Continuing your track</span>
-            <button type="button" onClick={startOver}>
-              Start over
-            </button>
-            <button type="button" aria-label="Dismiss" onClick={() => setResumed(false)}>
-              <X aria-hidden="true" />
-            </button>
-          </div>
-        )}
-
         {place && (
           <div className={styles.banner}>
             <span className={styles.placeName}>{place.name.split(",")[0]}</span>
@@ -713,6 +715,39 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
         />
       </div>
 
+      {ask && (
+        <ChoiceCard
+          title={ask === "choose" ? "You have an unfinished route" : "Delete this route?"}
+          detail={
+            ask === "choose"
+              ? `${formatKm(stats.distanceM)} km · ${pointCount} point${pointCount === 1 ? "" : "s"} · ${draft.profile === "mtb" ? "Off-road" : "Road"}`
+              : "It can't be brought back."
+          }
+          primary={
+            ask === "choose"
+              ? { label: "Continue Editing", onClick: () => setAsk(null) }
+              : { label: "Delete", danger: true, onClick: deleteDraftAndStartNew }
+          }
+          secondary={
+            ask === "choose"
+              ? {
+                  label: "Delete and Start New",
+                  danger: true,
+                  onClick: () => setAsk("confirm-delete"),
+                }
+              : { label: "Keep it", onClick: () => setAsk("choose") }
+          }
+        />
+      )}
+      {pendingImport && (
+        <ChoiceCard
+          title="Replace your unfinished route?"
+          detail={`The route on the map is replaced by ${pendingImport.name || "this file"}. Undo brings it back.`}
+          primary={{ label: "Replace", onClick: () => applyImport(pendingImport) }}
+          secondary={{ label: "Keep my route", onClick: () => setPendingImport(null) }}
+        />
+      )}
+
       {finishOpen && (
         <FinishSheet
           draft={draft}
@@ -723,7 +758,7 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
           canRide={canRide}
           onRename={(name) => patch((d) => renameDraft(d, name))}
           onClose={() => setFinishOpen(false)}
-          onStartOver={startOver}
+          onStartOver={deleteDraftAndStartNew}
           rideLabel={forRide ? "Use this route" : "Ride it now"}
           showSave={!forRide}
           onRide={(handoff) =>
@@ -904,12 +939,12 @@ function FinishSheet(props: FinishSheetProps) {
         )}
         {confirmStartOver ? (
           <div className={styles.confirmRow}>
-            <span>Clear this track?</span>
+            <span>Delete this route?</span>
             <button type="button" className={styles.danger} onClick={props.onStartOver}>
-              Clear
+              Delete
             </button>
             <button type="button" onClick={() => setConfirmStartOver(false)}>
-              Keep
+              Keep it
             </button>
           </div>
         ) : (
@@ -918,9 +953,54 @@ function FinishSheet(props: FinishSheetProps) {
             className={styles.linkButton}
             onClick={() => setConfirmStartOver(true)}
           >
-            Start over
+            Delete and start new
           </button>
         )}
+      </div>
+    </>
+  );
+}
+
+interface ChoiceAction {
+  label: string;
+  danger?: boolean;
+  onClick(): void;
+}
+
+/** A small centred card over the map that must be answered — the map behind cannot be touched. */
+function ChoiceCard(props: {
+  title: string;
+  detail: string;
+  primary: ChoiceAction;
+  secondary: ChoiceAction;
+}) {
+  return (
+    <>
+      <div className={styles.choiceBackdrop} aria-hidden="true" />
+      <div
+        className={styles.choiceCard}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={props.title}
+      >
+        <p className={styles.choiceTitle}>{props.title}</p>
+        <p className={styles.choiceDetail}>{props.detail}</p>
+        <div className={styles.choiceActions}>
+          <button
+            type="button"
+            className={props.primary.danger ? styles.choiceDanger : styles.primary}
+            onClick={props.primary.onClick}
+          >
+            {props.primary.label}
+          </button>
+          <button
+            type="button"
+            className={props.secondary.danger ? styles.choiceDangerQuiet : undefined}
+            onClick={props.secondary.onClick}
+          >
+            {props.secondary.label}
+          </button>
+        </div>
       </div>
     </>
   );

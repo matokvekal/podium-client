@@ -1,0 +1,659 @@
+/* Route Builder — full-screen map, controls floating over it. Phone first; from 900 px a point
+   list appears on the left. Colours come from tokens.css; the map's own colours (lines,
+   markers) are set in BuilderMap.tsx because Leaflet draws them. */
+
+.page {
+  position: fixed;
+  inset: 0;
+  /* Above the app shell: from the ride form the builder opens over the whole page. */
+  z-index: 5000;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  /* The map stays left-to-right even inside an RTL page. */
+  direction: ltr;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-sunken);
+}
+
+/* Phones pinch to zoom; the +/- buttons would only crowd the bottom bar. */
+@media (max-width: 899px) {
+  .map :global(.leaflet-control-zoom) {
+    display: none;
+  }
+}
+
+.map :global(.rb-pending) {
+  animation: rb-dash 0.9s linear infinite;
+}
+
+@keyframes rb-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+/* ---- floating controls -------------------------------------------------------------------- */
+
+.top {
+  position: absolute;
+  z-index: 1000;
+  top: max(var(--sp-3, 12px), env(safe-area-inset-top));
+  left: var(--sp-3, 12px);
+  right: var(--sp-3, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 8px);
+  pointer-events: none;
+  max-width: 560px;
+}
+
+.top > * {
+  pointer-events: auto;
+}
+
+.searchRow {
+  display: flex;
+  gap: var(--sp-2, 8px);
+}
+
+.search {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px; /* 16 px stops iOS zooming into the field */
+  padding: 0 var(--sp-4, 16px);
+  height: 44px;
+  outline: none;
+}
+
+.search button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  width: 48px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.search button:disabled {
+  color: var(--text-muted);
+}
+
+.results {
+  list-style: none;
+  margin: 0;
+  padding: var(--sp-1, 4px);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-md);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.results button {
+  width: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: var(--sp-3, 12px);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--fs-sm, 14px);
+  cursor: pointer;
+  /* Hebrew place names read right-to-left inside an otherwise ltr overlay. */
+  unicode-bidi: plaintext;
+}
+
+.results button:hover,
+.results button:focus-visible {
+  background: var(--surface-sunken);
+}
+
+.results .resultsClose {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: var(--shadow-md);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: var(--fs-sm, 14px);
+  cursor: pointer;
+}
+
+.segmented button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 16px;
+  height: 42px;
+  box-shadow: var(--shadow-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stats strong {
+  font-size: var(--fs-lg, 18px);
+}
+
+.stats span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm, 14px);
+}
+
+.stats svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+
+.side {
+  position: absolute;
+  z-index: 1000;
+  right: var(--sp-3, 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 8px);
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.iconButtonFlat {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* ---- bottom --------------------------------------------------------------------------------- */
+
+.bottom {
+  position: absolute;
+  z-index: 1000;
+  left: var(--sp-3, 12px);
+  right: var(--sp-3, 12px);
+  bottom: max(var(--sp-3, 12px), env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2, 8px);
+  pointer-events: none;
+}
+
+.bottom > * {
+  pointer-events: auto;
+}
+
+.hint {
+  margin: 0;
+  align-self: center;
+  background: rgba(17, 24, 39, 0.82);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: var(--fs-sm, 14px);
+  pointer-events: none;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  max-width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 6px 6px 6px 14px;
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm, 14px);
+}
+
+.banner > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.banner button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bannerError {
+  border-color: var(--status-danger);
+}
+
+.placeName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 12px;
+  font-size: var(--fs-xs, 12px);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.noteError {
+  color: var(--status-danger);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: var(--fs-sm, 14px);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px;
+  box-shadow: var(--shadow-md);
+  max-width: 100%;
+}
+
+.bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 9px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-sm, 14px);
+  cursor: pointer;
+}
+
+.bar button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.barLabel {
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.bar .primary {
+  margin-inline-start: auto;
+  padding: 0 14px;
+}
+
+.primary,
+.bar .primary,
+.sheetActions .primary {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.banner .primarySmall {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.toggleOn,
+.bar .toggleOn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.danger,
+.bar .danger {
+  color: var(--status-danger);
+}
+
+.spin {
+  animation: rb-spin 0.9s linear infinite;
+}
+
+@keyframes rb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- desktop point list -------------------------------------------------------------------- */
+
+.panel {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .top {
+    left: calc(var(--sp-3, 12px) + 236px);
+  }
+
+  .bottom {
+    left: calc(var(--sp-3, 12px) + 236px);
+    right: calc(var(--sp-3, 12px) + 56px); /* clear of the zoom buttons */
+    align-items: center;
+  }
+
+  .bar {
+    width: auto;
+  }
+
+  .panel {
+    display: block;
+    position: absolute;
+    z-index: 1000;
+    left: var(--sp-3, 12px);
+    top: var(--sp-3, 12px);
+    width: 220px;
+    max-height: calc(100% - 2 * var(--sp-3, 12px));
+    overflow-y: auto;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .panel ol {
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+  }
+
+  .panel li {
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+  }
+
+  .panel li button {
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+
+  .panel li button:first-child {
+    flex: 1;
+    text-align: start;
+  }
+
+  .panel li button:last-child {
+    color: var(--text-muted);
+  }
+
+  .panel li button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .panelSelected {
+    background: var(--accent-soft);
+  }
+}
+
+/* ---- finish sheet --------------------------------------------------------------------------- */
+
+.sheetBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.sheet {
+  position: absolute;
+  z-index: 2001;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 20px 20px 0 0;
+  padding: var(--sp-4, 16px) var(--sp-4, 16px) max(var(--sp-4, 16px), env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 12px);
+}
+
+@media (min-width: 900px) {
+  .sheet {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    border-radius: 20px;
+  }
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+}
+
+.nameInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  unicode-bidi: plaintext;
+}
+
+.sheetStats {
+  margin: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetStats strong {
+  color: var(--text);
+  font-size: var(--fs-lg, 18px);
+}
+
+.sheetActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 8px);
+}
+
+.sheetActions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: var(--fs-md, 16px);
+  cursor: pointer;
+}
+
+.sheetActions .primary {
+  border-color: transparent;
+}
+
+.sheetActions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sheetActions button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sheetFoot {
+  margin: 0;
+  font-size: var(--fs-xs, 12px);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.linkButton {
+  align-self: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  text-decoration: underline;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2, 8px);
+}
+
+.confirmRow button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.confirmRow .danger {
+  color: var(--status-danger);
+}

@@ -27,7 +27,7 @@
  */
 
 import { useEffect, useMemo } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { TrackGalleryBrowser } from "../app/TrackGalleryBrowser";
 import {
   buildFindTracksPath,
@@ -77,6 +77,10 @@ export function TracksPage() {
 
   return (
     <section className="stack">
+      {/* Not finding it? Draw one — the Route Builder (/build). */}
+      <Link to="/build" className="button button--quiet" style={{ alignSelf: "flex-start" }}>
+        ✏️ Draw your own track
+      </Link>
       <TrackGalleryBrowser
         variant="page"
         onPick={openCreateWithTrack}

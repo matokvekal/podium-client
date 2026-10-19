@@ -37,9 +37,10 @@ import { TracksPage } from "./pages/TracksPage";
 import { EntryChoicePage } from "./ride-studio/EntryChoicePage";
 import { RideStudioPage } from "./ride-studio/RideStudioPage";
 import { StudioGate } from "./ride-studio/StudioGate";
+import { RouteBuilderPage } from "./route-builder/RouteBuilderPage";
 import { useUserModeStore } from "./store/userModeStore";
 
-function RequireAuth({ children }: { children: ReactNode }) {
+function RequireAuth({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   const { status, requiresProfile } = useAuth();
   const location = useLocation();
 
@@ -62,6 +63,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
     return <Navigate to="/account/setup" replace state={{ from: location.pathname }} />;
   }
 
+  // `bare`: a full-screen page that brings its own Back control (the Route Builder's map).
+  if (bare) return children;
   return <AppShell>{children}</AppShell>;
 }
 
@@ -357,6 +360,16 @@ export function App() {
             }
           />
         ))}
+        {/* Build a Track (src/route-builder): draw a route on a full-screen map. Signed-in, any
+            rider — saving to My Tracks is a rider action; only "Ride it now" needs organizer. */}
+        <Route
+          path="/build"
+          element={
+            <RequireAuth bare>
+              <RouteBuilderPage />
+            </RequireAuth>
+          }
+        />
         {/* The address this page had before it became shareable — old bookmarks keep working. */}
         <Route path="/routes" element={<Navigate to="/findtracks" replace />} />
         <Route

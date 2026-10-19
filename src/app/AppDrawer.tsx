@@ -20,6 +20,7 @@ import {
   Megaphone,
   MessageCircleHeart,
   Moon,
+  PenLine,
   QrCode,
   Sun,
   User,
@@ -194,6 +195,12 @@ export function AppDrawer({ open, onClose, colorTheme, onToggleColorTheme }: App
             Explore Tracks
             <span className="drawer__nav-tag">New</span>
           </NavLink>
+          {status === "signed-in" && (
+            <NavLink to="/build" className="drawer__nav-item" onClick={onClose}>
+              <PenLine aria-hidden="true" />
+              Build a Track
+            </NavLink>
+          )}
           {status === "signed-in" && (
             <NavLink to="/teams" className="drawer__nav-item" onClick={onClose}>
               <Users aria-hidden="true" />

@@ -20,6 +20,7 @@
  * says so.
  */
 
+import { IMAGE_DIRS } from "../../config/images";
 import type { StudioRideType } from "../engine/types";
 
 export type Landscape =
@@ -92,7 +93,7 @@ function img(
     title,
     provenance: "ai-illustration",
     source: "AI-generated illustration created for El Niño Ride; no third-party material",
-    file: `/ride-studio/images/${id}.webp`,
+    file: `${IMAGE_DIRS.rideStudio}/covers/${id}.webp`,
     width: 1600,
     height: 900,
     fileSizeBytes: null,

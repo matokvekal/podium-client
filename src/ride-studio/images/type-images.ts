@@ -1,11 +1,12 @@
 /**
  * The pictures on the ride-type cards: the ONE place their paths are listed.
  *
- * The files live in `public/images/ride-studio/types/` (see the README there for how to replace or
- * add one). Nothing in a component names a path, and nothing is embedded in the code: a file is
+ * The files live in `public/images/ride-studio/types/` — a file is replaced by
+ * overwriting it with the same name (960×540 WebP). Nothing in a component names a path, and nothing is embedded in the code: a file is
  * swapped by overwriting it, and a type is added with one line here.
  */
 
+import { IMAGE_DIRS } from "../../config/images";
 import type { StudioRideType } from "../engine/types";
 
 export interface TypeImage {
@@ -15,7 +16,7 @@ export interface TypeImage {
   gradient: string;
 }
 
-const BASE = "/images/ride-studio/types";
+const BASE = `${IMAGE_DIRS.rideStudio}/types`;
 
 export const TYPE_IMAGES: Record<StudioRideType, TypeImage> = {
   road: { src: `${BASE}/road.webp`, gradient: "linear-gradient(135deg, #1e3a8a, #f59e0b)" },

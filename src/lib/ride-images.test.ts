@@ -15,7 +15,7 @@ describe("registry integrity", () => {
 
   it("names every file after its key", () => {
     for (const img of RIDE_IMAGES) {
-      expect(img.src).toBe(`/ride-images/${img.key}.webp`);
+      expect(img.src).toBe(`/images/ride-covers/${img.key}.webp`);
     }
   });
 

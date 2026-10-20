@@ -12,7 +12,7 @@
  *
  * The clip is muted, silent and 234 KB: muted+playsInline is what lets a browser autoplay it
  * at all, and the whole point of a splash is that it is already on screen before anyone waits
- * for it. public/splash-poster.jpg is its first frame, so something real is visible in the
+ * for it. public/images/startup/splash-poster.jpg is its first frame, so something real is visible in the
  * moment before the video decodes — and stays visible if autoplay is refused or the rider has
  * asked for reduced motion, in which case the video never plays and the still is the splash.
  *
@@ -23,6 +23,7 @@
  */
 
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { STARTUP_IMAGES } from "../config/images";
 import { APP_NAME, APP_SLOGAN } from "../lib/branding";
 import { fastResumeRoute } from "../lib/fast-resume";
 import "./splash-screen.css";
@@ -125,7 +126,7 @@ export function SplashScreen() {
         ref={videoRef}
         className="splash__video"
         src="/splash.mp4"
-        poster="/splash-poster.jpg"
+        poster={STARTUP_IMAGES.splashPoster}
         muted
         playsInline
         preload="auto"

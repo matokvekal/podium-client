@@ -22,7 +22,7 @@ describe("registry integrity", () => {
   it("names every file after its id, in the folder for its type", () => {
     for (const p of IDENTITY_PRESETS) {
       const dir = p.type === "cover" ? "covers" : "avatars";
-      expect(p.url).toBe(`/identity-presets/${dir}/${p.id}.svg`);
+      expect(p.url).toBe(`/images/profile/${dir}/${p.id}.svg`);
     }
   });
 

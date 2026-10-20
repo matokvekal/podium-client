@@ -44,6 +44,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../app/Avatar";
 import { useMyIdentity } from "../app/useMyIdentity";
+import { IMAGE_DIRS } from "../config/images";
 import { COUNTRIES, FALLBACK_COUNTRY_CODE } from "../lib/countries";
 import { countryFlagEmoji } from "../lib/country-flag";
 import { MOCK_LEADERBOARD_ENTRIES, MOCK_LEADERBOARD_ME } from "../lib/rider-stats-mock";
@@ -57,7 +58,7 @@ import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsLeaderboardPage.module.css";
 import shared from "./StatisticsShared.module.css";
 
-const ICON_BASE = "/images/statistics/leaderboard";
+const ICON_BASE = `${IMAGE_DIRS.statistics}/leaderboard`;
 
 const CATEGORY_META: Record<
   LeaderboardCategory,

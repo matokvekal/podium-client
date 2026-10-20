@@ -81,7 +81,7 @@
 .bg {
   position: absolute;
   inset: 0;
-  background: url("/welcome1.png") center 35% / cover no-repeat;
+  background: url("/images/startup/welcome1.png") center 35% / cover no-repeat;
   transform: scale(1.04);
   animation: drift 20s ease-out both;
 }

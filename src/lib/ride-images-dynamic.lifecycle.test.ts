@@ -26,7 +26,9 @@ const catalog: RideImageDto[] = [
 
 describe("ride image catalog on the client", () => {
   it("resolves an existing ride's key even when it is no longer selectable", () => {
-    expect(resolveRideImage(catalog, "sukkot-01")?.src).toBe("/ride-images/sukkot-01.webp");
+    // The catalog row still holds the address from before the move (sql/052); the picture is
+    // found in its new folder.
+    expect(resolveRideImage(catalog, "sukkot-01")?.src).toBe("/images/ride-covers/sukkot-01.webp");
   });
 
   it("offers only selectable images in the picker", () => {
@@ -51,9 +53,9 @@ describe("resolveApiAssetUrl", () => {
       resolveApiAssetUrl("/api/v1/ride-image-files/a.webp", "http://localhost:5000/api/v1"),
     ).toBe("http://localhost:5000/api/v1/ride-image-files/a.webp");
   });
-  it("never touches built-in covers or absolute URLs", () => {
+  it("never puts the API origin on built-in covers or absolute URLs", () => {
     expect(resolveApiAssetUrl("/ride-images/tikva1.webp", "http://localhost:5000/api/v1")).toBe(
-      "/ride-images/tikva1.webp",
+      "/images/ride-covers/tikva1.webp",
     );
     expect(resolveApiAssetUrl("https://x/y.webp", "http://localhost:5000/api/v1")).toBe(
       "https://x/y.webp",

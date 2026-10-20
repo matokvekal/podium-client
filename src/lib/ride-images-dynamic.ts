@@ -14,6 +14,7 @@
 // (ensureLoaded is idempotent) so no call site has to remember to.
 
 import { useEffect } from "react";
+import { currentImageUrl } from "../config/images";
 import { config } from "./config";
 import { type RideImageDto, useRideImagesStore } from "../store/rideImagesStore";
 import {
@@ -27,9 +28,12 @@ import {
  * The server returns an uploaded cover as a path on the API origin ("/api/v1/ride-image-files/…").
  * When the app is served from the same origin as the API (production: VITE_API_URL=/api/v1) that
  * path works as is; when the API is on another origin (local dev) it needs that origin in front.
- * Built-in covers ("/ride-images/…") and full URLs are left alone.
+ * Built-in covers and full URLs are left alone — except that a built-in address written before
+ * the images moved to public/images/ (the database still holds "/ride-images/…") is brought up
+ * to date by config/images.ts's currentImageUrl. Every catalog address passes through here.
  */
-export function resolveApiAssetUrl(url: string, apiUrl: string = config.apiUrl): string {
+export function resolveApiAssetUrl(rawUrl: string, apiUrl: string = config.apiUrl): string {
+  const url = currentImageUrl(rawUrl);
   if (!url.startsWith("/api/") || !/^https?:\/\//i.test(apiUrl)) return url;
   return new URL(url, apiUrl).href;
 }

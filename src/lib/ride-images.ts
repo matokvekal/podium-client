@@ -2,7 +2,7 @@
  * The built-in RIDE cover-image registry — what an organizer may pick on Create/Edit Ride and
  * what events.rideImageKey (sql/051-events-ride-image.sql) may name.
  *
- * V1 is picker-only, by design: these are shared APPLICATION assets in public/ride-images/, not
+ * V1 is picker-only, by design: these are shared APPLICATION assets in public/images/ride-covers/ (config/images.ts), not
  * a per-ride upload. Choosing one stores only its `key`, on the server, in events.ride_image_key
  * — never a copy of the image, never a URL, never binary data. See the "no upload" plan.
  *
@@ -23,10 +23,12 @@
  *    server schema would reject that ride's next unrelated edit if the key vanished from either
  *    registry (see identity-presets.ts's identical rule for user avatar/cover presets).
  *
- * Adding an image later is therefore: drop the .webp in public/ride-images/ named exactly after
+ * Adding an image later is therefore: drop the .webp in public/images/ride-covers/ named exactly after
  * its key, add one entry here AND one matching key in the server's RIDE_IMAGE_KEYS. Nothing else
  * — no migration, no DB row.
  */
+
+import { IMAGE_DIRS } from "../config/images";
 
 export type RideImageCategory = "sukkot" | "holidays" | "road" | "mtb" | "gravel" | "generic";
 
@@ -52,7 +54,7 @@ export const CATEGORY_ORDER: readonly RideImageCategory[] = [
 export interface RideImage {
   /** STABLE and permanent — the only thing ever persisted (server: events.ride_image_key). */
   key: string;
-  /** Public path. Always `/ride-images/<key>.webp`, so a registry entry and its file cannot
+  /** Public path. Always `/images/ride-covers/<key>.webp`, so a registry entry and its file cannot
    *  drift apart. */
   src: string;
   category: RideImageCategory;
@@ -69,7 +71,7 @@ function rideImage(
   label: string,
   selectable = true,
 ): RideImage {
-  return { key, src: `/ride-images/${key}.webp`, category, label, selectable };
+  return { key, src: `${IMAGE_DIRS.rideCovers}/${key}.webp`, category, label, selectable };
 }
 
 /** Append new entries at the end. Never edit, reorder or remove an existing one — see rule 1

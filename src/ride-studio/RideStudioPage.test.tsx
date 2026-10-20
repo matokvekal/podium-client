@@ -536,7 +536,7 @@ describe("cover image", () => {
     await toNameWithType(/^Road Cycling/);
     const preview = screen.getByLabelText("Your ride");
     expect((within(preview).getByRole("img") as HTMLImageElement).src).toContain(
-      "/ride-images/road-",
+      "/images/ride-covers/road-",
     );
     expect(within(preview).getByRole("button", { name: "Change image" })).toBeTruthy();
   });

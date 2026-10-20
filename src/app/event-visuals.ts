@@ -1,6 +1,7 @@
 // Shared presentation logic for EventTile and EventCard — one place for "how does an event
 // look as a card" so the home row and the Other Rides list read as the same design system.
 
+import { IMAGE_DIRS } from "../config/images";
 import type { EventStatus } from "../lib/local-db";
 import { stableHash as hashSeed } from "../lib/stable-hash";
 import {
@@ -96,7 +97,7 @@ export function placeholderCoverGradient(seed: string | null | undefined): strin
 }
 
 /**
- * The built-in cover art, in public/event-covers/. Ten abstract SVG landscapes — sky, sun,
+ * The built-in cover art, in public/images/event-covers/ (config/images.ts). Ten abstract SVG landscapes — sky, sun,
  * layered ridges, a road ribbon — used until the organizer uploads a real cover.
  *
  * They are deliberately ABSTRACT, not stock photographs: a photo of a real road on a ride that
@@ -109,7 +110,7 @@ export function placeholderCoverGradient(seed: string | null | undefined): strin
 const GENERATED_COVER_COUNT = 10;
 
 export function generatedCoverUrl(seed: string | null | undefined): string {
-  return `/event-covers/cover-${(hashSeed(seed) % GENERATED_COVER_COUNT) + 1}.svg`;
+  return `${IMAGE_DIRS.eventCovers}/cover-${(hashSeed(seed) % GENERATED_COVER_COUNT) + 1}.svg`;
 }
 
 /** The owner's identity, for the cover chain. All optional — today's API sends none of it. */

@@ -1,7 +1,7 @@
 /**
  * The built-in visual preset library.
  *
- * These are shared APPLICATION assets in public/identity-presets/, not per-user files. A user
+ * These are shared APPLICATION assets in public/images/profile/ (config/images.ts), not per-user files. A user
  * who picks one stores only its `id`; the server/DB will eventually store that same string and
  * nothing else — never a copy of the image, never a URL.
  *
@@ -17,7 +17,7 @@
  *    Appending to a pool only affects users whose hash lands on a newly added slot; inserting
  *    or reordering would reshuffle everyone, so don't.
  *
- * Adding a preset later is therefore: drop the SVG in public/identity-presets/{covers,avatars}/
+ * Adding a preset later is therefore: drop the SVG in public/images/profile/{covers,avatars}/
  * named exactly after its id, add one entry here. Nothing else.
  *
  * Assets are SVG so one file serves every render size (see aspectRatio note below), and because
@@ -25,6 +25,7 @@
  * offline-ready with no extra work.
  */
 
+import { IMAGE_DIRS } from "../config/images";
 import { pickStable } from "./stable-hash";
 
 export type IdentityAssetType = "avatar" | "cover";
@@ -105,7 +106,7 @@ function cover(id: string, category: PresetCategory, label: string): IdentityPre
   return {
     id,
     type: "cover",
-    url: `/identity-presets/covers/${id}.svg`,
+    url: `${IMAGE_DIRS.profileCovers}/${id}.svg`,
     ...COVER_DIMENSIONS,
     category,
     label,
@@ -116,7 +117,7 @@ function avatar(id: string, category: PresetCategory, label: string): IdentityPr
   return {
     id,
     type: "avatar",
-    url: `/identity-presets/avatars/${id}.svg`,
+    url: `${IMAGE_DIRS.profileAvatars}/${id}.svg`,
     ...AVATAR_DIMENSIONS,
     category,
     label,

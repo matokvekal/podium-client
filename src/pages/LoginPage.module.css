@@ -3,7 +3,7 @@
  *
  * Modelled on Images/login1.jpg: a photographic trail scene behind the whole viewport, the
  * mark and wordmark high in the frame, the sign-in actions sitting on the bottom edge. The
- * scene itself is public/login-hero.jpg — the photograph out of that mockup, with its
+ * scene itself is public/images/startup/login-hero.jpg — the photograph out of that mockup, with its
  * baked-in text removed (see the .page::before comment below).
  *
  * Everything here is scoped to this page on purpose: no other screen has white-on-image
@@ -37,7 +37,7 @@
   content: "";
   position: fixed;
   inset: 0;
-  background: url("/login-hero.jpg") center 70% / cover no-repeat;
+  background: url("/images/startup/login-hero.jpg") center 70% / cover no-repeat;
 }
 
 /* Two scrims, top and bottom: without them the wordmark sits on bright sky and the buttons

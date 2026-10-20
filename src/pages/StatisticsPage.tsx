@@ -26,7 +26,7 @@
  *
  * Route:   /stats
  * Loads:   store/statisticsStore.ts -> GET /api/v1/statistics/me,
- *          public/statistics-year-{header,footer}.png, -{bike,calorie}-icon.png
+ *          public/images/statistics/year/{header,footer,bike-icon,calorie-icon}.png
  * Actions: Overview/Achievements/Activity tabs; season prev/next; links to Achievements and
  *          Leaderboard
  */
@@ -35,6 +35,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMyIdentity } from "../app/useMyIdentity";
+import { IMAGE_DIRS } from "../config/images";
 import { MOCK_RIDER_STATS, type StatTotals } from "../lib/rider-stats-mock";
 import { tierColor } from "../lib/rider-stats-ui";
 import type { RiderStatsPayload, StatYearTotals } from "../store/statisticsStore";
@@ -42,10 +43,11 @@ import { useStatisticsStore } from "../store/statisticsStore";
 import { MockDataNotice } from "./MockDataBadge";
 import styles from "./StatisticsPage.module.css";
 
-const HERO_IMAGE = "/statistics-year-header.png";
-const FOOTER_IMAGE = "/statistics-year-footer.png";
-const BIKE_ICON_IMAGE = "/statistics-year-bike-icon.png";
-const CALORIE_ICON_IMAGE = "/statistics-year-calorie-icon.png";
+const YEAR_IMAGES = `${IMAGE_DIRS.statistics}/year`;
+const HERO_IMAGE = `${YEAR_IMAGES}/header.png`;
+const FOOTER_IMAGE = `${YEAR_IMAGES}/footer.png`;
+const BIKE_ICON_IMAGE = `${YEAR_IMAGES}/bike-icon.png`;
+const CALORIE_ICON_IMAGE = `${YEAR_IMAGES}/calorie-icon.png`;
 
 type Tab = "overview" | "achievements" | "activity";
 

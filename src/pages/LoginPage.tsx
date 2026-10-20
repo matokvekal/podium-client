@@ -11,7 +11,7 @@
  * question — who is this person — and both end with the server issuing its own tokens.
  *
  * Presentation: the one full-bleed screen in the app (LoginPage.module.css +
- * public/login-hero.jpg, the photograph from Images/login2.png), laid out to the mockup in
+ * public/images/startup/login-hero.jpg, the photograph from Images/login2.png), laid out to the mockup in
  * Images/login1.jpg — trail scene behind everything, mark and wordmark high in the frame,
  * sign-in on the bottom edge. Nothing about the auth flow changed with it; the previous
  * plain-card version is kept verbatim at src/_backup-pre-hero-login/LoginPage.tsx.bak.

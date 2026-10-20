@@ -15,6 +15,8 @@
  * server's statistics.gems.ts.
  */
 
+import { IMAGE_DIRS } from "../config/images";
+
 export type Gem = "stone" | "onyx" | "emerald" | "ruby" | "diamond";
 export type StatKey = "hours" | "rides" | "calories" | "distance" | "climb";
 export type PeriodType = "month" | "year";
@@ -180,4 +182,4 @@ export function percentChange(current: number | null, previous: number | null): 
   return Math.round(((current - previous) / previous) * 100);
 }
 
-export const GEM_ASSET = (gem: Gem) => `/images/statistics/achievements/${gem}.jpg`;
+export const GEM_ASSET = (gem: Gem) => `${IMAGE_DIRS.statistics}/achievements/${gem}.jpg`;

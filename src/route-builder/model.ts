@@ -297,6 +297,26 @@ export function insertOnSegment(draft: RouteDraft, segmentId: string, tap: LatLn
   return { ...draft, waypoints, segments };
 }
 
+/**
+ * The rider grabbed the line at `grab` and let go at `drop`: a new point where they grabbed it,
+ * moved to where they let go — so both sides re-route through the drop. One edit, one undo.
+ */
+export function dragSegment(
+  draft: RouteDraft,
+  segmentId: string,
+  grab: LatLng,
+  drop: LatLng,
+): RouteDraft {
+  const inserted = insertOnSegment(draft, segmentId, grab);
+  if (inserted === draft) return draft;
+  // On an imported line anchors are added too; the dragged one is the point nearest the grab.
+  const dist = (p: LatLng) => haversineDistanceKm(p, grab);
+  const added = inserted.waypoints
+    .filter((w) => !draft.waypoints.some((b) => b.id === w.id))
+    .sort((a, b) => dist(a.position) - dist(b.position));
+  return added[0] ? moveWaypoint(inserted, added[0].id, drop) : inserted;
+}
+
 function segmentIndexAtDistance(cumulative: readonly number[], distance: number): number {
   for (let i = 0; i < cumulative.length - 1; i++) {
     if (cumulative[i + 1] >= distance) return i;

@@ -10,6 +10,7 @@ import {
   closeLoop,
   draftStats,
   draftToEventRoute,
+  dragSegment,
   emptyDraft,
   importTrack,
   insertOnSegment,
@@ -152,6 +153,20 @@ describe("editing", () => {
     // …and dragging it re-routes only its two sides.
     d = moveWaypoint(d, d.waypoints[1].id, [31.84, 34.96]);
     expect(d.segments.map((s) => s.status)).toEqual(["pending", "pending", "ready"]);
+  });
+
+  it("dragging the line adds one point where it was let go and re-routes both sides through it", () => {
+    let d = threePointRoad();
+    const drop: LatLng = [31.845, 34.94];
+    d = dragSegment(d, d.segments[0].id, [31.8405, 34.9548], drop);
+    expect(d.waypoints).toHaveLength(4);
+    expect(d.waypoints[1].position).toEqual(drop);
+    expect(d.segments.map((s) => s.status)).toEqual(["pending", "pending", "ready"]);
+  });
+
+  it("dragging a line still waiting for the router changes nothing", () => {
+    const d = addWaypoint(addWaypoint(emptyDraft("road"), PEDAYA), NACHSHON);
+    expect(dragSegment(d, d.segments[0].id, [31.84, 34.96], [31.84, 34.94])).toBe(d);
   });
 
   it("a segment can be switched to a straight line and back", () => {

@@ -11,7 +11,12 @@
  *   - drag a point       → move it (Leaflet stops the map panning while a marker is dragged)
  *   - tap a point        → select it (actions appear in the page's bottom bar)
  *   - tap the line       → add a point there (a wide invisible line makes it easy to hit)
+ *   - drag the line      → a new point where it was grabbed, moved to where it is let go
  * Double-tap zoom is off: a quick double tap would otherwise add two points AND zoom.
+ *
+ * A via point is drawn where its routed line actually meets the road (the router snaps a tap
+ * near a road onto it), so the marker sits on the road, not 20 m beside it. Start and finish
+ * stay exactly where the rider put them.
  *
  * Lazy-loaded by RouteBuilderPage like every Leaflet map here (see RouteMap.tsx's header for
  * what an eager Leaflet import costs the bundle).
@@ -48,6 +53,7 @@ interface BuilderMapProps {
   onWaypointTap(id: string): void;
   onWaypointMoved(id: string, position: LatLng): void;
   onSegmentTap(segmentId: string, position: LatLng): void;
+  onSegmentDragged(segmentId: string, grab: LatLng, drop: LatLng): void;
   onViewChange(view: MapView): void;
 }
 
@@ -114,12 +120,113 @@ function waypointIcon(kind: WaypointKind, label: string, selected: boolean): L.D
   });
 }
 
+/** Where a via point is drawn: the routed line's own end there (on the road), else where the
+ *  rider put it — while routing is pending, after an error, or on a straight line. */
+function onRoadPosition(draft: RouteDraft, index: number): LatLng {
+  const isRoad = (s: RouteSegment | undefined) =>
+    s?.mode === "routed" && s.status === "ready" && s.geometry.length > 1;
+  const out = draft.segments[index];
+  if (isRoad(out)) return out.geometry[0];
+  const into = draft.segments[index - 1];
+  if (isRoad(into)) return into.geometry[into.geometry.length - 1];
+  return draft.waypoints[index].position;
+}
+
+/** Below this many pixels a press on the line is a tap (add a point), not a drag. */
+const LINE_DRAG_THRESHOLD_PX = 8;
+
+/**
+ * A press on a segment's line. Once it moves past the threshold the map stops panning and a
+ * dashed guide runs from the segment's start, through the finger, to its end; letting go
+ * reports grab + drop. A segment still waiting for the router cannot be dragged (there is no
+ * line on the road to grab yet).
+ */
+function startLineDrag(
+  map: L.Map,
+  down: PointerEvent,
+  segmentId: string,
+  propsRef: { current: BuilderMapProps },
+  suppressClickRef: { current: boolean },
+): void {
+  if (down.pointerType === "mouse" && down.button !== 0) return;
+  const { draft } = propsRef.current;
+  const index = draft.segments.findIndex((s) => s.id === segmentId);
+  if (index === -1 || draft.segments[index].status !== "ready") return;
+  const from = onRoadOrStart(draft, index);
+  const to = onRoadOrStart(draft, index + 1);
+  const grab = map.mouseEventToLatLng(down);
+
+  // Keep the map still from the first touch: a press that turns into a drag must not pan.
+  down.stopPropagation();
+  map.dragging.disable();
+  let guide: L.Polyline | null = null;
+  let handle: L.CircleMarker | null = null;
+
+  const toLatLng = (e: PointerEvent): LatLng => {
+    const p = map.mouseEventToLatLng(e);
+    return [p.lat, p.lng];
+  };
+  const onMove = (e: PointerEvent) => {
+    if (e.pointerId !== down.pointerId) return;
+    if (!guide) {
+      const moved = Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY);
+      if (moved < LINE_DRAG_THRESHOLD_PX) return;
+      guide = L.polyline([], {
+        color: COLORS.routed,
+        weight: 3,
+        opacity: 0.8,
+        dashArray: "6 8",
+        interactive: false,
+      }).addTo(map);
+      handle = L.circleMarker(grab, {
+        radius: 9,
+        color: COLORS.routed,
+        weight: 2,
+        fillColor: "#fff",
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(map);
+    }
+    const at = toLatLng(e);
+    guide.setLatLngs([from, at, to]);
+    handle?.setLatLng(at);
+  };
+  const finish = (e: PointerEvent, commit: boolean) => {
+    if (e.pointerId !== down.pointerId) return;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    map.dragging.enable();
+    if (!guide) return; // never moved: a tap, which the line's click handler takes
+    guide.remove();
+    handle?.remove();
+    suppressClickRef.current = true;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 300);
+    if (commit) propsRef.current.onSegmentDragged(segmentId, [grab.lat, grab.lng], toLatLng(e));
+  };
+  const onUp = (e: PointerEvent) => finish(e, true);
+  const onCancel = (e: PointerEvent) => finish(e, false);
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onCancel);
+}
+
+/** The ends of the dashed drag guide: on the road for a via point, as placed for start/finish. */
+function onRoadOrStart(draft: RouteDraft, index: number): LatLng {
+  const last = draft.waypoints.length - 1;
+  return index === 0 || index === last ? draft.waypoints[index].position : onRoadPosition(draft, index);
+}
+
 export default function BuilderMap(props: BuilderMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef(new Map<string, { marker: L.Marker; iconKey: string }>());
   const linesRef = useRef(new Map<string, { line: L.Polyline; hit: L.Polyline }>());
   const draggingRef = useRef<string | null>(null);
+  /** True for a moment after a line drag, so the click that ends it does not add a point too. */
+  const suppressClickRef = useRef(false);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -209,8 +316,12 @@ export default function BuilderMap(props: BuilderMapProps) {
       const id = seg.id;
       hit.on("click", (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
+        if (suppressClickRef.current) return;
         propsRef.current.onSegmentTap(id, [e.latlng.lat, e.latlng.lng]);
       });
+      (hit.getElement() as SVGElement | undefined)?.addEventListener("pointerdown", (e) =>
+        startLineDrag(map, e, id, propsRef, suppressClickRef),
+      );
       lines.set(seg.id, { line, hit });
     }
     for (const [id, { line, hit }] of lines) {
@@ -233,9 +344,10 @@ export default function BuilderMap(props: BuilderMapProps) {
       const kind: WaypointKind = i === 0 ? "start" : i === waypoints.length - 1 ? "finish" : "via";
       const selected = wp.id === props.selectedId;
       const iconKey = `${kind}|${i}|${selected}`;
+      const shown = kind === "via" ? onRoadPosition(props.draft, i) : wp.position;
       const existing = markers.get(wp.id);
       if (existing) {
-        if (draggingRef.current !== wp.id) existing.marker.setLatLng(wp.position);
+        if (draggingRef.current !== wp.id) existing.marker.setLatLng(shown);
         if (existing.iconKey !== iconKey) {
           existing.marker.setIcon(waypointIcon(kind, String(i), selected));
           existing.marker.setZIndexOffset(kind === "start" ? 500 : selected ? 1000 : 0);
@@ -243,7 +355,7 @@ export default function BuilderMap(props: BuilderMapProps) {
         }
         return;
       }
-      const marker = L.marker(wp.position, {
+      const marker = L.marker(shown, {
         icon: waypointIcon(kind, String(i), selected),
         draggable: true,
         autoPan: true,

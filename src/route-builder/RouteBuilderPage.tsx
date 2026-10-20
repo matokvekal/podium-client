@@ -68,6 +68,7 @@ import {
   closeLoop,
   draftStats,
   draftToEventRoute,
+  dragSegment,
   emptyDraft,
   importTrack,
   insertOnSegment,
@@ -237,6 +238,15 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
 
   const onWaypointMoved = useCallback(
     (id: string, position: LatLng) => edit((d) => moveWaypoint(d, id, position)),
+    [edit],
+  );
+
+  const onSegmentDragged = useCallback(
+    (segmentId: string, grab: LatLng, drop: LatLng) => {
+      edit((d) => dragSegment(d, segmentId, grab, drop));
+      setSelectedId(null);
+      vibrate();
+    },
     [edit],
   );
 
@@ -435,6 +445,7 @@ export function RouteBuilderPage({ forRide }: { forRide?: BuilderForRide } = {})
             onWaypointTap={(id) => setSelectedId((cur) => (cur === id ? null : id))}
             onWaypointMoved={onWaypointMoved}
             onSegmentTap={onSegmentTap}
+            onSegmentDragged={onSegmentDragged}
             onViewChange={onViewChange}
           />
         )}
